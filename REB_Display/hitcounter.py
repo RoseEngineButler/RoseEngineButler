@@ -817,14 +817,27 @@ class HandlerClass:
         c.mdi(GcodeStr1)
         c.mdi(GcodeStr2)
 
+        # M19 orients to an absolute angle, not a relative step, so compute
+        # the next target from the spindle's actual current angle rather
+        # than sending Sp0_Idx_Deg itself as R each time (which would just
+        # re-target the same fixed angle on every press).
+        current_angle = (hal.get_value('spindle.0-position-fb') % 1.0) * 360.0
+        target_angle = (current_angle + self.Sp0_Idx_Deg) % 360.0
+
         # Send MDI command to start spindles rotating.
-        GcodeStr3 = "M19 R" + str(self.Sp0_Idx_Deg) + " Q10 P1 $0"
+        # NOTE: P0 = shortest path. Forcing a specific CW/CCW direction
+        # (P1/P2) was tried and empirically always took the long ~270 deg
+        # way around to reach the same (correct) target angle - see the
+        # live HAL trace analysis in conversation. P0 takes the direct
+        # ~90 deg route to the same destination.
+        GcodeStr3 = "M19 R" + str(target_angle) + " Q20 P0 $0"
         print(GcodeStr3)
         c.mdi(GcodeStr3)
 
-        GcodeStr4 = "M19 R" + str(self.Sp0_Idx_Deg) + " Q10 P1 $1"
-        print(GcodeStr4)
-        c.mdi(GcodeStr4)
+        # NOTE: no M19 for $1 (Sp1) here - Sp1 has no orient HAL wiring
+        # (deferred, see conversation), so an M19 for it can never report
+        # is-oriented and would just burn the full Q20 wait every press
+        # before failing. Re-add once Sp1's orient chain is built out.
 
         # Wait for the command to complete
         c.wait_complete()
@@ -873,13 +886,19 @@ class HandlerClass:
         c.mdi(GcodeStr1)
         c.mdi(GcodeStr2)
 
-        # Send MDI commands to start spindles rotating.
-        GcodeStr3 = "M19 R" + str(self.Sp0_Idx_Deg) + " Q10 P2 $0"
-        print(GcodeStr3)
-        GcodeStr4 = "M19 R" + str(Sp1_Idx_Deg) + " Q10 P1 $1"
-        print(GcodeStr4)
+        # See Sp0_Move_Idx_Fwd for why the target is computed from the
+        # spindle's actual current angle rather than sent as a fixed R value.
+        current_angle = (hal.get_value('spindle.0-position-fb') % 1.0) * 360.0
+        target_angle = (current_angle - self.Sp0_Idx_Deg) % 360.0
 
+        # Send MDI commands to start spindles rotating.
+        # NOTE: P0 = shortest path - see matching note in Sp0_Move_Idx_Fwd.
+        GcodeStr3 = "M19 R" + str(target_angle) + " Q20 P0 $0"
+        print(GcodeStr3)
         c.mdi(GcodeStr3)
+
+        # NOTE: no M19 for $1 (Sp1) here - see matching note in
+        # Sp0_Move_Idx_Fwd.
 
         # Wait for the command to complete
         c.wait_complete()

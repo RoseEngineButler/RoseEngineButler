@@ -101,6 +101,7 @@ loadrt hostmot2
 loadrt hm2_eth board_ip="192.168.1.121" config="num_encoders=0 num_pwmgens=0 num_stepgens=8"
 loadrt orient
 loadrt sum2
+loadrt mux2
 loadrt pid names=pid.x,pid.z,pid.b,pid.u,pid.v,pid.w,pid.s0,pid.s1,pid.p0,orient.0-pid
 
 addf hm2_7i92.0.read                        servo-thread
@@ -676,12 +677,14 @@ setp pid.w.maxoutput                        [JOINT_5]MAX_OUTPUT
 
 addf orient.0                               servo-thread
 addf pid.p0.do-pid-calcs                    servo-thread
+addf mux2.0                                 servo-thread
 
 # ********************************************************************
 #  Connect signals to pins
 
 net machine-is-on                        => hm2_7i92.0.stepgen.06.enable
 
+net orient.0-angle                      <=  spindle.0.orient-angle
 net orient.0-angle                       => orient.0.angle
 
 net orient.0-command                     => orient.0-pid.command
@@ -717,8 +720,9 @@ net spindle.0-manual-stop                   halui.spindle.0.stop
 
 net spindle.0-output                    <=  sum2.0.out
 
-net spindle.0-output-pos				<=  pid.p0.output  
+net spindle.0-output-pos				<=  pid.p0.output
 net spindle.0-output-pos				 => sum2.0.in1
+net spindle.0-output-pos				 => mux2.0.in1
 
 net spindle.0-output-vel  				<=  pid.s0.output
 net spindle.0-output-vel  				 => sum2.0.in0
@@ -732,6 +736,7 @@ net spindle.0-pos-cmd                    => pid.p0.command
 net spindle.0-pos-mode-enable           <=  spindle.0.orient
 net spindle.0-pos-mode-enable            => orient.0.enable
 net spindle.0-pos-mode-enable            => pid.p0.enable
+net spindle.0-pos-mode-enable            => mux2.0.sel
 
 net spindle.0-position-fb              <=  hm2_7i92.0.stepgen.06.position-fb
 net spindle.0-position-fb               => orient.0.position
@@ -744,7 +749,13 @@ net spindle.0-vel-cmd-rpm                => pid.s0.command
 net spindle.0-vel-cmd-rpm-abs           <=  spindle.0.speed-out-abs
 
 net spindle.0-vel-cmd-rps               <=  spindle.0.speed-out-rps
-net spindle.0-vel-cmd-rps                => hm2_7i92.0.stepgen.06.velocity-cmd
+net spindle.0-vel-cmd-rps                => mux2.0.in0
+
+# mux2.0 selects between normal spindle speed (mux2.0.in0, sel=FALSE) and
+# the orient position-PID output (mux2.0.in1, sel=TRUE while spindle.0.orient
+# is active during an M19 move) - see spindle.0-pos-mode-enable above.
+net spindle.0-vel-cmd-final              <=  mux2.0.out
+net spindle.0-vel-cmd-final               => hm2_7i92.0.stepgen.06.velocity-cmd
 
 net spindle.0-vel-cmd-rps-abs          <=  spindle.0.speed-out-rps-abs
 
@@ -772,6 +783,7 @@ setp pid.p0.bias                            [SPINDLE_0]BIAS_POS
 setp pid.p0.FF0                             [SPINDLE_0]FF0_POS
 setp pid.p0.FF1                             [SPINDLE_0]FF1_POS
 setp pid.p0.FF2                             [SPINDLE_0]FF2_POS
+setp orient.0.tolerance                     [SPINDLE_0]ORIENT_TOLERANCE
 setp pid.p0.maxoutput                       [SPINDLE_0]MAX_OUTPUT_POS
 
 setp pid.s0.Pgain                           [SPINDLE_0]P_VEL

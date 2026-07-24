@@ -117,15 +117,19 @@ FF2_VEL              = 0.0
 
 MAX_OUTPUT_VEL       = 10.0
 
-P_POS                = 35
+P_POS                = 1.0
 I_POS                = 20
 D_POS                = 1.2
 BIAS_POS             = 0.0
-FF0_POS              = 1.0
+FF0_POS              = 0.0
 FF1_POS              = 0.0
 FF2_POS              = 0.0
 
-MAX_OUTPUT_POS		 = 2.0
+MAX_OUTPUT_POS		 = 1.0
+
+# How close (in degrees) orient must get to the target angle before M19
+# reports the spindle as oriented.
+ORIENT_TOLERANCE     = 0.1
 
 # For the StepperOnline DM542T Digital Stepper Drive 
 # These are 5 μs = 5,000 ns
