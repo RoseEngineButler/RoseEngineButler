@@ -162,7 +162,7 @@ class HandlerClass:
 
         for axis_id, stepgen_ch in AXIS_STEPGEN.items():
             match = re.search(
-                r'<axis\s+id="' + re.escape(axis_id) + r'">\s*<scale>([\d.]+)</scale>',
+                r'<axis\s+id="' + re.escape(axis_id) + r'">\s*<scale>(-?[\d.]+)</scale>',
                 xml_text
             )
             if not match:

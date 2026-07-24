@@ -63,7 +63,7 @@ def main():
 
         pattern = (
             r'(<axis\s+id="' + re.escape(axis_id) + r'">\s*<scale>)'
-            r'[\d.]+'
+            r'-?[\d.]+'
             r'(</scale>)'
         )
         new_text, count = re.subn(
