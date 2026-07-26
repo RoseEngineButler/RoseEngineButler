@@ -107,6 +107,65 @@ def idx_log(msg):
     except Exception:
         pass
 
+def _clear_ena_override(axis_id):
+    # The *_Set_Ena handlers fire from whichever component owns that
+    # axis's ENA button (the main panel, "gladevcp") - but the real,
+    # netted *_Ena_Override pin (see REB_PostGUI.hal) lives on the
+    # Settings tab's component ("REBCnfg"), a different process. Writing
+    # to self.halcomp there would only touch this component's own,
+    # unconnected pin of the same name - a no-op. Cross the process
+    # boundary via halcmd instead, the same way Sp0_Set_Scale already
+    # does in the other direction for *_ENA_Status.
+    #
+    # Once a pin is netted to a signal, halcmd can't "setp" the pin
+    # directly ("pin is connected to a signal") - the signal itself has
+    # to be set instead, via "halcmd sets". The signal name follows the
+    # <axis>-ena-settings-allow convention in REB_PostGUI.hal.
+    hal_signal = axis_id.lower() + "-ena-settings-allow"
+    idx_log("_clear_ena_override(" + axis_id + ") -> " + hal_signal)
+
+    # Was the override actually blocking anything? Only true right after
+    # a scale change (Set_Scale) forced it False. If it's already True,
+    # this ENA press is routine day-to-day toggling and must be left
+    # alone below - forcing the panel bit in that case would turn
+    # "click to disable" into a no-op.
+    was_blocked = False
+    try:
+        result = subprocess.run(["halcmd", "gets", hal_signal], check=True, capture_output=True, text=True)
+        was_blocked = result.stdout.strip().upper() not in ("TRUE", "1")
+    except subprocess.CalledProcessError as e:
+        idx_log("Error reading " + hal_signal + ": " + str(e.stderr))
+    except FileNotFoundError:
+        idx_log("halcmd not found - is the LinuxCNC environment sourced?")
+
+    try:
+        subprocess.run(["halcmd", "sets", hal_signal, "TRUE"], check=True, capture_output=True, text=True)
+        idx_log("Set " + hal_signal + " = TRUE")
+    except subprocess.CalledProcessError as e:
+        idx_log("Error setting " + hal_signal + ": " + str(e.stderr))
+    except FileNotFoundError:
+        idx_log("halcmd not found - is the LinuxCNC environment sourced?")
+
+    if was_blocked:
+        # The same ENA press that got us here also clocks the flipflop's
+        # own toggle bit (REB_PostGUI.hal) via the ordinary clk input -
+        # since that bit never moved while the override was blocking
+        # things, this click would otherwise flip a previously-on panel
+        # state OFF, undoing the very re-enable just requested (this is
+        # exactly the "press ENA and nothing happens, need a confusing
+        # second press" behavior from live testing). Force the panel bit
+        # on deterministically via the flipflop's own set/reset override
+        # pins instead of leaving it to toggle-parity guesswork.
+        flip_set_pin = axis_id.lower() + "-ena-flip.set"
+        try:
+            subprocess.run(["halcmd", "setp", flip_set_pin, "TRUE"], check=True, capture_output=True, text=True)
+            subprocess.run(["halcmd", "setp", flip_set_pin, "FALSE"], check=True, capture_output=True, text=True)
+            idx_log("Forced " + axis_id.lower() + "-ena-panel ON (override had been blocking)")
+        except subprocess.CalledProcessError as e:
+            idx_log("Error pulsing " + flip_set_pin + ": " + str(e.stderr))
+        except FileNotFoundError:
+            idx_log("halcmd not found - is the LinuxCNC environment sourced?")
+
 def _show_no_spindle_enabled_popup(widget):
     dialog = Gtk.MessageDialog(
         transient_for=widget.get_toplevel(),
@@ -194,6 +253,36 @@ class HandlerClass:
         if widget is not None:
             widget.set_active(active)
         return False
+
+    def _sync_run_operation_buttons(self):
+        '''
+        Keeps the Run Operation tab's Fwd/Rev buttons visually depressed
+        for as long as the spindle is actually running in that
+        direction, reading the real HAL state (spindle.0.forward /
+        spindle.0.reverse) rather than just whatever the last click did -
+        so the button reflects reality even if a move ends some other
+        way (e.g. M5 from elsewhere, a fault, etc). Runs on a timer
+        rather than once, since gladevcp has no built-in live binding
+        for an arbitrary read-only HAL pin like this (unlike HAL_LED,
+        which is built for exactly this but doesn't give a "look
+        pressed" visual).
+
+        set_active() here only fires "toggled", not "pressed" - so this
+        can't re-trigger Sp0_Move_Fwd/Rev's own M3/M4 gcode, which is
+        wired to "pressed".
+
+        Only the main panel component has these widgets; every other
+        tab/panel finds them missing and this becomes a no-op (but the
+        timer itself, once started, keeps calling it - see __init__).
+        '''
+        fwd = self.builder.get_object('Sp0_Move_Fwd')
+        rev = self.builder.get_object('Sp0_Move_Rev')
+        if fwd is None or rev is None:
+            return False
+
+        fwd.set_active(bool(hal.get_value('spindle.0.forward')))
+        rev.set_active(bool(hal.get_value('spindle.0.reverse')))
+        return True
 
     def _load_scale_settings(self):
         '''
@@ -498,6 +587,25 @@ class HandlerClass:
             print("Error setting " + hal_pin + ": " + e.stderr)
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
+
+#######################################################################
+# B_Set_Ena
+# Purpose:              Clears this axis's Ena_Override veto whenever
+#                           the ENA button is pressed, so an axis that
+#                           was force-disabled by a scale change
+#                           (B_Set_Scale) can be re-enabled by the
+#                           operator afterward. Does not touch the
+#                           panel's own toggle state - see
+#                           REB_PostGUI.hal for the flip-flop that
+#                           tracks that.
+# ---------------------------------------------------------------------
+# Called from:
+#   UI:                 REB_Panel
+#   Button:             B_ENA
+#   Signal:             GtkButton/pressed
+#######################################################################
+    def B_Set_Ena(self,widget):
+        _clear_ena_override('B')
 
 #######################################################################
 # B_Set_Idx_Dist
@@ -1309,6 +1417,18 @@ class HandlerClass:
         print("=================================================")
         print("FUNCTION Sp0_Set_Scale")
 
+        # Stop any Run Operation spindle rotation (M3/M4) before this
+        # scale change lands - a large change to position-scale while
+        # the spindle is actively spinning under S-word/M3/M4 control
+        # could otherwise cause a runaway once the new scale takes
+        # effect (see conversation).
+        s.poll()
+        if s.task_state != linuxcnc.MODE_MDI:
+                c.mode(linuxcnc.MODE_MDI)
+                c.wait_complete()
+        c.mdi("M5")
+        c.wait_complete()
+
         Sp0_Scale = round(widget.get_value(), 1)
 
         # Sp0_ENA_Status belongs to the main panel's HAL component
@@ -1354,6 +1474,13 @@ class HandlerClass:
             print("Error setting " + hal_pin + ": " + e.stderr)
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
+
+#######################################################################
+# Sp0_Set_Ena
+# Purpose:              See B_Set_Ena - same pattern, for Sp0.
+#######################################################################
+    def Sp0_Set_Ena(self,widget):
+        _clear_ena_override('Sp0')
 
 # ********************************************************************
 #  SSSSSS  PPPPPPP  IIIIIIII N     NN DDDDDDD  LL       EEEEEEEE  1111
@@ -1498,6 +1625,15 @@ class HandlerClass:
         print("=================================================")
         print("FUNCTION Sp1_Set_Scale")
 
+        # See Sp0_Set_Scale for why this stops Run Operation rotation
+        # before the scale change lands.
+        s.poll()
+        if s.task_state != linuxcnc.MODE_MDI:
+                c.mode(linuxcnc.MODE_MDI)
+                c.wait_complete()
+        c.mdi("M5")
+        c.wait_complete()
+
         Sp1_Scale = round(widget.get_value(), 1)
 
         # Sp1_ENA_Status belongs to the main panel's HAL component
@@ -1543,6 +1679,14 @@ class HandlerClass:
             print("Error setting " + hal_pin + ": " + e.stderr)
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
+
+#######################################################################
+# Sp1_Set_Ena
+# Purpose:              See B_Set_Ena - same pattern, for Sp1.
+#######################################################################
+    def Sp1_Set_Ena(self,widget):
+        _clear_ena_override('Sp1')
+
 
 # ********************************************************************
 #    AA    XX    XX IIIIIIII  SSSSSS      UU    UU
@@ -1798,6 +1942,13 @@ class HandlerClass:
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
 
+#######################################################################
+# U_Set_Ena
+# Purpose:              See B_Set_Ena - same pattern, for U.
+#######################################################################
+    def U_Set_Ena(self,widget):
+        _clear_ena_override('U')
+
 # ********************************************************************
 #    AA    XX    XX IIIIIIII  SSSSSS      VV    VV
 #   AAAA    XX  XX    II     SS    SS     VV    VV
@@ -2051,6 +2202,14 @@ class HandlerClass:
             print("Error setting " + hal_pin + ": " + e.stderr)
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
+
+#######################################################################
+# V_Set_Ena
+# Purpose:              See B_Set_Ena - same pattern, for V.
+#######################################################################
+    def V_Set_Ena(self,widget):
+        _clear_ena_override('V')
+
 
 # ********************************************************************
 #    AA    XX    XX IIIIIIII  SSSSSS      WW       WW
@@ -2306,6 +2465,14 @@ class HandlerClass:
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
 
+#######################################################################
+# W_Set_Ena
+# Purpose:              See B_Set_Ena - same pattern, for W.
+#######################################################################
+    def W_Set_Ena(self,widget):
+        _clear_ena_override('W')
+
+
 # ********************************************************************
 #    AA    XX    XX IIIIIIII  SSSSSS      YY    YY
 #   AAAA    XX  XX    II     SS    SS      YY  YY
@@ -2559,6 +2726,14 @@ class HandlerClass:
             print("Error setting " + hal_pin + ": " + e.stderr)
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
+
+#######################################################################
+# X_Set_Ena
+# Purpose:              See B_Set_Ena - same pattern, for X.
+#######################################################################
+    def X_Set_Ena(self,widget):
+        _clear_ena_override('X')
+
 
 # ********************************************************************
 #    AA    XX    XX IIIIIIII  SSSSSS      ZZZZZZZZ
@@ -2815,6 +2990,14 @@ class HandlerClass:
             print("halcmd not found - is the LinuxCNC environment sourced?")
 
 #######################################################################
+# Z_Set_Ena
+# Purpose:              See B_Set_Ena - same pattern, for Z.
+#######################################################################
+    def Z_Set_Ena(self,widget):
+        _clear_ena_override('Z')
+
+
+#######################################################################
 # __init__
 # Purpose:              This is used to initialize everything.
 # Updated:              ver 1.0, 21 July 2026, R. Colvin
@@ -2840,7 +3023,17 @@ class HandlerClass:
         # axis disabled from this tab regardless of what the main
         # panel's own enable button is doing. Each defaults to "allow
         # enabled". ANDed with the panel button per-axis in
-        # REB_PostGUI.hal (REBHlp.<Axis>_Ena_Override).
+        # REB_PostGUI.hal (REBCnfg.<Axis>_Ena_Override).
+        #
+        # HAL_IO, not HAL_OUT: this component's own Set_Scale handlers
+        # clear an axis to False, but re-arming it happens from the main
+        # panel's ENA button - a different process - via
+        # `halcmd setp REBCnfg.<Axis>_Ena_Override TRUE` (see
+        # _clear_ena_override). An OUT pin can only ever be driven by
+        # its owning component; halcmd setp on one fails outright
+        # ("pin is not writable"). IO allows the legitimate external
+        # write while this component's own self.halcomp[...] = value
+        # writes still work exactly the same as before.
         #
         # Per the GladeVCP docs, an output pin must be created via
         # hal_glib.GPin(halcomp.newpin(...)) - not a bare newpin() -
@@ -2851,7 +3044,7 @@ class HandlerClass:
         for axis_id in AXIS_STEPGEN:
             pin_name = axis_id + "_Ena_Override"
             self._ena_override_pins[axis_id] = hal_glib.GPin(
-                self.halcomp.newpin(pin_name, hal.HAL_BIT, hal.HAL_OUT)
+                self.halcomp.newpin(pin_name, hal.HAL_BIT, hal.HAL_IO)
             )
             self.halcomp[pin_name] = True
 
@@ -2890,6 +3083,12 @@ class HandlerClass:
         # here directly).
         GLib.idle_add(self._set_checkbox_active, 'Sp0_Set_Idx_OnOff', self.Sp0_Idx_Bool)
         GLib.idle_add(self._set_checkbox_active, 'Sp1_Set_Idx_OnOff', self.Sp1_Idx_Bool)
+
+        # Keep the Run Operation tab's Fwd/Rev buttons showing pressed
+        # for as long as the spindle is actually running that direction
+        # (see _sync_run_operation_buttons). No-ops itself out after one
+        # call in every component other than the main panel.
+        GLib.timeout_add(100, self._sync_run_operation_buttons)
 
         self.U_Feed         = 1.0       # U axis feed rate
         self.U_Idx_Dist     = 0.0       # U axis index distance

@@ -266,6 +266,7 @@
                 <property name="receives-default">True</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
+              <signal name="pressed" handler="Sp0_Set_Ena" swapped="no"/>
               </object>
               <packing>
                 <property name="left-attach">1</property>
@@ -300,6 +301,7 @@
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
+              <signal name="pressed" handler="Sp1_Set_Ena" swapped="no"/>
               </object>
               <packing>
                 <property name="left-attach">1</property>
@@ -307,7 +309,7 @@
               </packing>
             </child>
             <child>
-              <object class="HAL_Button" id="Sp0_Move_Rev">
+              <object class="HAL_ToggleButton" id="Sp0_Move_Rev">
                 <property name="visible">True</property>
                 <property name="can-focus">True</property>
                 <property name="receives-default">True</property>
@@ -324,7 +326,7 @@
               </packing>
             </child>
             <child>
-              <object class="HAL_Button" id="Sp0_Move_Fwd">
+              <object class="HAL_ToggleButton" id="Sp0_Move_Fwd">
                 <property name="visible">True</property>
                 <property name="can-focus">True</property>
                 <property name="receives-default">True</property>
@@ -1394,6 +1396,7 @@ feed rate</property>
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
+              <signal name="pressed" handler="X_Set_Ena" swapped="no"/>
               </object>
               <packing>
                 <property name="left-attach">1</property>
@@ -1426,6 +1429,7 @@ feed rate</property>
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
+              <signal name="pressed" handler="Z_Set_Ena" swapped="no"/>
               </object>
               <packing>
                 <property name="left-attach">1</property>
@@ -1444,6 +1448,7 @@ feed rate</property>
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
+              <signal name="pressed" handler="U_Set_Ena" swapped="no"/>
               </object>
               <packing>
                 <property name="left-attach">1</property>
@@ -1462,6 +1467,7 @@ feed rate</property>
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
+              <signal name="pressed" handler="V_Set_Ena" swapped="no"/>
               </object>
               <packing>
                 <property name="left-attach">1</property>
@@ -1480,6 +1486,7 @@ feed rate</property>
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
+              <signal name="pressed" handler="W_Set_Ena" swapped="no"/>
               </object>
               <packing>
                 <property name="left-attach">1</property>
@@ -1999,6 +2006,7 @@ feed rate</property>
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
+              <signal name="pressed" handler="B_Set_Ena" swapped="no"/>
               </object>
               <packing>
                 <property name="left-attach">1</property>
