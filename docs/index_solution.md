@@ -13,8 +13,9 @@ code understands the reasoning instead of just seeing a diff.
 
 Problems 1–8 below were found and fixed against **Sp0 only**. Problem 9
 covers building the equivalent chain for **Sp1** afterward, by mirroring
-the Sp0 fixes — see that section for what's shared and what's still
-untested.
+the Sp0 fixes. Problem 10 covers the bugs found once Sp1 was actually
+live-tested on hardware, plus two Indexing-panel bugs (checkbox state,
+Deg/Div toggle) that surfaced during that same testing session.
 
 ## How indexing works, mechanically
 
@@ -294,28 +295,88 @@ underlying state said "don't index," until each box was toggled once.
 `self.Sp0_Idx_Bool` is true, and the `$1` M19 only if `self.Sp1_Idx_Bool`
 is true — each computed from that spindle's *own* live position
 (`spindle.0-position-fb` / `spindle.1-position-fb` respectively; they can
-be at completely different absolute angles). The two booleans' `__init__`
-defaults were changed from `False` to `True` to match the checkboxes'
-default-checked appearance.
+be at completely different absolute angles).
 
-**⚠ Not yet validated on real Sp1 hardware.** Everything in Problems 1–8
-was iteratively live-tested against physical Sp0 motion over the course
-of this work. Sp1's chain has been built by careful analogy and code
-review, but Sp1 has never actually been commanded to orient. Before
-relying on it:
+**Status: since superseded.** Sp1 has since been live-tested on real
+hardware — see Problem 10, which also corrects the checkbox-default claim
+originally made here (only `Sp0_Idx_Bool`'s default actually changed to
+`True`; `Sp1_Idx_Bool` stayed `False`, for reasons explained there).
 
-- Test with only the Sp0 checkbox on first, then only Sp1, before both
-  together.
-- Watch the first few Sp1 moves closely (e-stop within reach) the way
-  Sp0's first moves were watched in this session — oscillation
-  (Problem 2), runaway (Problem 3), or a wrong destination (Problem 4)
-  are exactly the failure modes that live testing caught for Sp0, and
-  none of that testing has happened for Sp1 yet.
-- `P_POS = 1.0` is conservative relative to Sp1's own
-  `STEPGEN_MAXACCEL`/`MAX_OUTPUT_POS` (see "A note on which files were
-  edited" for how those ceilings differ between the prototype and
-  `RoseEngineButlerLocal` copies), so it's unlikely to oscillate, but the
-  convergence speed and final accuracy have not been measured.
+## Problem 10: bugs found live-testing Sp1 on hardware
+
+**Context:** this is the first time Sp1's chain (built in Problem 9) was
+actually commanded to orient on the real machine. It converged correctly
+— no oscillation, runaway, or wrong-destination behavior, so the gains
+carried over by analogy in Problem 9 held up as-is with no retuning.
+Live testing did surface four Python-side bugs, unrelated to the HAL/PID
+work, all fixed in the same session in
+`REB_Display/hitcounter.py`.
+
+**Bug A — index checkboxes drifted out of sync with the display.**
+`Sp0_Set_Idx_OnOff`/`Sp1_Set_Idx_OnOff` blindly flipped their own
+`self.SpN_Idx_Bool` flag every time the handler ran, on the assumption
+the GTK `toggled` signal fires exactly once per click. It doesn't
+reliably, so the tracked flag could silently end up opposite of what the
+checkbox visually showed. **Fix:** both handlers now read the checkbox's
+actual state directly (`widget.get_active()`) instead of flipping a
+separately-tracked bool.
+
+This also forced a correction to the Problem 9 checkbox-default fix:
+`Sp0_Idx_Bool`'s `__init__` default was changed `False` → `True`, but
+live testing showed the `Sp0_Set_Idx_OnOff` checkbox *does* reliably
+render checked from the `.ui` file's `active="True"` alone, while the
+`Sp1_Set_Idx_OnOff` checkbox does **not** — it renders unchecked
+regardless of the `.ui` default. So `Sp1_Idx_Bool`'s default was left at
+`False` (matching what the box actually shows at launch), not changed to
+`True` as Problem 9 originally described. A `_set_checkbox_active()`
+helper, deferred via `GLib.idle_add()` so it runs after gladevcp's own
+startup sequence has settled (setting it directly during `__init__` was
+tried and didn't stick), now force-syncs both checkboxes to their
+`self.SpN_Idx_Bool` defaults once the panel is interactive.
+
+**Bug B — Sp0 and Sp1 M19s sent back-to-back interfered with each other.**
+With both checkboxes on, the `$0` and `$1` M19 commands were both queued
+via `c.mdi()` before a single trailing `c.wait_complete()` — and only Sp0
+actually moved. **Fix:** each M19 now gets its own `c.wait_complete()`
+immediately after it's sent, so Sp1's move doesn't start until Sp0's has
+fully resolved.
+
+**Bug C — Deg/Div toggle silently canceled itself out.**
+`Sp0_Set_Idx_bW_Deg`/`Sp0_Set_Idx_bW_Div` are a GTK radio-button pair
+sharing one `toggled` handler (`Sp0_Set_Idx_DegDiv`). Clicking either
+button fires that handler **twice** — once for the button becoming
+active, once for its sibling becoming inactive. The handler
+unconditionally toggled `self.Sp0_Idx_DegDiv` between `"Deg"`/`"Div"` on
+every call, so one click flipped it there and back — Div mode could
+never actually engage. **Fix:** the handler now checks
+`widget.get_active()` and ignores the "going inactive" call, and sets
+the mode directly from which button fired (`Gtk.Buildable.get_name(widget)
+== "Sp0_Set_Idx_bW_Div"`) rather than toggling blindly. Separately,
+`Sp0_Set_Idx_Dist` (the distance spinner) previously only recomputed
+`self.Sp0_Idx_Deg` inside the mode-toggle handler, so changing the
+distance while already in Div mode had no effect on the actual move size
+until the mode was toggled again — it now recomputes `Sp0_Idx_Deg` itself
+whenever the distance changes.
+
+**Smaller fixes made alongside the above:**
+- A busy ("wait") cursor is now shown for the duration of the blocking
+  `c.wait_complete()` calls in both index handlers, so the UI doesn't
+  look hung during a multi-second M19 move.
+- Pressing Fwd/Rev with neither Sp0 nor Sp1 checked now shows a "No
+  spindle is enabled" popup and aborts, instead of silently doing
+  nothing.
+- The temporary `idx_log()` helper (file-backed logging, added because
+  `print()` goes nowhere when the panel launches with `Terminal=false`)
+  was extended to cover the index/DegDiv/OnOff handlers touched here,
+  alongside the two functions it already covered.
+
+**Net result:** Sp0 and Sp1 can now both be tested independently or
+together via their checkboxes, with correct per-spindle sequencing, a
+working Deg/Div mode toggle, and UI feedback during moves. The
+"watch closely, e-stop within reach" caution from Problem 9 applied
+during this testing and can be considered satisfied for Sp1's core
+orient/PID chain; it was the surrounding Python state-handling that had
+bugs, not the HAL wiring or gains from Problem 9.
 
 ## A note on which files were edited
 
@@ -384,3 +445,10 @@ slowly than what was observed during this session, and may want to retune
   pre-existing bug where `Sp0_Move_Idx_Rev` referenced an undefined
   variable and never actually sent its `$1` command (unrelated to the
   indexing behavior itself, but discovered and fixed along the way).
+  Problem 10 (Sp1 hardware live-testing) added: per-M19
+  `c.wait_complete()` sequencing, `widget.get_active()`-based checkbox
+  state reading in `Sp0_Set_Idx_OnOff`/`Sp1_Set_Idx_OnOff`, the
+  `_set_checkbox_active()`/`GLib.idle_add()` startup-sync fix, the
+  `Sp0_Set_Idx_DegDiv` double-fire fix and `Sp0_Set_Idx_Dist` recompute
+  fix, `_set_busy_cursor()`, `_show_no_spindle_enabled_popup()`, and
+  extending `idx_log()` into the touched handlers.
