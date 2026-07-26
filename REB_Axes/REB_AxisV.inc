@@ -100,7 +100,11 @@ MAX_ACCELERATION     = 20.0
 # ********************************************************************
 # STEPPER MOTOR SETTINGS
 
-STEPGEN_MAXACCEL     = 0.5
+# See REB_AxisX.inc for why STEPGEN_MAXACCEL changed (was lower than
+# MAX_ACCELERATION above, backwards). STEPGEN_MAXVEL is unchanged -
+# with STEP_SCALE=20320 steps/in this axis's hardware ceiling is ~9.8
+# in/sec, well above 1.25, so no clipping here.
+STEPGEN_MAXACCEL     = 30
 STEPGEN_MAXVEL       = 1.25
 
 # ********************************************************************
@@ -125,11 +129,14 @@ MAX_OUTPUT           = 10.0
 OUTPUT_SCALE         = 1.000
 OUTPUT_OFFSET        = 0.000
 
-P                    = 35
-I                    = 20
+# See REB_AxisX.inc: these matched Sp0/Sp1's velocity-loop gains
+# (never independently tuned for a position loop) with FF1=0 forcing
+# P+I alone to do all the tracking, causing overshoot-then-slow-correct.
+P                    = 5
+I                    = 1
 D                    = 1.2
 FF0                  = 0.0
-FF1                  = 0.0
+FF1                  = 1.0
 FF2                  = 0.0
 
 # For the StepperOnline DM542T Digital Stepper Drive 

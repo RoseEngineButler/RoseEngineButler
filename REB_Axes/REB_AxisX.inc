@@ -102,8 +102,24 @@ MAX_ACCELERATION     = 20.0
 # STEPPER MOTOR SETTINGS
 #
 
-STEPGEN_MAXACCEL     = 0.5
-STEPGEN_MAXVEL       = 1.25
+# Was 0.5 - lower than MAX_ACCELERATION (20.0) above, backwards from
+# normal practice (stepgen limits should exceed trajectory limits with
+# margin, same as STEPGEN_MAXVEL vs MAX_VELOCITY below). This let the
+# trajectory planner demand more acceleration than the stepgen could
+# ever deliver, producing a large following error at the start of every
+# move that a P=35 loop then fought hard to correct, overshooting into
+# oscillation. Raised to 1.5x MAX_ACCELERATION as a conservative
+# starting point - retest live and retune from here.
+STEPGEN_MAXACCEL     = 30
+
+# Was 1.25 - with STEP_SCALE ~195900 steps/in (see RoseEngineButlerLocal
+# copy) and STEPLEN+STEPSPACE = 5000ns/step, the hardware ceiling is
+# 1/5000ns = 200,000 steps/sec = ~1.02 in/sec. 1.25 in/sec required
+# ~244,875 steps/sec - more than hm2 could deliver, so it silently
+# clipped (see the "maxvel is too big" warning) - a saturating PID
+# output is a classic source of exactly the overshoot-then-slow-correct
+# behavior seen live. Set with margin below the ~1.02 in/sec ceiling.
+STEPGEN_MAXVEL       = 0.95
 
 # ********************************************************************
 # STANDARD VALUES
@@ -127,11 +143,19 @@ MAX_OUTPUT           = 10.0
 OUTPUT_SCALE         = 1.000
 OUTPUT_OFFSET        = 0.000
 
-P                    = 35
-I                    = 20
+# Were P=35, I=20, D=1.2, FF1=0.0 - identical to Sp0/Sp1's P_VEL/I_VEL/
+# D_VEL (a *velocity* loop), suggesting these were never independently
+# tuned for X's *position* loop. With FF1=0, P+I alone had to do all the
+# tracking work with nothing to lean on, causing overshoot followed by a
+# slow correction (classic integral-windup signature from I=20
+# accumulating error while feedforward wasn't helping it keep up). FF1
+# now does most of the velocity tracking; P/I only need to clean up
+# small residual error - retest live and retune from here.
+P                    = 5
+I                    = 1
 D                    = 1.2
 FF0                  = 0.0
-FF1                  = 0.0
+FF1                  = 1.0
 FF2                  = 0.0
 
 # For the StepperOnline DM542T Digital Stepper Drive 

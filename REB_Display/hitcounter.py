@@ -190,6 +190,68 @@ def _set_busy_cursor(widget, busy):
     while Gtk.events_pending():
         Gtk.main_iteration()
 
+# Used to show a plain HAL_Button as depressed/darkened while a move or
+# an operation is active (X_Idx_Minus/Plus, Sp0_Move_Fwd/Rev).
+# Deliberately NOT done via HAL_ToggleButton.set_active(): a real
+# GtkToggleButton also flips its own active state on click or on the
+# theme's native (and here, barely visible) "checked" rendering, and
+# for the blocking X_Idx_Minus/Plus case specifically, the
+# release-driven auto-flip happens right after our own code sets it
+# back to False - undoing it and leaving the button stuck depressed
+# (confirmed live). A custom CSS class on a plain, non-toggle button has
+# no such built-in behavior to fight - only this code ever touches it,
+# and the darkened background makes the state obvious regardless of
+# theme.
+_DEPRESS_CSS = b"""
+button.reb-depressed,
+button.reb-depressed:hover,
+button.reb-depressed:focus,
+button.reb-depressed:active {
+    background-color: shade(@theme_bg_color, 0.6);
+    background-image: none;
+    box-shadow: inset 2px 2px 4px rgba(0,0,0,0.6), inset -1px -1px 2px rgba(255,255,255,0.15);
+}
+"""
+
+def _install_depress_css():
+    try:
+        provider = Gtk.CssProvider()
+        provider.load_from_data(_DEPRESS_CSS)
+        screen = Gdk.Screen.get_default()
+        Gtk.StyleContext.add_provider_for_screen(
+            screen,
+            provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+        idx_log("_install_depress_css OK, screen=" + str(screen))
+    except Exception as e:
+        idx_log("_install_depress_css FAILED: " + str(e))
+
+def _set_depressed(widget, depressed):
+    ctx = widget.get_style_context()
+    was_depressed = ctx.has_class("reb-depressed")
+    if depressed:
+        ctx.add_class("reb-depressed")
+    else:
+        ctx.remove_class("reb-depressed")
+    # Only log actual transitions - the Run Operation poll calls this
+    # every 100ms regardless of whether anything changed, which was
+    # flooding idx_debug.log and triggering the monitor's own rate
+    # limiting.
+    if was_depressed != depressed:
+        idx_log("_set_depressed(" + Gtk.Buildable.get_name(widget) + ", " + str(depressed)
+                + ") classes=" + str(ctx.list_classes()))
+    # Force the style change to actually paint now, the same reason
+    # _set_busy_cursor does this - callers that bracket a blocking MDI
+    # call (X_Idx_Minus/Plus) would otherwise freeze the main loop
+    # before GTK gets a chance to repaint the new class, so the darkened
+    # look barely shows (confirmed live: "hardly noticeable"). Periodic
+    # callers (the Run Operation poll) don't strictly need this - they
+    # get repainted on the next idle cycle regardless - but it's
+    # harmless there too.
+    while Gtk.events_pending():
+        Gtk.main_iteration()
+
 class HandlerClass:
     '''
     class with gladevcp callback handlers
@@ -256,8 +318,8 @@ class HandlerClass:
 
     def _sync_run_operation_buttons(self):
         '''
-        Keeps the Run Operation tab's Fwd/Rev buttons visually depressed
-        for as long as the spindle is actually running in that
+        Keeps the Run Operation tab's Fwd/Rev buttons visually depressed/
+        darkened for as long as the spindle is actually running in that
         direction, reading the real HAL state (spindle.0.forward /
         spindle.0.reverse) rather than just whatever the last click did -
         so the button reflects reality even if a move ends some other
@@ -267,9 +329,11 @@ class HandlerClass:
         which is built for exactly this but doesn't give a "look
         pressed" visual).
 
-        set_active() here only fires "toggled", not "pressed" - so this
-        can't re-trigger Sp0_Move_Fwd/Rev's own M3/M4 gcode, which is
-        wired to "pressed".
+        Uses _set_depressed (a plain HAL_Button plus a CSS class), not
+        HAL_ToggleButton.set_active() - the theme's native "checked"
+        look for a toggle button wasn't visibly different enough to
+        read as "pressed" (confirmed live: hover-highlight only, no
+        visible change on click).
 
         Only the main panel component has these widgets; every other
         tab/panel finds them missing and this becomes a no-op (but the
@@ -280,8 +344,8 @@ class HandlerClass:
         if fwd is None or rev is None:
             return False
 
-        fwd.set_active(bool(hal.get_value('spindle.0.forward')))
-        rev.set_active(bool(hal.get_value('spindle.0.reverse')))
+        _set_depressed(fwd, bool(hal.get_value('spindle.0.forward')))
+        _set_depressed(rev, bool(hal.get_value('spindle.0.reverse')))
         return True
 
     def _load_scale_settings(self):
@@ -2508,20 +2572,26 @@ class HandlerClass:
         print("=================================================")
         print("FUNCTION X_Idx_Minus")
 
-        # Ensure the system is in MDI mode
-        s.poll()
-        if s.task_state != linuxcnc.MODE_MDI:
-                c.mode(linuxcnc.MODE_MDI)
-                c.wait_complete() # Wait for mode change to complete
+        # Depress the button for the duration of the move (see
+        # _set_depressed for why this isn't a HAL_ToggleButton).
+        _set_depressed(widget, True)
+        try:
+            # Ensure the system is in MDI mode
+            s.poll()
+            if s.task_state != linuxcnc.MODE_MDI:
+                    c.mode(linuxcnc.MODE_MDI)
+                    c.wait_complete() # Wait for mode change to complete
 
-        # Send an MDI command to move along the axis.
-        Gcode = "G0 X-" + str(self.X_Idx_Dist) + " F" + str(self.X_Feed)
+            # Send an MDI command to move along the axis.
+            Gcode = "G0 X-" + str(self.X_Idx_Dist) + " F" + str(self.X_Feed)
 
-        print(Gcode)
-        c.mdi(Gcode)
+            print(Gcode)
+            c.mdi(Gcode)
 
-        # Wait for the command to complete
-        c.wait_complete()
+            # Wait for the command to complete
+            c.wait_complete()
+        finally:
+            _set_depressed(widget, False)
 
 #######################################################################
 # X_Idx_Plus
@@ -2547,22 +2617,27 @@ class HandlerClass:
     def X_Idx_Plus(self,widget):
 
         print("=================================================")
-        print("FUNCTION X_Idx_Minus")
+        print("FUNCTION X_Idx_Plus")
 
-        # Ensure the system is in MDI mode
-        s.poll()
-        if s.task_state != linuxcnc.MODE_MDI:
-                c.mode(linuxcnc.MODE_MDI)
-                c.wait_complete() # Wait for mode change to complete
+        # See X_Idx_Minus for _set_depressed.
+        _set_depressed(widget, True)
+        try:
+            # Ensure the system is in MDI mode
+            s.poll()
+            if s.task_state != linuxcnc.MODE_MDI:
+                    c.mode(linuxcnc.MODE_MDI)
+                    c.wait_complete() # Wait for mode change to complete
 
-        # Send an MDI command to move along the axis.
-        Gcode = "G0 X" + str(self.X_Idx_Dist) + " F" + str(self.X_Feed)
+            # Send an MDI command to move along the axis.
+            Gcode = "G0 X" + str(self.X_Idx_Dist) + " F" + str(self.X_Feed)
 
-        print(Gcode)
-        c.mdi(Gcode)
+            print(Gcode)
+            c.mdi(Gcode)
 
-        # Wait for the command to complete
-        c.wait_complete()
+            # Wait for the command to complete
+            c.wait_complete()
+        finally:
+            _set_depressed(widget, False)
 
 #######################################################################
 # X_Set_Feed
@@ -2681,6 +2756,15 @@ class HandlerClass:
         print("=================================================")
         print("FUNCTION X_Set_Scale")
 
+        # Cancel any in-progress move (e.g. X_Idx_Plus/Minus) before this
+        # scale change lands - a large change to position-scale while a
+        # coordinated move is still executing could otherwise leave the
+        # physical axis somewhere unexpected once the new scale takes
+        # effect (same class of risk as the Run Operation spindle case -
+        # see conversation).
+        c.abort()
+        c.wait_complete()
+
         X_Scale = round(widget.get_value(), 1)
 
         # X_ENA_Status belongs to the main panel's HAL component
@@ -2770,20 +2854,25 @@ class HandlerClass:
         print("=================================================")
         print("FUNCTION Z_Idx_Minus")
 
-        # Ensure the system is in MDI mode
-        s.poll()
-        if s.task_state != linuxcnc.MODE_MDI:
-                c.mode(linuxcnc.MODE_MDI)
-                c.wait_complete() # Wait for mode change to complete
+        # See X_Idx_Minus for _set_depressed.
+        _set_depressed(widget, True)
+        try:
+            # Ensure the system is in MDI mode
+            s.poll()
+            if s.task_state != linuxcnc.MODE_MDI:
+                    c.mode(linuxcnc.MODE_MDI)
+                    c.wait_complete() # Wait for mode change to complete
 
-        # Send an MDI command to move along the axis.
-        Gcode = "G0 Z-" + str(self.Z_Idx_Dist) + " F" + str(self.Z_Feed)
+            # Send an MDI command to move along the axis.
+            Gcode = "G0 Z-" + str(self.Z_Idx_Dist) + " F" + str(self.Z_Feed)
 
-        print(Gcode)
-        c.mdi(Gcode)
+            print(Gcode)
+            c.mdi(Gcode)
 
-        # Wait for the command to complete
-        c.wait_complete()
+            # Wait for the command to complete
+            c.wait_complete()
+        finally:
+            _set_depressed(widget, False)
 
 #######################################################################
 # Z_Idx_Plus
@@ -2809,22 +2898,27 @@ class HandlerClass:
     def Z_Idx_Plus(self,widget):
 
         print("=================================================")
-        print("FUNCTION Z_Idx_Minus")
+        print("FUNCTION Z_Idx_Plus")
 
-        # Ensure the system is in MDI mode
-        s.poll()
-        if s.task_state != linuxcnc.MODE_MDI:
-                c.mode(linuxcnc.MODE_MDI)
-                c.wait_complete() # Wait for mode change to complete
+        # See X_Idx_Minus for _set_depressed.
+        _set_depressed(widget, True)
+        try:
+            # Ensure the system is in MDI mode
+            s.poll()
+            if s.task_state != linuxcnc.MODE_MDI:
+                    c.mode(linuxcnc.MODE_MDI)
+                    c.wait_complete() # Wait for mode change to complete
 
-        # Send an MDI command to move along the axis.
-        Gcode = "G0 Z" + str(self.Z_Idx_Dist) + " F" + str(self.Z_Feed)
+            # Send an MDI command to move along the axis.
+            Gcode = "G0 Z" + str(self.Z_Idx_Dist) + " F" + str(self.Z_Feed)
 
-        print(Gcode)
-        c.mdi(Gcode)
+            print(Gcode)
+            c.mdi(Gcode)
 
-        # Wait for the command to complete
-        c.wait_complete()
+            # Wait for the command to complete
+            c.wait_complete()
+        finally:
+            _set_depressed(widget, False)
 
 #######################################################################
 # Z_Set_Feed
@@ -3018,6 +3112,8 @@ class HandlerClass:
         self.halcomp        = halcomp
         self.builder        = builder
         self.nhits          = 0
+
+        _install_depress_css()
 
         # Independent pins this component owns, used to force each
         # axis disabled from this tab regardless of what the main

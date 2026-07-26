@@ -309,7 +309,7 @@
               </packing>
             </child>
             <child>
-              <object class="HAL_ToggleButton" id="Sp0_Move_Rev">
+              <object class="HAL_Button" id="Sp0_Move_Rev">
                 <property name="visible">True</property>
                 <property name="can-focus">True</property>
                 <property name="receives-default">True</property>
@@ -326,7 +326,7 @@
               </packing>
             </child>
             <child>
-              <object class="HAL_ToggleButton" id="Sp0_Move_Fwd">
+              <object class="HAL_Button" id="Sp0_Move_Fwd">
                 <property name="visible">True</property>
                 <property name="can-focus">True</property>
                 <property name="receives-default">True</property>
