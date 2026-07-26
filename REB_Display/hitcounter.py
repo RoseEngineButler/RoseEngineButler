@@ -88,6 +88,19 @@ AXIS_STEPGEN = {
     "Sp1": "07",
 }
 
+# ENA button widget id -> the final enable signal it should reflect
+# (see REB_PostGUI.hal - same signal each *_ENA_Status LED is fed from).
+ENA_BUTTON_SIGNALS = {
+    "Sp0_ENA": "spindle.0-enable",
+    "Sp1_ENA": "spindle.1-enable",
+    "B_ENA":   "b-enable",
+    "X_ENA":   "x-enable",
+    "Z_ENA":   "z-enable",
+    "U_ENA":   "u-enable",
+    "V_ENA":   "v-enable",
+    "W_ENA":   "w-enable",
+}
+
 # Establish connection to command and status channels
 c = linuxcnc.command()
 s = linuxcnc.stat()
@@ -346,6 +359,24 @@ class HandlerClass:
 
         _set_depressed(fwd, bool(hal.get_value('spindle.0.forward')))
         _set_depressed(rev, bool(hal.get_value('spindle.0.reverse')))
+        return True
+
+    def _sync_ena_buttons(self):
+        '''
+        Same idea as _sync_run_operation_buttons, but for the 8 axis ENA
+        buttons: shows each one depressed/darkened for as long as that
+        axis is actually enabled (the same signal each *_ENA_Status LED
+        already reflects - see ENA_BUTTON_SIGNALS), rather than however
+        the flipflop's own toggle-on-click visual happens to be doing.
+        '''
+        first = self.builder.get_object('Sp0_ENA')
+        if first is None:
+            return False
+
+        for widget_id, signal_name in ENA_BUTTON_SIGNALS.items():
+            widget = self.builder.get_object(widget_id)
+            if widget is not None:
+                _set_depressed(widget, bool(hal.get_value(signal_name)))
         return True
 
     def _load_scale_settings(self):
@@ -3185,6 +3216,9 @@ class HandlerClass:
         # (see _sync_run_operation_buttons). No-ops itself out after one
         # call in every component other than the main panel.
         GLib.timeout_add(100, self._sync_run_operation_buttons)
+
+        # Same idea, for the 8 axis ENA buttons (see _sync_ena_buttons).
+        GLib.timeout_add(100, self._sync_ena_buttons)
 
         self.U_Feed         = 1.0       # U axis feed rate
         self.U_Idx_Dist     = 0.0       # U axis index distance
