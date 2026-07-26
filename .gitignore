@@ -1,0 +1,15 @@
+.DS_Store
+linuxcnc/Rosetta_MesaCard/.7i92t_rosetta.bin.icloud
+linuxcnc/Rosetta_MesaCard/.7i92t_rosetta.pin.icloud
+linuxcnc/Rosetta_Setup/.lightdm.conf.icloud
+
+# Python bytecode cache
+__pycache__/
+*.pyc
+
+# Generated/runtime files
+/REB.ini.expanded
+/sim.var
+/sim.var.bak
+REB_Display/idx_debug.log
+/memory.md
