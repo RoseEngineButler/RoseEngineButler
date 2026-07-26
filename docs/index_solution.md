@@ -11,8 +11,10 @@ Python button handlers. This document records *why* each change was made,
 in the order the problems were found, so the next engineer touching this
 code understands the reasoning instead of just seeing a diff.
 
-All changes described here affect **Sp0 only**. Sp1 has no orient wiring at
-all yet — see "Known limitation: Sp1" at the end.
+Problems 1–8 below were found and fixed against **Sp0 only**. Problem 9
+covers building the equivalent chain for **Sp1** afterward, by mirroring
+the Sp0 fixes — see that section for what's shared and what's still
+untested.
 
 ## How indexing works, mechanically
 
@@ -192,15 +194,15 @@ stopped pressing buttons.
 
 **Cause:** Both handlers sent **two** M19 commands per press: one for
 spindle `$0` (Sp0, fully wired per the fixes above) and one for spindle
-`$1` (Sp1). **Sp1 has no `orient` HAL wiring at all** — it was
-deliberately out of scope for this work. The `$1` M19 could never report
-`is-oriented`, so it always ran for the full timeout window and then
-failed, one command behind the real (successful) Sp0 move.
+`$1` (Sp1). At the time, **Sp1 had no `orient` HAL wiring at all**. The
+`$1` M19 could never report `is-oriented`, so it always ran for the full
+timeout window and then failed, one command behind the real (successful)
+Sp0 move.
 
-**Fix:** Removed the `$1` M19 call from both handlers
-(`REB_Display/hitcounter.py`). A comment marks where to re-add it once
-Sp1's own `orient`/`pid` chain is built out (see "Known limitation: Sp1"
-below).
+**Fix (temporary, later superseded — see Problem 9):** Removed the `$1`
+M19 call from both handlers (`REB_Display/hitcounter.py`). Once Sp1's own
+`orient`/`pid` chain was built out, the `$1` call was reinstated —
+properly gated this time, per Problem 9.
 
 ## Where to adjust accuracy ⭐
 
@@ -237,14 +239,83 @@ raised further — the no-overshoot ceiling is
 Problem 2) — or a small `I_POS` can be added to eliminate any residual
 steady-state error a pure-P loop leaves behind.
 
-## Known limitation: Sp1
+## Problem 9: building out the Sp1 chain, and respecting the Sp0/Sp1 checkboxes
 
-Sp1 currently has **no `orient`/`pid` HAL chain at all** — indexing only
-works for Sp0. Building it out means mirroring the Sp0 wiring described in
-Problem 1 (a second `orient.N`, position `pid`, and `mux2` gating
-`hm2_7i92.0.stepgen.07.velocity-cmd`) and its own tuned gains in a
-`REB_Spindle1.inc`-equivalent block, then re-adding the `$1` M19 call
-removed in Problem 8.
+**Goal:** apply the same wiring and tuning fixes to Sp1 that Problems 1–4
+established for Sp0, so both spindles can be indexed, and make the
+Indexing panel's Sp0/Sp1 checkboxes actually control which spindle(s)
+move (they never did).
+
+**HAL wiring (`REB.hal`):** mirrors Problem 1 and Problem 4 exactly, for
+spindle 1 / `hm2_7i92.0.stepgen.07`:
+
+- `loadrt orient` → `loadrt orient count=2` and `loadrt mux2` →
+  `loadrt mux2 count=2`, to get `orient.1` and `mux2.1`.
+- `pid.p1` added to the `loadrt pid names=...` list.
+- `addf orient.1`, `addf pid.p1.do-pid-calcs`, `addf mux2.1` added to
+  `servo-thread`.
+- `orient.1-angle <= spindle.1.orient-angle` (the Problem 4 fix, built in
+  from the start this time rather than discovered missing).
+- `mux2.1` gates `hm2_7i92.0.stepgen.07.velocity-cmd` between normal
+  spindle speed and `pid.p1`'s orient output, selected by
+  `spindle.1-pos-mode-enable` — the same pattern as `mux2.0`.
+- Fixed a latent Problem-4-style bug found while wiring this up: the
+  existing `net spindle.1-revs => spindle.1.revs` had **no source at
+  all** (spindle 1's revolution counter was permanently stuck at 0, same
+  class of bug as the original `orient.0-angle`). Replaced by properly
+  feeding it from `spindle.1-position-fb`, alongside `orient.1.position`
+  and `pid.p1.feedback`.
+
+As with Sp0, the pre-existing `pid.s1` velocity-loop chain (`spindle.1-output
+<= pid.s1.output`, itself already a dead end — no consumer) was left alone;
+`mux2.1` bypasses it the same way `mux2.0` bypasses `pid.s0`.
+
+**Gains (`REB_Axes/REB_Spindle1.inc`, both the git-managed prototype and
+the loaded `RoseEngineButlerLocal` copy):** applied the same *pattern* of
+fixes as Problems 2–3, using the same starting numbers validated on Sp0
+— `P_POS = 1.0`, `FF0_POS = 0.0`, `MAX_OUTPUT_POS = 1.0`, and a new
+`ORIENT_TOLERANCE = 0.1`. `orient.1.tolerance` is wired to it in `REB.hal`
+the same way as `orient.0.tolerance`. **These numbers are carried over
+from Sp0 by analogy, not independently derived or live-tested on Sp1** —
+see the caveat below.
+
+**The checkbox bug:** `Sp0_Move_Idx_Fwd`/`Sp0_Move_Idx_Rev` never checked
+`self.Sp0_Idx_Bool` / `self.Sp1_Idx_Bool` at all — the Sp0/Sp1 checkboxes
+on the Indexing panel visibly existed but did nothing; both spindles
+(before Problem 8) or just Sp0 (after Problem 8) always moved regardless
+of which boxes were checked. Compounding this, the Python defaults for
+those two variables were `False`, while the corresponding GTK checkboxes
+(`Sp0_Set_Idx_OnOff`/`Sp1_Set_Idx_OnOff` in `REB_Panel_v2.ui`) default to
+**checked** (`active=True`) — so even if the checkboxes had been wired up
+naively, a freshly-started GUI would show both boxes checked while the
+underlying state said "don't index," until each box was toggled once.
+
+**Fix:** Both handlers now build and send the `$0` M19 only if
+`self.Sp0_Idx_Bool` is true, and the `$1` M19 only if `self.Sp1_Idx_Bool`
+is true — each computed from that spindle's *own* live position
+(`spindle.0-position-fb` / `spindle.1-position-fb` respectively; they can
+be at completely different absolute angles). The two booleans' `__init__`
+defaults were changed from `False` to `True` to match the checkboxes'
+default-checked appearance.
+
+**⚠ Not yet validated on real Sp1 hardware.** Everything in Problems 1–8
+was iteratively live-tested against physical Sp0 motion over the course
+of this work. Sp1's chain has been built by careful analogy and code
+review, but Sp1 has never actually been commanded to orient. Before
+relying on it:
+
+- Test with only the Sp0 checkbox on first, then only Sp1, before both
+  together.
+- Watch the first few Sp1 moves closely (e-stop within reach) the way
+  Sp0's first moves were watched in this session — oscillation
+  (Problem 2), runaway (Problem 3), or a wrong destination (Problem 4)
+  are exactly the failure modes that live testing caught for Sp0, and
+  none of that testing has happened for Sp1 yet.
+- `P_POS = 1.0` is conservative relative to Sp1's own
+  `STEPGEN_MAXACCEL`/`MAX_OUTPUT_POS` (see "A note on which files were
+  edited" for how those ceilings differ between the prototype and
+  `RoseEngineButlerLocal` copies), so it's unlikely to oscillate, but the
+  convergence speed and final accuracy have not been measured.
 
 ## A note on which files were edited
 
@@ -275,6 +346,12 @@ prototype; it was never part of this indexing fix and reconciling it was
 out of scope. If those other differences are unintentional drift rather
 than an intentional newer revision, that still needs a separate look.
 
+`REB_Axes/REB_Spindle1.inc` has the identical two-copy split, with the
+same kind of pre-existing divergence (`STEPGEN_MAXVEL`/`STEPGEN_MAXACCEL`,
+the `SCALE` block, `P_VEL`/`I_VEL`/`D_VEL`) between the prototype and
+`RoseEngineButlerLocal`. The Problem 9 gain values were applied to both
+copies the same way as Sp0's.
+
 One consequence worth flagging: the no-overshoot ceiling in Problem 2
 (`P_POS ≤ 2 × STEPGEN_MAXACCEL / MAX_OUTPUT_POS`) evaluates differently
 in each file, because `STEPGEN_MAXACCEL` differs (`1` in
@@ -289,14 +366,21 @@ slowly than what was observed during this session, and may want to retune
 
 ## Files touched by this work
 
-- `REB.hal` (git-managed) — `mux2` component (load, thread, wiring), the
-  missing `orient.0-angle` source net, `orient.0.tolerance` setp.
-- `REB_Axes/REB_Spindle0.inc`, **both copies** (see above) — `P_POS`,
-  `MAX_OUTPUT_POS`, `FF0_POS`, `ORIENT_TOLERANCE`.
+- `REB.hal` (git-managed) — for Sp0: `mux2.0` component (load, thread,
+  wiring), the missing `orient.0-angle` source net, `orient.0.tolerance`
+  setp. For Sp1 (Problem 9): `orient`/`mux2` bumped to `count=2`, `pid.p1`
+  added, `orient.1`/`pid.p1.do-pid-calcs`/`mux2.1` added to
+  `servo-thread`, the full `orient.1`/`pid.p1`/`mux2.1` wiring, and the
+  `spindle.1-revs` dangling-net fix.
+- `REB_Axes/REB_Spindle0.inc`, **both copies** (see "A note on which
+  files were edited") — `P_POS`, `MAX_OUTPUT_POS`, `FF0_POS`,
+  `ORIENT_TOLERANCE`.
+- `REB_Axes/REB_Spindle1.inc`, **both copies** — same four keys, same
+  pattern, added in Problem 9.
 - `REB_Display/hitcounter.py` (git-managed) — `Sp0_Move_Idx_Fwd` /
-  `Sp0_Move_Idx_Rev`: incremental (not absolute) target-angle computation,
-  shortest-path (`P0`) direction, removal of the doomed Sp1 `$1` M19 call,
-  and a fix to a pre-existing bug where `Sp0_Move_Idx_Rev` referenced an
-  undefined variable and never actually sent its `$1` command (unrelated
-  to the indexing behavior itself, but discovered and fixed along the
-  way).
+  `Sp0_Move_Idx_Rev`: incremental (not absolute) per-spindle target-angle
+  computation, shortest-path (`P0`) direction, the Sp0/Sp1 checkbox gating
+  and matching `__init__` default fix from Problem 9, and a fix to a
+  pre-existing bug where `Sp0_Move_Idx_Rev` referenced an undefined
+  variable and never actually sent its `$1` command (unrelated to the
+  indexing behavior itself, but discovered and fixed along the way).

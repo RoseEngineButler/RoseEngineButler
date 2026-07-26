@@ -70,6 +70,8 @@ import webbrowser
 import subprocess
 import re
 from gi.repository import Gdk
+from gi.repository import Gtk
+from gi.repository import GLib
 
 # Axis id (as used in REB_Settings_v1.ini and the Settings tab spin
 # buttons) -> hm2_7i92.0 stepgen channel. Verified against the actual
@@ -89,6 +91,45 @@ AXIS_STEPGEN = {
 # Establish connection to command and status channels
 c = linuxcnc.command()
 s = linuxcnc.stat()
+
+# Temporary diagnostic log for the Sp0/Sp1 indexing checkbox investigation.
+# The panel is normally launched with Terminal=false (see the desktop
+# launcher), so print() output has nowhere visible to go - this mirrors the
+# relevant prints to a file so they can be watched during live testing.
+IDX_LOG_PATH = "/home/reuben/linuxcnc/configs/RoseEngineButler/REB_Display/idx_debug.log"
+
+def idx_log(msg):
+    print(msg)
+    try:
+        with open(IDX_LOG_PATH, "a") as f:
+            f.write(time.strftime("%H:%M:%S") + " " + msg + "\n")
+            f.flush()
+    except Exception:
+        pass
+
+def _show_no_spindle_enabled_popup(widget):
+    dialog = Gtk.MessageDialog(
+        transient_for=widget.get_toplevel(),
+        flags=0,
+        message_type=Gtk.MessageType.WARNING,
+        buttons=Gtk.ButtonsType.OK,
+        text="No spindle is enabled",
+    )
+    dialog.run()
+    dialog.destroy()
+
+# The indexing Fwd/Rev handlers block on c.wait_complete() for as long as
+# each M19 takes to converge (or time out), which otherwise leaves the UI
+# looking unresponsive with no feedback that anything is happening.
+def _set_busy_cursor(widget, busy):
+    win = widget.get_toplevel().get_window()
+    if win is None:
+        return
+    win.set_cursor(Gdk.Cursor.new_from_name(win.get_display(), "wait") if busy else None)
+    # Force the cursor change to actually paint before the blocking MDI
+    # calls take over the main loop.
+    while Gtk.events_pending():
+        Gtk.main_iteration()
 
 class HandlerClass:
     '''
@@ -134,6 +175,24 @@ class HandlerClass:
                 adj.set_value(max(lower, min(upper, new_value)))
             return True
 
+        return False
+
+    def _set_checkbox_active(self, widget_id, active):
+        '''
+        Forces a checkbox to the given state. Only the main panel
+        component has these widgets - every other tab/panel finds
+        the widget missing and no-ops.
+
+        Deferred via GLib.idle_add (see __init__) rather than set
+        directly during __init__: the checkbox doesn't reliably end up
+        checked from the .ui file's active="True" alone once the panel
+        is actually interactive (confirmed live), so this runs after
+        gladevcp's own startup sequence has settled instead of risking
+        being overwritten by whatever resets it otherwise.
+        '''
+        widget = self.builder.get_object(widget_id)
+        if widget is not None:
+            widget.set_active(active)
         return False
 
     def _load_scale_settings(self):
@@ -797,50 +856,74 @@ class HandlerClass:
 #######################################################################
     def Sp0_Move_Idx_Fwd(self,widget):
 
-        print("=================================================")
-        print("FUNCTION Sp0_Move_Idx_Fwd")
+        idx_log("=================================================")
+        idx_log("FUNCTION Sp0_Move_Idx_Fwd")
+        idx_log("Sp0_Idx_Bool = " + str(self.Sp0_Idx_Bool) + "  Sp1_Idx_Bool = " + str(self.Sp1_Idx_Bool))
 
-        # Ensure the system is in MDI mode
-        s.poll()
-        if s.task_state != linuxcnc.MODE_MDI:
-                c.mode(linuxcnc.MODE_MDI)
-                c.wait_complete() # Wait for mode change to complete
+        if not self.Sp0_Idx_Bool and not self.Sp1_Idx_Bool:
+            idx_log("No spindle enabled - aborting move")
+            _show_no_spindle_enabled_popup(widget)
+            return
 
-        # Set spindle rotational speeds
-        GcodeStr1 = "S0 " + str(self.Sp0_Feed)
-        print(GcodeStr1)
+        _set_busy_cursor(widget, True)
+        try:
+            # Ensure the system is in MDI mode
+            s.poll()
+            if s.task_state != linuxcnc.MODE_MDI:
+                    c.mode(linuxcnc.MODE_MDI)
+                    c.wait_complete() # Wait for mode change to complete
 
-        Sp1_Feed = self.Sp0_Feed * self.Sp1_Pct / 100
-        GcodeStr2 = "S1 " + str(Sp1_Feed)
-        print(GcodeStr2)
+            # Set spindle rotational speeds
+            GcodeStr1 = "S0 " + str(self.Sp0_Feed)
+            idx_log(GcodeStr1)
 
-        c.mdi(GcodeStr1)
-        c.mdi(GcodeStr2)
+            Sp1_Feed = self.Sp0_Feed * self.Sp1_Pct / 100
+            GcodeStr2 = "S1 " + str(Sp1_Feed)
+            idx_log(GcodeStr2)
 
-        # M19 orients to an absolute angle, not a relative step, so compute
-        # the next target from the spindle's actual current angle rather
-        # than sending Sp0_Idx_Deg itself as R each time (which would just
-        # re-target the same fixed angle on every press).
-        current_angle = (hal.get_value('spindle.0-position-fb') % 1.0) * 360.0
-        target_angle = (current_angle + self.Sp0_Idx_Deg) % 360.0
+            c.mdi(GcodeStr1)
+            c.mdi(GcodeStr2)
 
-        # Send MDI command to start spindles rotating.
-        # NOTE: P0 = shortest path. Forcing a specific CW/CCW direction
-        # (P1/P2) was tried and empirically always took the long ~270 deg
-        # way around to reach the same (correct) target angle - see the
-        # live HAL trace analysis in conversation. P0 takes the direct
-        # ~90 deg route to the same destination.
-        GcodeStr3 = "M19 R" + str(target_angle) + " Q20 P0 $0"
-        print(GcodeStr3)
-        c.mdi(GcodeStr3)
+            # M19 orients to an absolute angle, not a relative step, so compute
+            # the next target from each spindle's own actual current angle
+            # rather than sending Sp0_Idx_Deg itself as R each time (which
+            # would just re-target the same fixed angle on every press). The
+            # Sp0/Sp1 checkboxes on the Indexing panel gate which spindle(s)
+            # actually get an M19 - a spindle with no orient HAL chain (or one
+            # the operator hasn't enabled) is simply skipped rather than
+            # sent a command that can only time out.
+            if self.Sp0_Idx_Bool:
+                current_angle = (hal.get_value('spindle.0-position-fb') % 1.0) * 360.0
+                target_angle = (current_angle + self.Sp0_Idx_Deg) % 360.0
 
-        # NOTE: no M19 for $1 (Sp1) here - Sp1 has no orient HAL wiring
-        # (deferred, see conversation), so an M19 for it can never report
-        # is-oriented and would just burn the full Q20 wait every press
-        # before failing. Re-add once Sp1's orient chain is built out.
+                # NOTE: P0 = shortest path. Forcing a specific CW/CCW direction
+                # (P1/P2) was tried and empirically always took the long ~270
+                # deg way around to reach the same (correct) target angle -
+                # see the live HAL trace analysis in conversation. P0 takes
+                # the direct ~90 deg route to the same destination.
+                GcodeStr3 = "M19 R" + str(target_angle) + " Q20 P0 $0"
+                idx_log(GcodeStr3)
+                c.mdi(GcodeStr3)
+                # Let Sp0's orient fully resolve before Sp1's M19 is even sent -
+                # queuing both back-to-back with a single wait_complete() at the
+                # end let Sp0's move interfere with Sp1's (see conversation: with
+                # both checkboxes on, only Sp0 actually moved).
+                c.wait_complete()
+            else:
+                idx_log("Sp0 M19 skipped (Sp0_Idx_Bool is False)")
 
-        # Wait for the command to complete
-        c.wait_complete()
+            if self.Sp1_Idx_Bool:
+                current_angle_1 = (hal.get_value('spindle.1-position-fb') % 1.0) * 360.0
+                target_angle_1 = (current_angle_1 + self.Sp0_Idx_Deg) % 360.0
+
+                GcodeStr4 = "M19 R" + str(target_angle_1) + " Q20 P0 $1"
+                idx_log(GcodeStr4)
+                c.mdi(GcodeStr4)
+                c.wait_complete()
+            else:
+                idx_log("Sp1 M19 skipped (Sp1_Idx_Bool is False)")
+        finally:
+            _set_busy_cursor(widget, False)
 
 #######################################################################
 # Sp0_Move_Idx_Rev
@@ -866,42 +949,62 @@ class HandlerClass:
 #######################################################################
     def Sp0_Move_Idx_Rev(self,widget):
 
-        print("=================================================")
-        print("FUNCTION Sp0_Move_Idx_Rev")
+        idx_log("=================================================")
+        idx_log("FUNCTION Sp0_Move_Idx_Rev")
+        idx_log("Sp0_Idx_Bool = " + str(self.Sp0_Idx_Bool) + "  Sp1_Idx_Bool = " + str(self.Sp1_Idx_Bool))
 
-        # Ensure the system is in MDI mode
-        s.poll()
-        if s.task_state != linuxcnc.MODE_MDI:
-                c.mode(linuxcnc.MODE_MDI)
-                c.wait_complete() # Wait for mode change to complete
+        if not self.Sp0_Idx_Bool and not self.Sp1_Idx_Bool:
+            idx_log("No spindle enabled - aborting move")
+            _show_no_spindle_enabled_popup(widget)
+            return
 
-        # Set spindle rotational speeds
-        GcodeStr1 = "S0 " + str(self.Sp0_Feed)
-        print(GcodeStr1)
+        _set_busy_cursor(widget, True)
+        try:
+            # Ensure the system is in MDI mode
+            s.poll()
+            if s.task_state != linuxcnc.MODE_MDI:
+                    c.mode(linuxcnc.MODE_MDI)
+                    c.wait_complete() # Wait for mode change to complete
 
-        Sp1_Feed = self.Sp0_Feed * self.Sp1_Pct / 100
-        GcodeStr2 = "S1 " + str(Sp1_Feed)
-        print(GcodeStr2)
+            # Set spindle rotational speeds
+            GcodeStr1 = "S0 " + str(self.Sp0_Feed)
+            idx_log(GcodeStr1)
 
-        c.mdi(GcodeStr1)
-        c.mdi(GcodeStr2)
+            Sp1_Feed = self.Sp0_Feed * self.Sp1_Pct / 100
+            GcodeStr2 = "S1 " + str(Sp1_Feed)
+            idx_log(GcodeStr2)
 
-        # See Sp0_Move_Idx_Fwd for why the target is computed from the
-        # spindle's actual current angle rather than sent as a fixed R value.
-        current_angle = (hal.get_value('spindle.0-position-fb') % 1.0) * 360.0
-        target_angle = (current_angle - self.Sp0_Idx_Deg) % 360.0
+            c.mdi(GcodeStr1)
+            c.mdi(GcodeStr2)
 
-        # Send MDI commands to start spindles rotating.
-        # NOTE: P0 = shortest path - see matching note in Sp0_Move_Idx_Fwd.
-        GcodeStr3 = "M19 R" + str(target_angle) + " Q20 P0 $0"
-        print(GcodeStr3)
-        c.mdi(GcodeStr3)
+            # See Sp0_Move_Idx_Fwd for why the target is computed per-spindle
+            # from live position, and why the checkboxes gate each M19.
+            if self.Sp0_Idx_Bool:
+                current_angle = (hal.get_value('spindle.0-position-fb') % 1.0) * 360.0
+                target_angle = (current_angle - self.Sp0_Idx_Deg) % 360.0
 
-        # NOTE: no M19 for $1 (Sp1) here - see matching note in
-        # Sp0_Move_Idx_Fwd.
+                # NOTE: P0 = shortest path - see matching note in Sp0_Move_Idx_Fwd.
+                GcodeStr3 = "M19 R" + str(target_angle) + " Q20 P0 $0"
+                idx_log(GcodeStr3)
+                c.mdi(GcodeStr3)
+                # See matching note in Sp0_Move_Idx_Fwd - let Sp0 fully resolve
+                # before Sp1's M19 is sent.
+                c.wait_complete()
+            else:
+                idx_log("Sp0 M19 skipped (Sp0_Idx_Bool is False)")
 
-        # Wait for the command to complete
-        c.wait_complete()
+            if self.Sp1_Idx_Bool:
+                current_angle_1 = (hal.get_value('spindle.1-position-fb') % 1.0) * 360.0
+                target_angle_1 = (current_angle_1 - self.Sp0_Idx_Deg) % 360.0
+
+                GcodeStr4 = "M19 R" + str(target_angle_1) + " Q20 P0 $1"
+                idx_log(GcodeStr4)
+                c.mdi(GcodeStr4)
+                c.wait_complete()
+            else:
+                idx_log("Sp1 M19 skipped (Sp1_Idx_Bool is False)")
+        finally:
+            _set_busy_cursor(widget, False)
 
 #######################################################################
 # Sp0_Move_Rev
@@ -1080,21 +1183,30 @@ class HandlerClass:
 #######################################################################
     def Sp0_Set_Idx_DegDiv(self,widget):
 
-        print("=================================================")
-        print("FUNCTION Sp0_Set_Idx_DegDiv")
+        idx_log("=================================================")
+        idx_log("FUNCTION Sp0_Set_Idx_DegDiv")
 
-        if self.Sp0_Idx_DegDiv == "Deg":
-                        self.Sp0_Idx_DegDiv = "Div"
-                        self.Sp0_Idx_Deg = round(360 / self.Sp0_Idx_Dist, 1)
+        # Sp0_Set_Idx_bW_Deg and Sp0_Set_Idx_bW_Div are a GTK radio pair
+        # sharing this one "toggled" handler - clicking either one fires
+        # this handler TWICE (once for the button going active, once for
+        # its paired sibling going inactive). Blindly flipping our own
+        # mode flag on every call meant one click flipped it there and
+        # back, net no-op - Div mode could never actually engage. Reading
+        # the widget directly and ignoring the "going inactive" call fixes
+        # it the same way the Sp0/Sp1 index checkboxes were fixed earlier.
+        if not widget.get_active():
+            idx_log("Sp0_Set_Idx_DegDiv ignored (widget going inactive)")
+            return
+
+        self.Sp0_Idx_DegDiv = "Div" if Gtk.Buildable.get_name(widget) == "Sp0_Set_Idx_bW_Div" else "Deg"
+
+        if self.Sp0_Idx_DegDiv == "Div":
+            self.Sp0_Idx_Deg = round(360 / self.Sp0_Idx_Dist, 1)
         else:
-                        self.Sp0_Idx_DegDiv = "Deg"
-                        self.Sp0_Idx_Deg = round(self.Sp0_Idx_Dist, 1)
+            self.Sp0_Idx_Deg = round(self.Sp0_Idx_Dist, 1)
 
-        Prt1 = "Sp0_Idx_Deg = " + str(self.Sp0_Idx_Deg)
-        print(Prt1)
-
-        Prt2 = "self.Sp0_Idx_DegDiv = " + self.Sp0_Idx_DegDiv
-        print(Prt2)
+        idx_log("Sp0_Idx_DegDiv = " + self.Sp0_Idx_DegDiv)
+        idx_log("Sp0_Idx_Deg = " + str(self.Sp0_Idx_Deg))
 
 #######################################################################
 # Sp0_Set_Idx_Dist
@@ -1120,11 +1232,22 @@ class HandlerClass:
 #######################################################################
     def Sp0_Set_Idx_Dist(self,widget):
 
-        print("=================================================")
-        print("FUNCTION Sp0_Set_Idx_Dist")
+        idx_log("=================================================")
+        idx_log("FUNCTION Sp0_Set_Idx_Dist")
 
         self.Sp0_Idx_Dist = round(widget.get_value(), 1)
-        print("self.Sp0_Idx_Dist = " + str(self.Sp0_Idx_Dist))
+        idx_log("self.Sp0_Idx_Dist = " + str(self.Sp0_Idx_Dist))
+
+        # Sp0_Idx_Deg is what every M19 move actually uses, and it must
+        # track the current Deg/Div mode here too - previously it was only
+        # recalculated inside Sp0_Set_Idx_DegDiv (the mode toggle), so
+        # changing the distance value while already in Div mode had no
+        # effect on the actual move size until the mode was toggled again.
+        if self.Sp0_Idx_DegDiv == "Div":
+            self.Sp0_Idx_Deg = round(360 / self.Sp0_Idx_Dist, 1)
+        else:
+            self.Sp0_Idx_Deg = round(self.Sp0_Idx_Dist, 1)
+        idx_log("self.Sp0_Idx_Deg = " + str(self.Sp0_Idx_Deg))
 
 #######################################################################
 # Sp0_Set_Idx_OnOff
@@ -1148,15 +1271,15 @@ class HandlerClass:
 #######################################################################
     def Sp0_Set_Idx_OnOff(self,widget):
 
-        print("=================================================")
-        print("FUNCTION Sp0_Set_Idx_OnOff")
+        idx_log("=================================================")
+        idx_log("FUNCTION Sp0_Set_Idx_OnOff")
 
-        if self.Sp0_Idx_Bool:
-                self.Sp0_Idx_Bool = False
-                print("Sp0_Idx_Bool = False")
-        else:
-                self.Sp0_Idx_Bool = True
-                print("Sp0_Idx_Bool = True")
+        # Read the checkbox's actual state rather than blindly flipping our
+        # own flag - the "toggled" signal isn't guaranteed to fire exactly
+        # once per user click, so blindly flipping let this drift out of
+        # sync with what the checkbox visually shows.
+        self.Sp0_Idx_Bool = widget.get_active()
+        idx_log("Sp0_Idx_Bool = " + str(self.Sp0_Idx_Bool))
 
 #######################################################################
 # Sp0_Set_Scale
@@ -1291,15 +1414,13 @@ class HandlerClass:
 #######################################################################
     def Sp1_Set_Idx_OnOff(self,widget):
 
-        print("=================================================")
-        print("FUNCTION Sp1_Set_Idx_OnOff")
+        idx_log("=================================================")
+        idx_log("FUNCTION Sp1_Set_Idx_OnOff")
 
-        if self.Sp1_Idx_Bool:
-                self.Sp1_Idx_Bool = False
-                print("Sp1_Idx_Bool = False")
-        else:
-                self.Sp1_Idx_Bool = True
-                print("Sp1_Idx_Bool = True")
+        # See Sp0_Set_Idx_OnOff for why this reads the widget directly
+        # instead of flipping a separately-tracked flag.
+        self.Sp1_Idx_Bool = widget.get_active()
+        idx_log("Sp1_Idx_Bool = " + str(self.Sp1_Idx_Bool))
 
 #######################################################################
 # Sp1_Set_Move_Pct
@@ -2753,16 +2874,22 @@ class HandlerClass:
         self.B_Move_Dist    = 0.0       # B axis move distance
 
         self.Sp0_Feed       = 1.0       # Sp0 Speed
-        self.Sp0_Idx_Bool   = False     # Index this spindle?
+        self.Sp0_Idx_Bool   = True      # Index this spindle? Default enabled at startup. The checkbox itself doesn't reliably render checked from the .ui file's active="True" alone (confirmed live) - _set_checkbox_active below forces it to match once the panel is up.
         self.Sp0_Idx_DegDiv = "Deg"     # Sp0 & Sp1 spindles: index by degrees or divisions
         self.Sp0_Idx_Deg    = 90.0      # Sp0 index degrees
         self.Sp0_Idx_Dist   = 90.0      # B axis index distance
         self.Sp0_Idx_Qty    = 0         # Sp0 axis index counter
 
-        self.Sp1_Idx_Bool   = False     # Index this spindle?
+        self.Sp1_Idx_Bool   = False     # Index this spindle? See Sp0_Idx_Bool - the checkbox renders unchecked at launch regardless of the .ui default.
         self.Sp1_Idx_Dist   = 90.0      # Sp1 index degrees
         self.Sp1_Idx_Qty    = 0         # Sp1 axis index counter
         self.Sp1_Pct        = 100.0     # Sp1 speed percentage of Sp0 speed
+
+        # Match the on-screen checkboxes to the defaults above (see
+        # _set_checkbox_active for why this is deferred rather than done
+        # here directly).
+        GLib.idle_add(self._set_checkbox_active, 'Sp0_Set_Idx_OnOff', self.Sp0_Idx_Bool)
+        GLib.idle_add(self._set_checkbox_active, 'Sp1_Set_Idx_OnOff', self.Sp1_Idx_Bool)
 
         self.U_Feed         = 1.0       # U axis feed rate
         self.U_Idx_Dist     = 0.0       # U axis index distance
