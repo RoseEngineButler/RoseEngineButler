@@ -35,6 +35,11 @@
 #                /home/reuben/
 #             to
 #                /home/reuben/
+#   1.3 - 27 July 2026, R. Colvin - The repo remote moved from HTTPS
+#             to SSH, authenticated with the reuben user's SSH key.
+#             Dropped sudo from the git commands so pull/stash run as
+#             reuben (whose key is registered with GitHub) instead of
+#             root (which has no key and would fail publickey auth).
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #
@@ -94,8 +99,8 @@ echo -e "${TITLE}                                                               
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
 echo -e "${TITLE}Pull latest files from GitHub                                          ${NOCOLOR}"
 cd /home/reuben/linuxcnc/configs/RoseEngineButler
-sudo git stash
-sudo git pull
+git stash
+git pull
 if [ $? != 0 ]; then
     echo -e "${KEYNOTE}ERROR: git pull failed.                                              ${NOCOLOR}"
     echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
