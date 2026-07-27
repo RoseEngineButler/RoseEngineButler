@@ -270,6 +270,22 @@ class HandlerClass:
         except OSError as e:
             print("Could not write " + SETTINGS_PATH + ": " + str(e))
 
+    def _on_machine_is_on_changed(self, hal_pin, data=None):
+        '''
+        Grays out the main panel's whole grid of axis/spindle controls
+        whenever the machine is not powered on, so nothing on it can be
+        operated until the operator powers the machine on. GTK
+        propagates insensitivity to every child of a container, so
+        toggling this one grid is enough for the whole panel.
+
+        No-op in every component other than the main panel (MainGrid),
+        which is the only one with this widget.
+        '''
+        grid = self.builder.get_object("MainGrid")
+        if grid is None:
+            return
+        grid.set_sensitive(bool(hal_pin.get()))
+
     def X_Comment(self, widget):
         self._save_axis_comment("X", widget.get_text())
 
@@ -2825,6 +2841,19 @@ class HandlerClass:
         # component other than the main panel (gladevcp), which is the
         # only one with these widgets.
         self._load_axis_comments()
+
+        # Input pin fed from the existing "machine-is-on" HAL signal
+        # (net machine-is-on => gladevcp.machine-is-on in
+        # REB_PostGUI.hal). Grays out the whole main panel grid
+        # whenever the machine is not powered on. GPin.update() treats
+        # any pin's first read after creation as a change (self._prev
+        # starts as None), so this fires once automatically shortly
+        # after startup even if the machine is already on - no need to
+        # sync it manually here.
+        self._machine_is_on_pin = hal_glib.GPin(
+            self.halcomp.newpin("machine-is-on", hal.HAL_BIT, hal.HAL_IN)
+        )
+        self._machine_is_on_pin.connect('value-changed', self._on_machine_is_on_changed)
 
         ###############################################################
         # Global Program Variables - declare and set initial value.

@@ -266,3 +266,11 @@ net w-ena-settings-allow                 <= REBCnfg.W_Ena_Override
 net w-ena-settings-allow                 => w-ena-and.in1
 net w-enable                             <= w-ena-and.out
 net w-enable                             => gladevcp.W_ENA-light
+
+# ******************************************
+# Main panel enable/disable
+
+# Grays out the whole main panel (REB_Panel_v2.ui) until the machine
+# is powered on. machine-is-on is defined in REB.hal, driven by
+# halui.machine.is-on.
+net machine-is-on                        => gladevcp.machine-is-on

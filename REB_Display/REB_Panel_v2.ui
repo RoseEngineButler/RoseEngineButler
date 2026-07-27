@@ -67,6 +67,7 @@
   <requires lib="gtk+" version="3.24"/>
   <requires lib="gladevcp" version="0.0"/>
   <object class="GtkAdjustment" id="B_Feed_Rate">
+    <property name="lower">-10</property>
     <property name="upper">10</property>
     <property name="value">1</property>
     <property name="step-increment">0.01</property>
@@ -163,14 +164,15 @@
     <property name="pixbuf">Images/Axis-Zpos.png</property>
   </object>
   <object class="GtkAdjustment" id="Sp0_Feed_Rate">
+    <property name="lower">-10</property>
     <property name="upper">10</property>
     <property name="value">1</property>
     <property name="step-increment">0.01</property>
     <property name="page-increment">0.10</property>
   </object>
   <object class="GtkAdjustment" id="Sp1_Feed_Rate">
-    <property name="lower">-1000</property>
-    <property name="upper">1000</property>
+    <property name="lower">-100</property>
+    <property name="upper">100</property>
     <property name="value">100</property>
     <property name="step-increment">0.01</property>
     <property name="page-increment">0.10</property>
@@ -181,6 +183,7 @@
     <property name="page-increment">1</property>
   </object>
   <object class="GtkAdjustment" id="U_Feed_Rate">
+    <property name="lower">-10</property>
     <property name="upper">10</property>
     <property name="value">1</property>
     <property name="step-increment">0.01</property>
@@ -192,6 +195,7 @@
     <property name="page-increment">0.10</property>
   </object>
   <object class="GtkAdjustment" id="V_Feed_Rate">
+    <property name="lower">-10</property>
     <property name="upper">10</property>
     <property name="value">1</property>
     <property name="step-increment">0.01</property>
@@ -203,6 +207,7 @@
     <property name="page-increment">0.10</property>
   </object>
   <object class="GtkAdjustment" id="W_Feed_Rate">
+    <property name="lower">-10</property>
     <property name="upper">10</property>
     <property name="value">1</property>
     <property name="step-increment">0.01</property>
@@ -214,6 +219,7 @@
     <property name="page-increment">0.10</property>
   </object>
   <object class="GtkAdjustment" id="X_Feed_Rate">
+    <property name="lower">-10</property>
     <property name="upper">10</property>
     <property name="value">1</property>
     <property name="step-increment">0.01</property>
@@ -225,6 +231,7 @@
     <property name="page-increment">0.10</property>
   </object>
   <object class="GtkAdjustment" id="Z_Feed_Rate">
+    <property name="lower">-10</property>
     <property name="upper">10</property>
     <property name="value">1</property>
     <property name="step-increment">0.01</property>
@@ -251,13 +258,14 @@
         <property name="orientation">vertical</property>
         <child>
           <!-- n-columns=14 n-rows=22 -->
-          <object class="GtkGrid">
+          <object class="GtkGrid" id="MainGrid">
             <property name="visible">True</property>
             <property name="can-focus">False</property>
             <property name="halign">start</property>
             <property name="valign">start</property>
             <property name="margin-top">4</property>
             <property name="vexpand">True</property>
+            <property name="sensitive">False</property>
             <child>
               <object class="HAL_LightButton" id="Sp0_ENA">
                 <property name="visible">True</property>
