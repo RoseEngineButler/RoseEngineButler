@@ -259,13 +259,15 @@
             <property name="margin-top">4</property>
             <property name="vexpand">True</property>
             <child>
-              <object class="HAL_Button" id="Sp0_ENA">
-                <property name="label" translatable="yes">ENA</property>
+              <object class="HAL_LightButton" id="Sp0_ENA">
                 <property name="visible">True</property>
-                <property name="can-focus">True</property>
-                <property name="receives-default">True</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
+                <property name="button_text">ENA</property>
+                <property name="is_momentary">True</property>
+                <property name="dual_color">True</property>
+                <property name="light_on_color">#00ff00</property>
+                <property name="light_off_color">#ff0000</property>
               </object>
               <packing>
                 <property name="left-attach">1</property>
@@ -273,33 +275,19 @@
               </packing>
             </child>
             <child>
-              <object class="HAL_LED" id="Sp1_ENA_Status">
+              <object class="HAL_LightButton" id="Sp1_ENA">
                 <property name="visible">True</property>
-                <property name="can-focus">False</property>
-                <property name="halign">center</property>
-                <property name="valign">center</property>
-                <property name="margin-left">5</property>
-                <property name="margin-right">5</property>
-                <property name="led-blink-rate">0</property>
-                <property name="led-size">8</property>
-              </object>
-              <packing>
-                <property name="left-attach">2</property>
-                <property name="top-attach">8</property>
-              </packing>
-            </child>
-            <child>
-              <object class="HAL_Button" id="Sp1_ENA">
-                <property name="label" translatable="yes">ENA</property>
-                <property name="visible">True</property>
-                <property name="can-focus">True</property>
-                <property name="receives-default">True</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
                 <property name="margin-left">2</property>
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
+                <property name="button_text">ENA</property>
+                <property name="is_momentary">True</property>
+                <property name="dual_color">True</property>
+                <property name="light_on_color">#00ff00</property>
+                <property name="light_off_color">#ff0000</property>
               </object>
               <packing>
                 <property name="left-attach">1</property>
@@ -925,7 +913,7 @@
                 <property name="can-focus">False</property>
                 <property name="halign">start</property>
                 <property name="hexpand">True</property>
-                <property name="label" translatable="yes">Alpha Version - 23 Jul 26</property>
+                <property name="label" translatable="yes">Alpha Version - 27 Jul 26</property>
                 <property name="justify">right</property>
                 <property name="width-chars">9</property>
                 <attributes>
@@ -953,22 +941,6 @@
                 <property name="left-attach">0</property>
                 <property name="top-attach">18</property>
                 <property name="width">14</property>
-              </packing>
-            </child>
-            <child>
-              <object class="HAL_LED" id="Sp0_ENA_Status">
-                <property name="visible">True</property>
-                <property name="can-focus">False</property>
-                <property name="halign">center</property>
-                <property name="valign">center</property>
-                <property name="margin-left">5</property>
-                <property name="margin-right">5</property>
-                <property name="led-blink-rate">0</property>
-                <property name="led-size">8</property>
-              </object>
-              <packing>
-                <property name="left-attach">2</property>
-                <property name="top-attach">7</property>
               </packing>
             </child>
             <child>
@@ -1367,33 +1339,19 @@ feed rate</property>
               </packing>
             </child>
             <child>
-              <object class="HAL_LED" id="X_ENA_Status">
+              <object class="HAL_LightButton" id="X_ENA">
                 <property name="visible">True</property>
-                <property name="can-focus">False</property>
-                <property name="halign">center</property>
-                <property name="valign">center</property>
-                <property name="margin-left">5</property>
-                <property name="margin-right">5</property>
-                <property name="led-blink-rate">0</property>
-                <property name="led-size">8</property>
-              </object>
-              <packing>
-                <property name="left-attach">2</property>
-                <property name="top-attach">10</property>
-              </packing>
-            </child>
-            <child>
-              <object class="HAL_Button" id="X_ENA">
-                <property name="label" translatable="yes">ENA</property>
-                <property name="visible">True</property>
-                <property name="can-focus">True</property>
-                <property name="receives-default">True</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
                 <property name="margin-left">2</property>
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
+                <property name="button_text">ENA</property>
+                <property name="is_momentary">True</property>
+                <property name="dual_color">True</property>
+                <property name="light_on_color">#00ff00</property>
+                <property name="light_off_color">#ff0000</property>
               </object>
               <packing>
                 <property name="left-attach">1</property>
@@ -1415,17 +1373,19 @@ feed rate</property>
               </packing>
             </child>
             <child>
-              <object class="HAL_Button" id="Z_ENA">
-                <property name="label" translatable="yes">ENA</property>
+              <object class="HAL_LightButton" id="Z_ENA">
                 <property name="visible">True</property>
-                <property name="can-focus">True</property>
-                <property name="receives-default">True</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
                 <property name="margin-left">2</property>
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
+                <property name="button_text">ENA</property>
+                <property name="is_momentary">True</property>
+                <property name="dual_color">True</property>
+                <property name="light_on_color">#00ff00</property>
+                <property name="light_off_color">#ff0000</property>
               </object>
               <packing>
                 <property name="left-attach">1</property>
@@ -1433,17 +1393,19 @@ feed rate</property>
               </packing>
             </child>
             <child>
-              <object class="HAL_Button" id="U_ENA">
-                <property name="label" translatable="yes">ENA</property>
+              <object class="HAL_LightButton" id="U_ENA">
                 <property name="visible">True</property>
-                <property name="can-focus">True</property>
-                <property name="receives-default">True</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
                 <property name="margin-left">2</property>
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
+                <property name="button_text">ENA</property>
+                <property name="is_momentary">True</property>
+                <property name="dual_color">True</property>
+                <property name="light_on_color">#00ff00</property>
+                <property name="light_off_color">#ff0000</property>
               </object>
               <packing>
                 <property name="left-attach">1</property>
@@ -1451,17 +1413,19 @@ feed rate</property>
               </packing>
             </child>
             <child>
-              <object class="HAL_Button" id="V_ENA">
-                <property name="label" translatable="yes">ENA</property>
+              <object class="HAL_LightButton" id="V_ENA">
                 <property name="visible">True</property>
-                <property name="can-focus">True</property>
-                <property name="receives-default">True</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
                 <property name="margin-left">2</property>
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
+                <property name="button_text">ENA</property>
+                <property name="is_momentary">True</property>
+                <property name="dual_color">True</property>
+                <property name="light_on_color">#00ff00</property>
+                <property name="light_off_color">#ff0000</property>
               </object>
               <packing>
                 <property name="left-attach">1</property>
@@ -1469,84 +1433,22 @@ feed rate</property>
               </packing>
             </child>
             <child>
-              <object class="HAL_Button" id="W_ENA">
-                <property name="label" translatable="yes">ENA</property>
+              <object class="HAL_LightButton" id="W_ENA">
                 <property name="visible">True</property>
-                <property name="can-focus">True</property>
-                <property name="receives-default">True</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
                 <property name="margin-left">2</property>
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
+                <property name="button_text">ENA</property>
+                <property name="is_momentary">True</property>
+                <property name="dual_color">True</property>
+                <property name="light_on_color">#00ff00</property>
+                <property name="light_off_color">#ff0000</property>
               </object>
               <packing>
                 <property name="left-attach">1</property>
-                <property name="top-attach">15</property>
-              </packing>
-            </child>
-            <child>
-              <object class="HAL_LED" id="Z_ENA_Status">
-                <property name="visible">True</property>
-                <property name="can-focus">False</property>
-                <property name="halign">center</property>
-                <property name="valign">center</property>
-                <property name="margin-left">5</property>
-                <property name="margin-right">5</property>
-                <property name="led-blink-rate">0</property>
-                <property name="led-size">8</property>
-              </object>
-              <packing>
-                <property name="left-attach">2</property>
-                <property name="top-attach">12</property>
-              </packing>
-            </child>
-            <child>
-              <object class="HAL_LED" id="U_ENA_Status">
-                <property name="visible">True</property>
-                <property name="can-focus">False</property>
-                <property name="halign">center</property>
-                <property name="valign">center</property>
-                <property name="margin-left">5</property>
-                <property name="margin-right">5</property>
-                <property name="led-blink-rate">0</property>
-                <property name="led-size">8</property>
-              </object>
-              <packing>
-                <property name="left-attach">2</property>
-                <property name="top-attach">13</property>
-              </packing>
-            </child>
-            <child>
-              <object class="HAL_LED" id="V_ENA_Status">
-                <property name="visible">True</property>
-                <property name="can-focus">False</property>
-                <property name="halign">center</property>
-                <property name="valign">center</property>
-                <property name="margin-left">5</property>
-                <property name="margin-right">5</property>
-                <property name="led-blink-rate">0</property>
-                <property name="led-size">8</property>
-              </object>
-              <packing>
-                <property name="left-attach">2</property>
-                <property name="top-attach">14</property>
-              </packing>
-            </child>
-            <child>
-              <object class="HAL_LED" id="W_ENA_Status">
-                <property name="visible">True</property>
-                <property name="can-focus">False</property>
-                <property name="halign">center</property>
-                <property name="valign">center</property>
-                <property name="margin-left">5</property>
-                <property name="margin-right">5</property>
-                <property name="led-blink-rate">0</property>
-                <property name="led-size">8</property>
-              </object>
-              <packing>
-                <property name="left-attach">2</property>
                 <property name="top-attach">15</property>
               </packing>
             </child>
@@ -1972,33 +1874,19 @@ feed rate</property>
               </packing>
             </child>
             <child>
-              <object class="HAL_LED" id="B_ENA_Status">
+              <object class="HAL_LightButton" id="B_ENA">
                 <property name="visible">True</property>
-                <property name="can-focus">False</property>
-                <property name="halign">center</property>
-                <property name="valign">center</property>
-                <property name="margin-left">5</property>
-                <property name="margin-right">5</property>
-                <property name="led-blink-rate">0</property>
-                <property name="led-size">8</property>
-              </object>
-              <packing>
-                <property name="left-attach">2</property>
-                <property name="top-attach">17</property>
-              </packing>
-            </child>
-            <child>
-              <object class="HAL_Button" id="B_ENA">
-                <property name="label" translatable="yes">ENA</property>
-                <property name="visible">True</property>
-                <property name="can-focus">True</property>
-                <property name="receives-default">True</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
                 <property name="margin-left">2</property>
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
+                <property name="button_text">ENA</property>
+                <property name="is_momentary">True</property>
+                <property name="dual_color">True</property>
+                <property name="light_on_color">#00ff00</property>
+                <property name="light_off_color">#ff0000</property>
               </object>
               <packing>
                 <property name="left-attach">1</property>

@@ -125,7 +125,7 @@ addf sp0-ena-and servo-thread
 addf sp1-ena-and servo-thread
 
 # net spindle.0-vel-cmd-rpm 				 => gladevcp.Sp0_Spd
-net sp0-ena-btn                          <= gladevcp.Sp0_ENA
+net sp0-ena-btn                          <= gladevcp.Sp0_ENA-button
 net sp0-ena-btn                          => sp0-ena-flip.clk
 net sp0-ena-panel                        <= sp0-ena-flip.out
 net sp0-ena-panel                        => sp0-ena-and.in0
@@ -135,10 +135,10 @@ net sp0-ena-panel-inv                    => sp0-ena-flip.data
 net sp0-ena-settings-allow               <= REBCnfg.Sp0_Ena_Override
 net sp0-ena-settings-allow               => sp0-ena-and.in1
 net spindle.0-enable                     <= sp0-ena-and.out
-net spindle.0-enable                     => gladevcp.Sp0_ENA_Status
+net spindle.0-enable                     => gladevcp.Sp0_ENA-light
 
 # net spindle.1-vel-cmd-rpm 				 => gladevcp.Sp1_Spd
-net sp1-ena-btn                          <= gladevcp.Sp1_ENA
+net sp1-ena-btn                          <= gladevcp.Sp1_ENA-button
 net sp1-ena-btn                          => sp1-ena-flip.clk
 net sp1-ena-panel                        <= sp1-ena-flip.out
 net sp1-ena-panel                        => sp1-ena-and.in0
@@ -148,7 +148,7 @@ net sp1-ena-panel-inv                    => sp1-ena-flip.data
 net sp1-ena-settings-allow               <= REBCnfg.Sp1_Ena_Override
 net sp1-ena-settings-allow               => sp1-ena-and.in1
 net spindle.1-enable                     <= sp1-ena-and.out
-net spindle.1-enable                     => gladevcp.Sp1_ENA_Status
+net spindle.1-enable                     => gladevcp.Sp1_ENA-light
 
 # ******************************************
 # Rotary Axes
@@ -159,7 +159,7 @@ addf b-ena-and servo-thread
 
 # net b-vel-cmd							 => gladevcp.B_Spd
 # net b-pos-fb							 => gladevcp.B_DRO
-net b-ena-btn                            <= gladevcp.B_ENA
+net b-ena-btn                            <= gladevcp.B_ENA-button
 net b-ena-btn                            => b-ena-flip.clk
 net b-ena-panel                          <= b-ena-flip.out
 net b-ena-panel                          => b-ena-and.in0
@@ -169,7 +169,7 @@ net b-ena-panel-inv                      => b-ena-flip.data
 net b-ena-settings-allow                 <= REBCnfg.B_Ena_Override
 net b-ena-settings-allow                 => b-ena-and.in1
 net b-enable                             <= b-ena-and.out
-net b-enable                             => gladevcp.B_ENA_Status
+net b-enable                             => gladevcp.B_ENA-light
 
 # ******************************************
 # Linear Axes
@@ -181,7 +181,7 @@ addf x-ena-not servo-thread
 addf x-ena-flip servo-thread
 addf x-ena-and servo-thread
 
-net x-ena-btn                            <= gladevcp.X_ENA
+net x-ena-btn                            <= gladevcp.X_ENA-button
 net x-ena-btn                            => x-ena-flip.clk
 net x-ena-panel                          <= x-ena-flip.out
 net x-ena-panel                          => x-ena-and.in0
@@ -191,7 +191,7 @@ net x-ena-panel-inv                      => x-ena-flip.data
 net x-ena-settings-allow                 <= REBCnfg.X_Ena_Override
 net x-ena-settings-allow                 => x-ena-and.in1
 net x-enable                             <= x-ena-and.out
-net x-enable                             => gladevcp.X_ENA_Status
+net x-enable                             => gladevcp.X_ENA-light
 
 # net y-vel-cmd							 => gladevcp.Y_Spd
 # net y-pos-fb							 => gladevcp.Y_DRO
@@ -213,7 +213,7 @@ addf w-ena-and servo-thread
 
 # net z-vel-cmd							 => gladevcp.Z_Spd
 # net z-pos-fb							 => gladevcp.Z_DRO
-net z-ena-btn                            <= gladevcp.Z_ENA
+net z-ena-btn                            <= gladevcp.Z_ENA-button
 net z-ena-btn                            => z-ena-flip.clk
 net z-ena-panel                          <= z-ena-flip.out
 net z-ena-panel                          => z-ena-and.in0
@@ -223,11 +223,11 @@ net z-ena-panel-inv                      => z-ena-flip.data
 net z-ena-settings-allow                 <= REBCnfg.Z_Ena_Override
 net z-ena-settings-allow                 => z-ena-and.in1
 net z-enable                             <= z-ena-and.out
-net z-enable                             => gladevcp.Z_ENA_Status
+net z-enable                             => gladevcp.Z_ENA-light
 
 # net u-vel-cmd							 => gladevcp.U_Spd
 # net u-pos-fb							 => gladevcp.U_DRO
-net u-ena-btn                            <= gladevcp.U_ENA
+net u-ena-btn                            <= gladevcp.U_ENA-button
 net u-ena-btn                            => u-ena-flip.clk
 net u-ena-panel                          <= u-ena-flip.out
 net u-ena-panel                          => u-ena-and.in0
@@ -237,11 +237,11 @@ net u-ena-panel-inv                      => u-ena-flip.data
 net u-ena-settings-allow                 <= REBCnfg.U_Ena_Override
 net u-ena-settings-allow                 => u-ena-and.in1
 net u-enable                             <= u-ena-and.out
-net u-enable                             => gladevcp.U_ENA_Status
+net u-enable                             => gladevcp.U_ENA-light
 
 # net v-vel-cmd							 => gladevcp.V_Spd
 # net v-pos-fb							 => gladevcp.V_DRO
-net v-ena-btn                            <= gladevcp.V_ENA
+net v-ena-btn                            <= gladevcp.V_ENA-button
 net v-ena-btn                            => v-ena-flip.clk
 net v-ena-panel                          <= v-ena-flip.out
 net v-ena-panel                          => v-ena-and.in0
@@ -251,11 +251,11 @@ net v-ena-panel-inv                      => v-ena-flip.data
 net v-ena-settings-allow                 <= REBCnfg.V_Ena_Override
 net v-ena-settings-allow                 => v-ena-and.in1
 net v-enable                             <= v-ena-and.out
-net v-enable                             => gladevcp.V_ENA_Status
+net v-enable                             => gladevcp.V_ENA-light
 
 # net w-vel-cmd							 => gladevcp.W_Spd
 # net w-pos-fb							 => gladevcp.W_DRO
-net w-ena-btn                            <= gladevcp.W_ENA
+net w-ena-btn                            <= gladevcp.W_ENA-button
 net w-ena-btn                            => w-ena-flip.clk
 net w-ena-panel                          <= w-ena-flip.out
 net w-ena-panel                          => w-ena-and.in0
@@ -265,4 +265,4 @@ net w-ena-panel-inv                      => w-ena-flip.data
 net w-ena-settings-allow                 <= REBCnfg.W_Ena_Override
 net w-ena-settings-allow                 => w-ena-and.in1
 net w-enable                             <= w-ena-and.out
-net w-enable                             => gladevcp.W_ENA_Status
+net w-enable                             => gladevcp.W_ENA-light
