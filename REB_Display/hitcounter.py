@@ -70,6 +70,7 @@ import webbrowser
 import subprocess
 import re
 from gi.repository import Gdk
+from xml.sax.saxutils import escape, unescape
 
 # Axis id (as used in REB_Settings_v1.ini and the Settings tab spin
 # buttons) -> hm2_7i92.0 stepgen channel. Verified against the actual
@@ -85,6 +86,12 @@ AXIS_STEPGEN = {
     "Sp0": "06",
     "Sp1": "07",
 }
+
+SETTINGS_PATH = "/home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Settings_v1.ini"
+
+# Axes (not spindles) that have a free-text comment field on the main
+# panel, persisted to REB_Settings_v1.ini as each <axis>'s <usercomment>.
+COMMENT_AXES = ("X", "Z", "U", "V", "W", "B")
 
 # Establish connection to command and status channels
 c = linuxcnc.command()
@@ -151,13 +158,11 @@ class HandlerClass:
         if self.builder.get_object("X_Set_Scale") is None:
             return
 
-        settings_path = "/home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Settings_v1.ini"
-
         try:
-            with open(settings_path, "r") as f:
+            with open(SETTINGS_PATH, "r") as f:
                 xml_text = f.read()
         except OSError as e:
-            print("Could not read " + settings_path + ": " + str(e))
+            print("Could not read " + SETTINGS_PATH + ": " + str(e))
             return
 
         for axis_id, stepgen_ch in AXIS_STEPGEN.items():
@@ -167,7 +172,7 @@ class HandlerClass:
             )
             if not match:
                 print("No stored scale found for axis " + axis_id
-                      + " in " + settings_path)
+                      + " in " + SETTINGS_PATH)
                 continue
 
             value = float(match.group(1))
@@ -189,6 +194,99 @@ class HandlerClass:
                 print("Error restoring " + hal_pin + ": " + e.stderr)
             except FileNotFoundError:
                 print("halcmd not found - is the LinuxCNC environment sourced?")
+
+    def _load_axis_comments(self):
+        '''
+        Reads each axis's persisted user comment from REB_Settings_v1.ini
+        and applies it to that axis's comment field on the main panel.
+
+        Only runs in the component that actually owns these Entry
+        widgets (X_Comment etc., on the main REB_Panel) - every other
+        tab/panel also using hitcounter.py will find that widget
+        missing and return immediately.
+        '''
+        if self.builder.get_object("X_Comment") is None:
+            return
+
+        try:
+            with open(SETTINGS_PATH, "r") as f:
+                xml_text = f.read()
+        except OSError as e:
+            print("Could not read " + SETTINGS_PATH + ": " + str(e))
+            return
+
+        for axis_id in COMMENT_AXES:
+            widget = self.builder.get_object(axis_id + "_Comment")
+            if widget is None:
+                continue
+
+            match = re.search(
+                r'<axis\s+id="' + re.escape(axis_id) + r'">\s*<scale>-?[\d.]+</scale>\s*'
+                r'<usercomment>(.*?)</usercomment>',
+                xml_text,
+                re.DOTALL
+            )
+            if not match:
+                print("No stored comment found for axis " + axis_id
+                      + " in " + SETTINGS_PATH)
+                continue
+
+            widget.set_text(unescape(match.group(1)))
+
+    def _save_axis_comment(self, axis_id, text):
+        '''
+        Writes a single axis's comment back into REB_Settings_v1.ini,
+        updating only that axis's <usercomment> value. Called from
+        each comment Entry's focus-out-event handler below.
+        '''
+        try:
+            with open(SETTINGS_PATH, "r") as f:
+                xml_text = f.read()
+        except OSError as e:
+            print("Could not read " + SETTINGS_PATH + ": " + str(e))
+            return
+
+        pattern = (
+            r'(<axis\s+id="' + re.escape(axis_id) + r'">\s*<scale>-?[\d.]+</scale>\s*<usercomment>)'
+            r'.*?'
+            r'(</usercomment>)'
+        )
+        new_text, count = re.subn(
+            pattern,
+            lambda m: m.group(1) + escape(text) + m.group(2),
+            xml_text,
+            count=1,
+            flags=re.DOTALL
+        )
+        if count == 0:
+            print("No <usercomment> entry found for axis " + axis_id
+                  + " in " + SETTINGS_PATH + " - leaving it unchanged")
+            return
+
+        try:
+            with open(SETTINGS_PATH, "w") as f:
+                f.write(new_text)
+            print("Saved " + axis_id + " comment")
+        except OSError as e:
+            print("Could not write " + SETTINGS_PATH + ": " + str(e))
+
+    def X_Comment(self, widget):
+        self._save_axis_comment("X", widget.get_text())
+
+    def Z_Comment(self, widget):
+        self._save_axis_comment("Z", widget.get_text())
+
+    def U_Comment(self, widget):
+        self._save_axis_comment("U", widget.get_text())
+
+    def V_Comment(self, widget):
+        self._save_axis_comment("V", widget.get_text())
+
+    def W_Comment(self, widget):
+        self._save_axis_comment("W", widget.get_text())
+
+    def B_Comment(self, widget):
+        self._save_axis_comment("B", widget.get_text())
 
 # ********************************************************************
 #    AA    XX    XX IIIIIIII  SSSSSS      BBBBBBB
@@ -2721,6 +2819,12 @@ class HandlerClass:
         # Settings tab (REBHlp), which is the only one with these
         # widgets.
         self._load_scale_settings()
+
+        # Restore persisted per-axis user comments (REB_Settings_v1.ini)
+        # into the main panel's comment fields. No-ops in every
+        # component other than the main panel (gladevcp), which is the
+        # only one with these widgets.
+        self._load_axis_comments()
 
         ###############################################################
         # Global Program Variables - declare and set initial value.

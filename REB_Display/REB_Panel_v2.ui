@@ -261,13 +261,16 @@
             <child>
               <object class="HAL_LightButton" id="Sp0_ENA">
                 <property name="visible">True</property>
+                <property name="can-focus">False</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
-                <property name="button_text">ENA</property>
-                <property name="is_momentary">True</property>
-                <property name="dual_color">True</property>
-                <property name="light_on_color">#00ff00</property>
-                <property name="light_off_color">#ff0000</property>
+                <property name="button-text">ENA</property>
+                <property name="dual-color">True</property>
+                <property name="font-off-color"/>
+                <property name="font-on-color"/>
+                <property name="is-momentary">True</property>
+                <property name="light-off-color">#ffff00000000</property>
+                <property name="light-on-color">#0000ffff0000</property>
               </object>
               <packing>
                 <property name="left-attach">1</property>
@@ -277,17 +280,20 @@
             <child>
               <object class="HAL_LightButton" id="Sp1_ENA">
                 <property name="visible">True</property>
+                <property name="can-focus">False</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
                 <property name="margin-left">2</property>
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
-                <property name="button_text">ENA</property>
-                <property name="is_momentary">True</property>
-                <property name="dual_color">True</property>
-                <property name="light_on_color">#00ff00</property>
-                <property name="light_off_color">#ff0000</property>
+                <property name="button-text">ENA</property>
+                <property name="dual-color">True</property>
+                <property name="font-off-color"/>
+                <property name="font-on-color"/>
+                <property name="is-momentary">True</property>
+                <property name="light-off-color">#ffff00000000</property>
+                <property name="light-on-color">#0000ffff0000</property>
               </object>
               <packing>
                 <property name="left-attach">1</property>
@@ -801,9 +807,9 @@
                 <property name="pixbuf">Images/AxesSm.png</property>
               </object>
               <packing>
-                <property name="left-attach">10</property>
+                <property name="left-attach">12</property>
                 <property name="top-attach">19</property>
-                <property name="width">4</property>
+                <property name="width">2</property>
                 <property name="height">3</property>
               </packing>
             </child>
@@ -1341,21 +1347,41 @@ feed rate</property>
             <child>
               <object class="HAL_LightButton" id="X_ENA">
                 <property name="visible">True</property>
+                <property name="can-focus">False</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
                 <property name="margin-left">2</property>
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
-                <property name="button_text">ENA</property>
-                <property name="is_momentary">True</property>
-                <property name="dual_color">True</property>
-                <property name="light_on_color">#00ff00</property>
-                <property name="light_off_color">#ff0000</property>
+                <property name="button-text">ENA</property>
+                <property name="dual-color">True</property>
+                <property name="font-off-color"/>
+                <property name="font-on-color"/>
+                <property name="is-momentary">True</property>
+                <property name="light-off-color">#ffff00000000</property>
+                <property name="light-on-color">#0000ffff0000</property>
               </object>
               <packing>
                 <property name="left-attach">1</property>
                 <property name="top-attach">10</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkEntry" id="X_Comment">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="tooltip-text" translatable="yes">X axis comment (press Enter to save)</property>
+                <property name="valign">center</property>
+                <property name="margin-left">2</property>
+                <property name="margin-right">2</property>
+                <property name="width-chars">10</property>
+                <signal name="activate" handler="X_Comment" swapped="no"/>
+              </object>
+              <packing>
+                <property name="left-attach">6</property>
+                <property name="top-attach">10</property>
+                <property name="width">3</property>
               </packing>
             </child>
             <child>
@@ -1375,17 +1401,20 @@ feed rate</property>
             <child>
               <object class="HAL_LightButton" id="Z_ENA">
                 <property name="visible">True</property>
+                <property name="can-focus">False</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
                 <property name="margin-left">2</property>
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
-                <property name="button_text">ENA</property>
-                <property name="is_momentary">True</property>
-                <property name="dual_color">True</property>
-                <property name="light_on_color">#00ff00</property>
-                <property name="light_off_color">#ff0000</property>
+                <property name="button-text">ENA</property>
+                <property name="dual-color">True</property>
+                <property name="font-off-color"/>
+                <property name="font-on-color"/>
+                <property name="is-momentary">True</property>
+                <property name="light-off-color">#ffff00000000</property>
+                <property name="light-on-color">#0000ffff0000</property>
               </object>
               <packing>
                 <property name="left-attach">1</property>
@@ -1393,19 +1422,39 @@ feed rate</property>
               </packing>
             </child>
             <child>
+              <object class="GtkEntry" id="Z_Comment">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="tooltip-text" translatable="yes">Z axis comment (press Enter to save)</property>
+                <property name="valign">center</property>
+                <property name="margin-left">2</property>
+                <property name="margin-right">2</property>
+                <property name="width-chars">10</property>
+                <signal name="activate" handler="Z_Comment" swapped="no"/>
+              </object>
+              <packing>
+                <property name="left-attach">6</property>
+                <property name="top-attach">12</property>
+                <property name="width">3</property>
+              </packing>
+            </child>
+            <child>
               <object class="HAL_LightButton" id="U_ENA">
                 <property name="visible">True</property>
+                <property name="can-focus">False</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
                 <property name="margin-left">2</property>
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
-                <property name="button_text">ENA</property>
-                <property name="is_momentary">True</property>
-                <property name="dual_color">True</property>
-                <property name="light_on_color">#00ff00</property>
-                <property name="light_off_color">#ff0000</property>
+                <property name="button-text">ENA</property>
+                <property name="dual-color">True</property>
+                <property name="font-off-color"/>
+                <property name="font-on-color"/>
+                <property name="is-momentary">True</property>
+                <property name="light-off-color">#ffff00000000</property>
+                <property name="light-on-color">#0000ffff0000</property>
               </object>
               <packing>
                 <property name="left-attach">1</property>
@@ -1413,19 +1462,39 @@ feed rate</property>
               </packing>
             </child>
             <child>
+              <object class="GtkEntry" id="U_Comment">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="tooltip-text" translatable="yes">U axis comment (press Enter to save)</property>
+                <property name="valign">center</property>
+                <property name="margin-left">2</property>
+                <property name="margin-right">2</property>
+                <property name="width-chars">10</property>
+                <signal name="activate" handler="U_Comment" swapped="no"/>
+              </object>
+              <packing>
+                <property name="left-attach">6</property>
+                <property name="top-attach">13</property>
+                <property name="width">3</property>
+              </packing>
+            </child>
+            <child>
               <object class="HAL_LightButton" id="V_ENA">
                 <property name="visible">True</property>
+                <property name="can-focus">False</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
                 <property name="margin-left">2</property>
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
-                <property name="button_text">ENA</property>
-                <property name="is_momentary">True</property>
-                <property name="dual_color">True</property>
-                <property name="light_on_color">#00ff00</property>
-                <property name="light_off_color">#ff0000</property>
+                <property name="button-text">ENA</property>
+                <property name="dual-color">True</property>
+                <property name="font-off-color"/>
+                <property name="font-on-color"/>
+                <property name="is-momentary">True</property>
+                <property name="light-off-color">#ffff00000000</property>
+                <property name="light-on-color">#0000ffff0000</property>
               </object>
               <packing>
                 <property name="left-attach">1</property>
@@ -1433,23 +1502,60 @@ feed rate</property>
               </packing>
             </child>
             <child>
+              <object class="GtkEntry" id="V_Comment">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="tooltip-text" translatable="yes">V axis comment (press Enter to save)</property>
+                <property name="valign">center</property>
+                <property name="margin-left">2</property>
+                <property name="margin-right">2</property>
+                <property name="width-chars">10</property>
+                <signal name="activate" handler="V_Comment" swapped="no"/>
+              </object>
+              <packing>
+                <property name="left-attach">6</property>
+                <property name="top-attach">14</property>
+                <property name="width">3</property>
+              </packing>
+            </child>
+            <child>
               <object class="HAL_LightButton" id="W_ENA">
                 <property name="visible">True</property>
+                <property name="can-focus">False</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
                 <property name="margin-left">2</property>
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
-                <property name="button_text">ENA</property>
-                <property name="is_momentary">True</property>
-                <property name="dual_color">True</property>
-                <property name="light_on_color">#00ff00</property>
-                <property name="light_off_color">#ff0000</property>
+                <property name="button-text">ENA</property>
+                <property name="dual-color">True</property>
+                <property name="font-off-color"/>
+                <property name="font-on-color"/>
+                <property name="is-momentary">True</property>
+                <property name="light-off-color">#ffff00000000</property>
+                <property name="light-on-color">#0000ffff0000</property>
               </object>
               <packing>
                 <property name="left-attach">1</property>
                 <property name="top-attach">15</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkEntry" id="W_Comment">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="tooltip-text" translatable="yes">W axis comment (press Enter to save)</property>
+                <property name="valign">center</property>
+                <property name="margin-left">2</property>
+                <property name="margin-right">2</property>
+                <property name="width-chars">10</property>
+                <signal name="activate" handler="W_Comment" swapped="no"/>
+              </object>
+              <packing>
+                <property name="left-attach">6</property>
+                <property name="top-attach">15</property>
+                <property name="width">3</property>
               </packing>
             </child>
             <child>
@@ -1876,21 +1982,41 @@ feed rate</property>
             <child>
               <object class="HAL_LightButton" id="B_ENA">
                 <property name="visible">True</property>
+                <property name="can-focus">False</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
                 <property name="margin-left">2</property>
                 <property name="margin-right">2</property>
                 <property name="margin-top">2</property>
                 <property name="margin-bottom">2</property>
-                <property name="button_text">ENA</property>
-                <property name="is_momentary">True</property>
-                <property name="dual_color">True</property>
-                <property name="light_on_color">#00ff00</property>
-                <property name="light_off_color">#ff0000</property>
+                <property name="button-text">ENA</property>
+                <property name="dual-color">True</property>
+                <property name="font-off-color"/>
+                <property name="font-on-color"/>
+                <property name="is-momentary">True</property>
+                <property name="light-off-color">#ffff00000000</property>
+                <property name="light-on-color">#0000ffff0000</property>
               </object>
               <packing>
                 <property name="left-attach">1</property>
                 <property name="top-attach">17</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkEntry" id="B_Comment">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="tooltip-text" translatable="yes">B axis comment (press Enter to save)</property>
+                <property name="valign">center</property>
+                <property name="margin-left">2</property>
+                <property name="margin-right">2</property>
+                <property name="width-chars">10</property>
+                <signal name="activate" handler="B_Comment" swapped="no"/>
+              </object>
+              <packing>
+                <property name="left-attach">6</property>
+                <property name="top-attach">17</property>
+                <property name="width">3</property>
               </packing>
             </child>
             <child>
@@ -1965,15 +2091,17 @@ feed rate</property>
               </packing>
             </child>
             <child>
-              <object class="GtkLabel" id="V_axis_feed1">
+              <object class="GtkLabel" id="Comments1">
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
                 <property name="halign">start</property>
                 <property name="valign">start</property>
                 <property name="margin-start">2</property>
                 <property name="vexpand">True</property>
-                <property name="label" translatable="yes">U is parallel to X
-V is parallel to Y | B is rotation around Y
+                <property name="label" translatable="yes">AXIS NOTES
+B is rotation around Y
+U is parallel to X
+V is parallel to Y
 W is parallel to Z</property>
                 <property name="wrap">True</property>
                 <property name="xalign">0.5</property>
@@ -1981,66 +2109,46 @@ W is parallel to Z</property>
               <packing>
                 <property name="left-attach">0</property>
                 <property name="top-attach">19</property>
-                <property name="width">10</property>
+                <property name="width">4</property>
                 <property name="height">2</property>
               </packing>
             </child>
             <child>
-              <placeholder/>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="valign">end</property>
+                <property name="label" translatable="yes">Comments</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif 12"/>
+                  <attribute name="weight" value="bold"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">6</property>
+                <property name="top-attach">9</property>
+                <property name="width">3</property>
+              </packing>
             </child>
             <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
+              <object class="GtkLabel" id="Comments2">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">start</property>
+                <property name="valign">start</property>
+                <property name="margin-left">2</property>
+                <property name="margin-start">2</property>
+                <property name="label" translatable="yes">COMMENTS
+After entering any comments, you must press ENTER to have them saved.</property>
+                <property name="wrap">True</property>
+                <property name="xalign">0.5</property>
+              </object>
+              <packing>
+                <property name="left-attach">4</property>
+                <property name="top-attach">19</property>
+                <property name="width">8</property>
+                <property name="height">3</property>
+              </packing>
             </child>
             <child>
               <placeholder/>
