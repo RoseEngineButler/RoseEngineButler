@@ -1,0 +1,969 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Generated with glade 3.40.0 -->
+<!-- 
+#######################################################################
+#                    RRRRRR    EEEEEEEE  BBBBBBB                      #
+#                    RR   RR   EE        BB    BB                     #
+#                    RR   RR   EE        BB    BB                     #
+#                    RRRRRR    EEEEEE    BBBBBBB                      #
+#                    RR   RR   EE        BB    BB                     #
+#                    RR    RR  EE        BB    BB                     #
+#                    RR    RR  EEEEEEEE  BBBBBBB                      #
+#                                                                     #
+# Rose Engine Butler                                                  #
+#######################################################################
+#                                                                     #
+# LinuxCNC configuration for use with a Rose Engine                   #
+#                                                                     #
+# File:                                                               #
+#   REB_Tab_Settings_v1.ui                                            #
+#                                                                     #
+# Purpose:                                                            #
+#   This is a Glade VCP panel used to provide the user the ability    #
+#   to modify the axis scales without having to edit a text file,     #
+#   or to stop and then re-start LinuxCNC.                            #
+#                                                                     #
+# End User Customisation:                                             #
+#   The end user of the Rose Engine Butler system should not modify   #
+#   this file.  Changes to this file are not supported by Colvin      #
+#   Tools nor Brainwave Embedded.                                     #
+#                                                                     #
+# Version                                                             #
+#   1.0 - 21 July 2026, R. Colvin                                     #
+#                                                                     #
+# Copyright (c) 2026 Colvin Tools and Brainwave Embedded.             #
+#                                                                     #
+# The following MIT/X Consortium License applies to the               #
+# Rose Engine Butler system. Use of this system constitutes consent   #
+# to the terms outlined below.                                        #
+#                                                                     #
+# Permission is hereby granted, free of charge, to any person         #
+# obtaining a copy of this software and associated documentation      #
+# files (the "Software"), to deal in the Software without             #
+# restriction, including without limitation the rights to use, copy,  #
+# modify, merge, publish, distribute, sublicense, and/or sell copies  #
+# of the Software, and to permit persons to whom the Software is      #
+# furnished to do so, subject to the following conditions:            #
+#                                                                     #
+#       The above copyright notice and this permission notice shall   #
+#       be included in all copies or substantial portions of the      #
+#       Software.                                                     #
+#                                                                     #
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,     #
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF  #
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND               #
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS #
+# BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN  #
+# ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN   #
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE    #
+# SOFTWARE.                                                           #
+#                                                                     #
+# Except as contained in this notice, the name of COPYRIGHT HOLDERS   #
+# shall not be used in advertising or otherwise to promote the sale,  #
+# use or other dealings in this Software without prior written        #
+# authorization from COPYRIGHT HOLDERS.                               #
+#######################################################################
+-->
+<interface>
+  <requires lib="gtk+" version="3.24"/>
+  <requires lib="gladevcp" version="0.0"/>
+  <object class="GtkAdjustment" id="B_Set_Scale_adj">
+    <property name="lower">-1000000</property>
+    <property name="upper">1000000</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="Sp0_Set_Scale_adj">
+    <property name="lower">-1000000</property>
+    <property name="upper">1000000</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="Sp1_Set_Scale_adj">
+    <property name="lower">-1000000</property>
+    <property name="upper">1000000</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="U_Set_Scale_adj">
+    <property name="lower">-1000000</property>
+    <property name="upper">1000000</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="V_Set_Scale_adj">
+    <property name="lower">-1000000</property>
+    <property name="upper">1000000</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="W_Set_Scale_adj">
+    <property name="lower">-1000000</property>
+    <property name="upper">1000000</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="X_Set_Scale_adj">
+    <property name="lower">-1000000</property>
+    <property name="upper">1000000</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="Z_Set_Scale_adj">
+    <property name="lower">-1000000</property>
+    <property name="upper">1000000</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkWindow" id="window1">
+    <property name="can-focus">False</property>
+    <property name="halign">start</property>
+    <property name="valign">start</property>
+    <property name="vexpand">True</property>
+    <child>
+      <object class="GtkBox" id="vbox1">
+        <property name="visible">True</property>
+        <property name="can-focus">False</property>
+        <property name="halign">start</property>
+        <property name="valign">start</property>
+        <property name="vexpand">True</property>
+        <property name="orientation">vertical</property>
+        <child>
+          <!-- n-columns=5 n-rows=20 -->
+          <object class="GtkGrid">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="halign">start</property>
+            <property name="valign">start</property>
+            <property name="margin-top">4</property>
+            <property name="vexpand">True</property>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">start</property>
+                <property name="hexpand">True</property>
+                <property name="label" translatable="yes">Configure Axes</property>
+                <property name="justify">center</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif 20"/>
+                  <attribute name="weight" value="bold"/>
+                  <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">0</property>
+                <property name="width">3</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">center</property>
+                <property name="valign">end</property>
+                <property name="label" translatable="yes">Axis</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif 10"/>
+                  <attribute name="weight" value="bold"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="label" translatable="yes">B</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif Bold 12"/>
+                  <attribute name="weight" value="bold"/>
+                  <attribute name="foreground" value="#a5a51d1d2d2d"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">16</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">start</property>
+                <property name="label" translatable="yes">Rotary Axes</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif 13"/>
+                  <attribute name="weight" value="bold"/>
+                  <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">15</property>
+                <property name="width">3</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="label" translatable="yes">W</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif Bold 12"/>
+                  <attribute name="weight" value="bold"/>
+                  <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">13</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="label" translatable="yes">V</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif Bold 12"/>
+                  <attribute name="weight" value="bold"/>
+                  <attribute name="foreground" value="#a5a51d1d2d2d"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">12</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="label" translatable="yes">U</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif Bold 12"/>
+                  <attribute name="weight" value="bold"/>
+                  <attribute name="foreground" value="#e5e5a5a50a0a"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">11</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="label" translatable="yes">Z</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif Bold 12"/>
+                  <attribute name="weight" value="bold"/>
+                  <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">10</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="label" translatable="yes">Y</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif Bold 14"/>
+                  <attribute name="style" value="italic"/>
+                  <attribute name="weight" value="bold"/>
+                  <attribute name="foreground" value="#c0c0bfbfbcbc"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">9</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="label" translatable="yes">X</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif Bold 12"/>
+                  <attribute name="weight" value="bold"/>
+                  <attribute name="foreground" value="#e5e5a5a50a0a"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">8</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">start</property>
+                <property name="label" translatable="yes">Linear Axes</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif 13"/>
+                  <attribute name="weight" value="bold"/>
+                  <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">7</property>
+                <property name="width">3</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="margin-left">10</property>
+                <property name="margin-right">10</property>
+                <property name="label" translatable="yes">Sp1</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif Bold 12"/>
+                  <attribute name="weight" value="bold"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">5</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="margin-left">10</property>
+                <property name="margin-right">10</property>
+                <property name="label" translatable="yes">Sp0</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif Bold 12"/>
+                  <attribute name="weight" value="bold"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">4</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel" id="R01Menu01_Title">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">start</property>
+                <property name="label" translatable="yes">Spindles</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif 13"/>
+                  <attribute name="weight" value="bold"/>
+                  <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">3</property>
+                <property name="width">3</property>
+              </packing>
+            </child>
+            <child>
+              <object class="HAL_SpinButton" id="X_Set_Scale">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="can-default">True</property>
+                <property name="halign">end</property>
+                <property name="valign">center</property>
+                <property name="margin-start">5</property>
+                <property name="margin-top">2</property>
+                <property name="margin-bottom">2</property>
+                <property name="text" translatable="yes">1.00</property>
+                <property name="overwrite-mode">True</property>
+                <property name="input-purpose">number</property>
+                <property name="adjustment">X_Set_Scale_adj</property>
+                <property name="climb-rate">0.009999999776482582</property>
+                <property name="digits">1</property>
+                <property name="numeric">True</property>
+                <signal name="value-changed" handler="X_Set_Scale" swapped="no"/>
+              </object>
+              <packing>
+                <property name="left-attach">1</property>
+                <property name="top-attach">8</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">start</property>
+                <property name="valign">center</property>
+                <property name="margin-left">4</property>
+                <property name="margin-start">4</property>
+                <property name="label" translatable="yes">pulses / in</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif 10"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">2</property>
+                <property name="top-attach">8</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">center</property>
+                <property name="valign">end</property>
+                <property name="label" translatable="yes">Scale</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif 10"/>
+                  <attribute name="weight" value="bold"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">1</property>
+                <property name="top-attach">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="HAL_SpinButton" id="Z_Set_Scale">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="can-default">True</property>
+                <property name="halign">end</property>
+                <property name="valign">center</property>
+                <property name="margin-start">5</property>
+                <property name="margin-top">2</property>
+                <property name="margin-bottom">2</property>
+                <property name="text" translatable="yes">20000.000</property>
+                <property name="overwrite-mode">True</property>
+                <property name="input-purpose">number</property>
+                <property name="adjustment">Z_Set_Scale_adj</property>
+                <property name="climb-rate">0.009999999776482582</property>
+                <property name="digits">1</property>
+                <property name="numeric">True</property>
+                <signal name="value-changed" handler="Z_Set_Scale" swapped="no"/>
+              </object>
+              <packing>
+                <property name="left-attach">1</property>
+                <property name="top-attach">10</property>
+              </packing>
+            </child>
+            <child>
+              <object class="HAL_SpinButton" id="U_Set_Scale">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="can-default">True</property>
+                <property name="halign">end</property>
+                <property name="valign">center</property>
+                <property name="margin-start">5</property>
+                <property name="margin-top">2</property>
+                <property name="margin-bottom">2</property>
+                <property name="text" translatable="yes">20000.000</property>
+                <property name="overwrite-mode">True</property>
+                <property name="input-purpose">number</property>
+                <property name="adjustment">U_Set_Scale_adj</property>
+                <property name="climb-rate">0.009999999776482582</property>
+                <property name="digits">1</property>
+                <property name="numeric">True</property>
+                <signal name="value-changed" handler="U_Set_Scale" swapped="no"/>
+              </object>
+              <packing>
+                <property name="left-attach">1</property>
+                <property name="top-attach">11</property>
+              </packing>
+            </child>
+            <child>
+              <object class="HAL_SpinButton" id="V_Set_Scale">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="can-default">True</property>
+                <property name="halign">end</property>
+                <property name="valign">center</property>
+                <property name="margin-start">5</property>
+                <property name="margin-top">2</property>
+                <property name="margin-bottom">2</property>
+                <property name="text" translatable="yes">20000.000</property>
+                <property name="overwrite-mode">True</property>
+                <property name="input-purpose">number</property>
+                <property name="adjustment">V_Set_Scale_adj</property>
+                <property name="climb-rate">0.009999999776482582</property>
+                <property name="digits">1</property>
+                <property name="numeric">True</property>
+                <property name="value">20000</property>
+                <signal name="value-changed" handler="V_Set_Scale" swapped="no"/>
+              </object>
+              <packing>
+                <property name="left-attach">1</property>
+                <property name="top-attach">12</property>
+              </packing>
+            </child>
+            <child>
+              <object class="HAL_SpinButton" id="W_Set_Scale">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="can-default">True</property>
+                <property name="halign">end</property>
+                <property name="valign">center</property>
+                <property name="margin-start">5</property>
+                <property name="margin-top">2</property>
+                <property name="margin-bottom">2</property>
+                <property name="text" translatable="yes">20000.000</property>
+                <property name="overwrite-mode">True</property>
+                <property name="input-purpose">number</property>
+                <property name="adjustment">W_Set_Scale_adj</property>
+                <property name="climb-rate">0.009999999776482582</property>
+                <property name="digits">1</property>
+                <property name="numeric">True</property>
+                <property name="value">20000</property>
+                <signal name="value-changed" handler="W_Set_Scale" swapped="no"/>
+              </object>
+              <packing>
+                <property name="left-attach">1</property>
+                <property name="top-attach">13</property>
+              </packing>
+            </child>
+            <child>
+              <object class="HAL_SpinButton" id="B_Set_Scale">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="can-default">True</property>
+                <property name="halign">end</property>
+                <property name="valign">center</property>
+                <property name="margin-start">5</property>
+                <property name="margin-top">2</property>
+                <property name="margin-bottom">2</property>
+                <property name="text" translatable="yes">20000.000</property>
+                <property name="overwrite-mode">True</property>
+                <property name="input-purpose">number</property>
+                <property name="adjustment">B_Set_Scale_adj</property>
+                <property name="climb-rate">0.009999999776482582</property>
+                <property name="digits">3</property>
+                <property name="numeric">True</property>
+                <signal name="value-changed" handler="B_Set_Scale" swapped="no"/>
+              </object>
+              <packing>
+                <property name="left-attach">1</property>
+                <property name="top-attach">16</property>
+              </packing>
+            </child>
+            <child>
+              <object class="HAL_SpinButton" id="Sp0_Set_Scale">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="can-default">True</property>
+                <property name="halign">end</property>
+                <property name="valign">center</property>
+                <property name="margin-start">5</property>
+                <property name="margin-top">2</property>
+                <property name="margin-bottom">2</property>
+                <property name="text" translatable="yes">20000.000</property>
+                <property name="overwrite-mode">True</property>
+                <property name="input-purpose">number</property>
+                <property name="adjustment">Sp0_Set_Scale_adj</property>
+                <property name="climb-rate">0.009999999776482582</property>
+                <property name="digits">1</property>
+                <property name="numeric">True</property>
+                <signal name="value-changed" handler="Sp0_Set_Scale" swapped="no"/>
+              </object>
+              <packing>
+                <property name="left-attach">1</property>
+                <property name="top-attach">4</property>
+              </packing>
+            </child>
+            <child>
+              <object class="HAL_SpinButton" id="Sp1_Set_Scale">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="can-default">True</property>
+                <property name="halign">end</property>
+                <property name="valign">center</property>
+                <property name="margin-start">5</property>
+                <property name="margin-top">2</property>
+                <property name="margin-bottom">2</property>
+                <property name="text" translatable="yes">20000.000</property>
+                <property name="overwrite-mode">True</property>
+                <property name="input-purpose">number</property>
+                <property name="adjustment">Sp1_Set_Scale_adj</property>
+                <property name="climb-rate">0.009999999776482582</property>
+                <property name="digits">1</property>
+                <property name="numeric">True</property>
+                <signal name="value-changed" handler="Sp1_Set_Scale" swapped="no"/>
+              </object>
+              <packing>
+                <property name="left-attach">1</property>
+                <property name="top-attach">5</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">start</property>
+                <property name="valign">center</property>
+                <property name="margin-left">4</property>
+                <property name="margin-start">4</property>
+                <property name="label" translatable="yes">pulses / in</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif 10"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">2</property>
+                <property name="top-attach">10</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">start</property>
+                <property name="valign">center</property>
+                <property name="margin-left">4</property>
+                <property name="margin-start">4</property>
+                <property name="label" translatable="yes">pulses / in</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif 10"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">2</property>
+                <property name="top-attach">11</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">start</property>
+                <property name="valign">center</property>
+                <property name="margin-left">4</property>
+                <property name="margin-start">4</property>
+                <property name="label" translatable="yes">pulses / in</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif 10"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">2</property>
+                <property name="top-attach">12</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">start</property>
+                <property name="valign">center</property>
+                <property name="margin-left">4</property>
+                <property name="margin-start">4</property>
+                <property name="label" translatable="yes">pulses / in</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif 10"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">2</property>
+                <property name="top-attach">13</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">start</property>
+                <property name="valign">center</property>
+                <property name="margin-left">4</property>
+                <property name="margin-start">4</property>
+                <property name="label" translatable="yes">pulses / deg</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif 10"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">2</property>
+                <property name="top-attach">16</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">start</property>
+                <property name="valign">center</property>
+                <property name="margin-left">4</property>
+                <property name="margin-start">4</property>
+                <property name="label" translatable="yes">pulses / 
+revolution</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif 10"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">2</property>
+                <property name="top-attach">4</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">start</property>
+                <property name="valign">center</property>
+                <property name="margin-left">4</property>
+                <property name="margin-start">4</property>
+                <property name="label" translatable="yes">pulses /
+revolution</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif 10"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">2</property>
+                <property name="top-attach">5</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">center</property>
+                <property name="valign">end</property>
+                <property name="label" translatable="yes">Comments</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif 10"/>
+                  <attribute name="weight" value="bold"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">4</property>
+                <property name="top-attach">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">start</property>
+                <property name="valign">center</property>
+                <property name="margin-left">4</property>
+                <property name="margin-start">4</property>
+                <property name="width-chars">2</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif 10"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">3</property>
+                <property name="top-attach">3</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkSeparator">
+                <property name="height-request">5</property>
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="margin-top">5</property>
+                <property name="margin-bottom">5</property>
+                <property name="hexpand">True</property>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">17</property>
+                <property name="width">5</property>
+              </packing>
+            </child>
+            <child>
+              <object class="HAL_Button" id="Library">
+                <property name="label" translatable="yes">www.RoseEngineButler.com</property>
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="receives-default">True</property>
+                <property name="halign">start</property>
+                <property name="valign">end</property>
+                <property name="relief">none</property>
+                <property name="use-underline">True</property>
+                <property name="image-position">top</property>
+                <property name="always-show-image">True</property>
+                <signal name="pressed" handler="OpenLibrary" swapped="no"/>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">19</property>
+                <property name="width">2</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">start</property>
+                <property name="valign">start</property>
+                <property name="margin-left">4</property>
+                <property name="margin-start">4</property>
+                <property name="margin-end">4</property>
+                <property name="label" translatable="yes">For these fields, enter a number between 100,000 and -100,000 (without the commas).
+
+SETTING THE VALUES
+The best manner for setting these is to direct your machine to move a certain distance (e.g., 1 inch or 10 degrees), and then change this value as necessary to achieve the requested movement.  For example, if you directed it to move 1 inch, and it moves 1.1 inches, then divide the setting by 1.1.  You may have to go thru a few iterations of this to get it perfect.
+
+For the spindles, 360° is a good starting point.  For rotary axes, 10° is a good starting point.
+
+REVERSING THE DIRECTION
+If the axis is running in the wrong direction, reverse the polarity of the number (i.e., make a + into a -, or vice versa).</property>
+                <property name="wrap">True</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif 10"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">4</property>
+                <property name="top-attach">3</property>
+                <property name="height">14</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">start</property>
+                <property name="valign">start</property>
+                <property name="margin-left">4</property>
+                <property name="margin-right">4</property>
+                <property name="margin-start">4</property>
+                <property name="margin-end">4</property>
+                <property name="label" translatable="yes">GOOD PRACTICE
+Add a label to each device with the values used by that device.  Then, when using that device, you will have the needed data at the ready.
+
+MORE HELP
+There is far more descriptive help  in the Rose Engine Butler's User Manual, in the entry, "Axis Settings for a Device".  You can get to the User Manual via the ℛ Help tab.  To get to the full library, use the button below.</property>
+                <property name="wrap">True</property>
+                <attributes>
+                  <attribute name="font-desc" value="DejaVu Serif 10"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">18</property>
+                <property name="width">5</property>
+              </packing>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+            <property name="position">-1</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+  </object>
+</interface>

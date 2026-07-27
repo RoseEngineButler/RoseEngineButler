@@ -1,0 +1,1354 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Generated with glade 3.40.0 -->
+<interface>
+  <requires lib="gtk+" version="3.24"/>
+  <requires lib="gladevcp" version="0.0"/>
+  <object class="GtkImage" id="Image_Run_Sync_Fwd">
+    <property name="visible">True</property>
+    <property name="can-focus">False</property>
+    <property name="pixbuf">Images/RunCW.png</property>
+  </object>
+  <object class="GtkImage" id="Image_Run_Sync_Rev">
+    <property name="visible">True</property>
+    <property name="can-focus">False</property>
+    <property name="pixbuf">Images/RunCCW.png</property>
+  </object>
+  <object class="GtkImage" id="Image_Run_Sync_Stop">
+    <property name="visible">True</property>
+    <property name="can-focus">False</property>
+    <property name="pixbuf">Images/Stop.png</property>
+  </object>
+  <object class="GtkAdjustment" id="Sp0_Set_Idx_Dist_adj">
+    <property name="upper">360</property>
+    <property name="value">90</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="Sp1_Idx_adj">
+    <property name="upper">360</property>
+    <property name="value">90</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="Sp1_Set_Move_Pct_adj">
+    <property name="upper">1000</property>
+    <property name="value">100</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkWindow" id="window1">
+    <property name="can-focus">False</property>
+    <child>
+      <object class="GtkScrolledWindow" id="scrolledwindow1">
+        <property name="visible">True</property>
+        <property name="can-focus">True</property>
+        <property name="vscrollbar-policy">always</property>
+        <property name="window-placement-set">False</property>
+        <property name="shadow-type">in</property>
+        <property name="propagate-natural-width">True</property>
+        <property name="propagate-natural-height">True</property>
+        <child>
+          <object class="GtkViewport">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <child>
+              <object class="GtkBox" id="vbox1">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="orientation">vertical</property>
+                <child>
+                  <!-- n-columns=10 n-rows=14 -->
+                  <object class="GtkGrid">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <child>
+                      <object class="GtkLabel" id="vbox1_Title">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">center</property>
+                        <property name="valign">end</property>
+                        <property name="label" translatable="yes">Synchronized Movement</property>
+                        <attributes>
+                          <attribute name="font-desc" value="DejaVu Serif 20"/>
+                          <attribute name="weight" value="bold"/>
+                          <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">0</property>
+                        <property name="width">10</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_Button" id="Run_Sync_Rev">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="receives-default">True</property>
+                        <property name="halign">center</property>
+                        <property name="valign">center</property>
+                        <property name="margin-left">2</property>
+                        <property name="margin-right">2</property>
+                        <property name="margin-start">2</property>
+                        <property name="margin-end">2</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="image">Image_Run_Sync_Rev</property>
+                        <property name="use-underline">True</property>
+                        <property name="image-position">top</property>
+                        <signal name="pressed" handler="Run_Sync_Rev" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="left-attach">7</property>
+                        <property name="top-attach">3</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_Button" id="Run_Sync_Stop">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="receives-default">True</property>
+                        <property name="halign">center</property>
+                        <property name="valign">center</property>
+                        <property name="margin-left">2</property>
+                        <property name="margin-right">2</property>
+                        <property name="margin-start">2</property>
+                        <property name="margin-end">2</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="image">Image_Run_Sync_Stop</property>
+                        <property name="image-position">top</property>
+                        <signal name="pressed" handler="Sp0_Move_Stop" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="left-attach">6</property>
+                        <property name="top-attach">3</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_Button" id="Run_Sync_Fwd">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="receives-default">True</property>
+                        <property name="halign">center</property>
+                        <property name="valign">center</property>
+                        <property name="margin-left">2</property>
+                        <property name="margin-right">2</property>
+                        <property name="margin-start">2</property>
+                        <property name="margin-end">2</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="image">Image_Run_Sync_Fwd</property>
+                        <property name="image-position">top</property>
+                        <signal name="pressed" handler="Run_Sync_Fwd" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="left-attach">5</property>
+                        <property name="top-attach">3</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="R01Menu01_Title_Sp0_2">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">start</property>
+                        <property name="margin-top">18</property>
+                        <property name="label" translatable="yes">Synchronized Axes</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans Bold 13"/>
+                          <attribute name="weight" value="bold"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">5</property>
+                        <property name="width">4</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_SpinButton" id="Sp1_Set_Move_Pct">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="text" translatable="yes">100.000</property>
+                        <property name="overwrite-mode">True</property>
+                        <property name="input-purpose">number</property>
+                        <property name="adjustment">Sp1_Set_Move_Pct_adj</property>
+                        <property name="digits">3</property>
+                        <property name="numeric">True</property>
+                        <property name="value">100</property>
+                        <signal name="value-changed" handler="Sp1_Set_Move_Pct" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">4</property>
+                        <property name="width">2</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkImage" id="REB_Logo">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">start</property>
+                        <property name="valign">start</property>
+                        <property name="hexpand">True</property>
+                        <property name="pixbuf">Images/REBLogo-Sm.png</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">0</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="uom_pct_spindle_speed">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">start</property>
+                        <property name="valign">center</property>
+                        <property name="label" translatable="yes">% Spindle Speed</property>
+                        <property name="width-chars">3</property>
+                        <property name="xalign">0.05000000074505806</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">2</property>
+                        <property name="top-attach">4</property>
+                        <property name="width">3</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_SpinButton" id="X_Move_Dist">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="text" translatable="yes">0.0000</property>
+                        <property name="overwrite-mode">True</property>
+                        <property name="input-purpose">number</property>
+                        <property name="climb-rate">0.01</property>
+                        <property name="digits">4</property>
+                        <property name="numeric">True</property>
+                        <signal name="value-changed" handler="U_Set_Move_Dist" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="left-attach">1</property>
+                        <property name="top-attach">6</property>
+                        <property name="width">2</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Title - Run Op">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">center</property>
+                        <property name="valign">end</property>
+                        <property name="margin-top">6</property>
+                        <property name="margin-bottom">6</property>
+                        <property name="label" translatable="yes">Run
+Operation</property>
+                        <property name="justify">center</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans Bold 13"/>
+                          <attribute name="weight" value="bold"/>
+                          <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">5</property>
+                        <property name="top-attach">1</property>
+                        <property name="width">3</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Spacer_01">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="width-chars">4</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">4</property>
+                        <property name="top-attach">3</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Comment_Sp0">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">start</property>
+                        <property name="valign">center</property>
+                        <property name="hexpand">True</property>
+                        <property name="label" translatable="yes">Sp1 runs at the selected % of Sp0 speed when Sp0 runs.</property>
+                        <property name="wrap">True</property>
+                        <property name="width-chars">6</property>
+                        <property name="xalign">0.05000000074505806</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans 10"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">9</property>
+                        <property name="top-attach">3</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Comment_Sp1">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">start</property>
+                        <property name="valign">center</property>
+                        <property name="hexpand">True</property>
+                        <property name="label" translatable="yes">Sp1 can run up to 10x the speed of Sp0.  If the rosette spindle / multiplier should not rotate, set the percentage to 0.</property>
+                        <property name="wrap">True</property>
+                        <property name="width-chars">6</property>
+                        <property name="xalign">0.05000000074505806</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans 10"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">9</property>
+                        <property name="top-attach">4</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="uom_X">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label" translatable="yes">in</property>
+                        <property name="width-chars">6</property>
+                        <property name="xalign">0.05000000074505806</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">3</property>
+                        <property name="top-attach">6</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_SpinButton" id="Syn_Y_Dist">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="text" translatable="yes">0.0000</property>
+                        <property name="overwrite-mode">True</property>
+                        <property name="input-purpose">number</property>
+                        <property name="climb-rate">0.01</property>
+                        <property name="digits">4</property>
+                        <property name="numeric">True</property>
+                        <signal name="value-changed" handler="Y_Set_Move_Dist" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="left-attach">1</property>
+                        <property name="top-attach">7</property>
+                        <property name="width">2</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_SpinButton" id="Syn_Z_Dist">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="text" translatable="yes">0.0000</property>
+                        <property name="overwrite-mode">True</property>
+                        <property name="input-purpose">number</property>
+                        <property name="climb-rate">0.01</property>
+                        <property name="digits">4</property>
+                        <property name="numeric">True</property>
+                        <signal name="value-changed" handler="Z_Set_Move_Dist" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="left-attach">1</property>
+                        <property name="top-attach">8</property>
+                        <property name="width">2</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_SpinButton" id="U_Move_Dist">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="text" translatable="yes">0.0000</property>
+                        <property name="overwrite-mode">True</property>
+                        <property name="input-purpose">number</property>
+                        <property name="climb-rate">0.01</property>
+                        <property name="digits">4</property>
+                        <property name="numeric">True</property>
+                        <signal name="value-changed" handler="U_Set_Move_Dist" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="left-attach">1</property>
+                        <property name="top-attach">9</property>
+                        <property name="width">2</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_SpinButton" id="V_Move_Dist">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="text" translatable="yes">0.0000</property>
+                        <property name="overwrite-mode">True</property>
+                        <property name="input-purpose">number</property>
+                        <property name="climb-rate">0.01</property>
+                        <property name="digits">4</property>
+                        <property name="numeric">True</property>
+                        <signal name="value-changed" handler="V_Set_Move_Dist" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="left-attach">1</property>
+                        <property name="top-attach">10</property>
+                        <property name="width">2</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Title_Minus">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">center</property>
+                        <property name="valign">end</property>
+                        <property name="label" translatable="yes">⊖</property>
+                        <property name="justify">center</property>
+                        <property name="xalign">0.05000000074505806</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans Bold 24"/>
+                          <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">5</property>
+                        <property name="top-attach">5</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Title_Plus">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">center</property>
+                        <property name="valign">end</property>
+                        <property name="label" translatable="yes">⊕</property>
+                        <property name="justify">center</property>
+                        <property name="xalign">0.05000000074505806</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans Bold 24"/>
+                          <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">7</property>
+                        <property name="top-attach">5</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkImage" id="Axis_X_Minus">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="pixbuf">Images/RunLft.png</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">5</property>
+                        <property name="top-attach">6</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkImage" id="Axis_Z_Minus">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="pixbuf">Images/RunLft.png</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">5</property>
+                        <property name="top-attach">8</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkImage" id="Axis_U_Minus">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="pixbuf">Images/RunLft.png</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">5</property>
+                        <property name="top-attach">9</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkImage" id="Axis_Y_Minus">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="pixbuf">Images/RunUp.png</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">5</property>
+                        <property name="top-attach">7</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkImage" id="Axis_V_Minus">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="pixbuf">Images/RunUp.png</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">5</property>
+                        <property name="top-attach">10</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkImage" id="Axis_X_Plus">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="pixbuf">Images/RunRt.png</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">7</property>
+                        <property name="top-attach">6</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkImage" id="Axis_Z_Plus">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="pixbuf">Images/RunRt.png</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">7</property>
+                        <property name="top-attach">8</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkImage" id="Axis_U_Plus">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="pixbuf">Images/RunRt.png</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">7</property>
+                        <property name="top-attach">9</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkImage" id="Axis_Y_Plus">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="pixbuf">Images/RunDown.png</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">7</property>
+                        <property name="top-attach">7</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkImage" id="Axis_V_Plus">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="pixbuf">Images/RunDown.png</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">7</property>
+                        <property name="top-attach">10</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkImage" id="Axis_B_Minus">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="pixbuf">Images/RunCW.png</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">5</property>
+                        <property name="top-attach">12</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkImage" id="Axis_B_Plus">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="pixbuf">Images/RunCCW.png</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">7</property>
+                        <property name="top-attach">12</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_CheckButton" id="X_Sync_OnOff">
+                        <property name="label" translatable="yes">X</property>
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="receives-default">False</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="image-position">right</property>
+                        <property name="draw-indicator">True</property>
+                        <signal name="toggled" handler="X_Set_Sync_OnOff" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">6</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_CheckButton" id="Y_Sync_OnOff">
+                        <property name="label" translatable="yes">Y</property>
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="receives-default">False</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="draw-indicator">True</property>
+                        <signal name="toggled" handler="Y_Set_Sync_OnOff" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">7</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_CheckButton" id="Z_Sync_OnOff">
+                        <property name="label" translatable="yes">Z</property>
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="receives-default">False</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="draw-indicator">True</property>
+                        <signal name="toggled" handler="Z_Set_Sync_OnOff" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">8</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_CheckButton" id="U_Sync_OnOff">
+                        <property name="label" translatable="yes">U</property>
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="receives-default">False</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="draw-indicator">True</property>
+                        <signal name="toggled" handler="U_Set_Sync_OnOff" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">9</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Spacer_03">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="width-chars">4</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">8</property>
+                        <property name="top-attach">1</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Title - Stop">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">center</property>
+                        <property name="valign">start</property>
+                        <property name="label" translatable="yes">Stop</property>
+                        <property name="justify">center</property>
+                        <property name="xalign">0.05000000074505806</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans Bold 11"/>
+                          <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">6</property>
+                        <property name="top-attach">2</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Title - Comments">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">center</property>
+                        <property name="valign">end</property>
+                        <property name="margin-top">6</property>
+                        <property name="margin-bottom">6</property>
+                        <property name="label" translatable="yes">Comments</property>
+                        <property name="justify">center</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans Bold 13"/>
+                          <attribute name="weight" value="bold"/>
+                          <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">9</property>
+                        <property name="top-attach">1</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="R01Menu01_Title_Sp0_1">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">start</property>
+                        <property name="valign">end</property>
+                        <property name="margin-top">6</property>
+                        <property name="label" translatable="yes">Spindles</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans Bold 13"/>
+                          <attribute name="weight" value="bold"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">1</property>
+                        <property name="width">5</property>
+                        <property name="height">2</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_SpinButton" id="Sp0_Set_Idx_Dist">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="text" translatable="yes">90.000</property>
+                        <property name="overwrite-mode">True</property>
+                        <property name="input-purpose">number</property>
+                        <property name="adjustment">Sp0_Set_Idx_Dist_adj</property>
+                        <property name="digits">3</property>
+                        <property name="numeric">True</property>
+                        <property name="value">90</property>
+                        <signal name="value-changed" handler="Sp0_Set_Idx_Dist" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">3</property>
+                        <property name="width">2</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="valign">center</property>
+                        <property name="margin-left">4</property>
+                        <property name="margin-start">4</property>
+                        <property name="orientation">vertical</property>
+                        <child>
+                          <object class="HAL_RadioButton" id="Sp0_Set_Idx_by_Deg">
+                            <property name="label" translatable="yes">deg</property>
+                            <property name="visible">True</property>
+                            <property name="can-focus">True</property>
+                            <property name="receives-default">False</property>
+                            <property name="draw-indicator">True</property>
+                            <property name="group">Sp0_Set_Idx_by_Div</property>
+                            <signal name="button-press-event" handler="Sp0_Set_Idx_by_Deg" swapped="no"/>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">0</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="HAL_RadioButton" id="Sp0_Set_Idx_by_Div">
+                            <property name="label" translatable="yes">div</property>
+                            <property name="visible">True</property>
+                            <property name="can-focus">True</property>
+                            <property name="receives-default">False</property>
+                            <property name="draw-indicator">True</property>
+                            <property name="group">Sp0_Set_Idx_by_Deg</property>
+                            <signal name="button-press-event" handler="Sp0_Set_Idx_by_Div" swapped="no"/>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">1</property>
+                          </packing>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="left-attach">2</property>
+                        <property name="top-attach">3</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkBox">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="valign">center</property>
+                        <property name="orientation">vertical</property>
+                        <child>
+                          <object class="HAL_CheckButton" id="Sp0_I_Sel">
+                            <property name="label" translatable="yes">Sp0</property>
+                            <property name="visible">True</property>
+                            <property name="can-focus">True</property>
+                            <property name="receives-default">False</property>
+                            <property name="active">True</property>
+                            <property name="draw-indicator">True</property>
+                            <signal name="toggled" handler="Sp0_Set_Idx_OnOff" swapped="no"/>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">0</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="HAL_CheckButton" id="Sp1_I_Sel">
+                            <property name="label" translatable="yes">Sp1</property>
+                            <property name="visible">True</property>
+                            <property name="can-focus">True</property>
+                            <property name="receives-default">False</property>
+                            <property name="active">True</property>
+                            <property name="draw-indicator">True</property>
+                            <signal name="toggled" handler="Sp1_Set_Idx_OnOff" swapped="no"/>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">1</property>
+                          </packing>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="left-attach">3</property>
+                        <property name="top-attach">3</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="X_axis_comment">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">start</property>
+                        <property name="valign">center</property>
+                        <property name="hexpand">True</property>
+                        <property name="label" translatable="yes">⊖ towards back / ⊕ towards operator</property>
+                        <property name="wrap">True</property>
+                        <property name="xalign">0.05000000074505806</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans 10"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">9</property>
+                        <property name="top-attach">6</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Title_Fwd_1">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">center</property>
+                        <property name="valign">start</property>
+                        <property name="label" translatable="yes">Fwd</property>
+                        <property name="justify">center</property>
+                        <property name="xalign">0.05000000074505806</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans Bold 11"/>
+                          <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">5</property>
+                        <property name="top-attach">2</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Title_Rev_1">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">center</property>
+                        <property name="valign">start</property>
+                        <property name="label" translatable="yes">Rev</property>
+                        <property name="justify">center</property>
+                        <property name="xalign">0.05000000074505806</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans Bold 11"/>
+                          <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">7</property>
+                        <property name="top-attach">2</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Comment_Sync_Axes">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">start</property>
+                        <property name="valign">end</property>
+                        <property name="hexpand">True</property>
+                        <property name="label" translatable="yes">For each of these axes, set the distance to move.</property>
+                        <property name="wrap">True</property>
+                        <property name="width-chars">6</property>
+                        <property name="xalign">0.05000000074505806</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans 12"/>
+                          <attribute name="foreground" value="#1c1c7171d8d8"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">9</property>
+                        <property name="top-attach">5</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Spacer_08">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="width-chars">4</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">8</property>
+                        <property name="top-attach">5</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Spacer_07">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="width-chars">4</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">6</property>
+                        <property name="top-attach">5</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Spacer_09">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="width-chars">4</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">4</property>
+                        <property name="top-attach">5</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="uom_Y">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label" translatable="yes">in</property>
+                        <property name="width-chars">6</property>
+                        <property name="xalign">0.05000000074505806</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">3</property>
+                        <property name="top-attach">7</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Y_axis_comment">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">start</property>
+                        <property name="valign">center</property>
+                        <property name="hexpand">True</property>
+                        <property name="label" translatable="yes">⊖ up / ⊕ down</property>
+                        <property name="wrap">True</property>
+                        <property name="xalign">0.05000000074505806</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans 10"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">9</property>
+                        <property name="top-attach">7</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Z_axis_comment">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">start</property>
+                        <property name="valign">center</property>
+                        <property name="hexpand">True</property>
+                        <property name="label" translatable="yes">⊖ towards headstock / ⊕ away from headstock</property>
+                        <property name="wrap">True</property>
+                        <property name="xalign">0.05000000074505806</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans 10"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">9</property>
+                        <property name="top-attach">8</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="uom_Z">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label" translatable="yes">in</property>
+                        <property name="width-chars">6</property>
+                        <property name="xalign">0.05000000074505806</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">3</property>
+                        <property name="top-attach">8</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="uom_U">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label" translatable="yes">in</property>
+                        <property name="width-chars">6</property>
+                        <property name="xalign">0.05000000074505806</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">3</property>
+                        <property name="top-attach">9</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="U_axis_comment">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">start</property>
+                        <property name="valign">center</property>
+                        <property name="hexpand">True</property>
+                        <property name="label" translatable="yes">⊖ towards back / ⊕ towards operator. U is parallel to X</property>
+                        <property name="wrap">True</property>
+                        <property name="xalign">0.05000000074505806</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans 10"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">9</property>
+                        <property name="top-attach">9</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="V_axis_comment">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">start</property>
+                        <property name="valign">center</property>
+                        <property name="hexpand">True</property>
+                        <property name="label" translatable="yes">⊖ up / ⊕ down.  V is parallel to Y</property>
+                        <property name="wrap">True</property>
+                        <property name="xalign">0.05000000074505806</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans 10"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">9</property>
+                        <property name="top-attach">10</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="uom_V">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label" translatable="yes">in</property>
+                        <property name="width-chars">6</property>
+                        <property name="xalign">0.05000000074505806</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">3</property>
+                        <property name="top-attach">10</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_CheckButton" id="V_Sync_OnOff">
+                        <property name="label" translatable="yes">V</property>
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="receives-default">False</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="draw-indicator">True</property>
+                        <signal name="toggled" handler="V_Set_Sync_OnOff" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">10</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Title_Fwd_2">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">center</property>
+                        <property name="valign">end</property>
+                        <property name="label" translatable="yes">Fwd</property>
+                        <property name="justify">center</property>
+                        <property name="xalign">0.05000000074505806</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans Bold 11"/>
+                          <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">5</property>
+                        <property name="top-attach">11</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Title_Rev_2">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">center</property>
+                        <property name="valign">end</property>
+                        <property name="label" translatable="yes">Rev</property>
+                        <property name="justify">center</property>
+                        <property name="xalign">0.05000000074505806</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans Bold 11"/>
+                          <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">7</property>
+                        <property name="top-attach">11</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_CheckButton" id="_Sync_OnOff">
+                        <property name="label" translatable="yes">B</property>
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="receives-default">False</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="draw-indicator">True</property>
+                        <signal name="toggled" handler="B_Set_Sync_OnOff" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">12</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_SpinButton" id="Syn_V_Dist1">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="margin-top">2</property>
+                        <property name="margin-bottom">2</property>
+                        <property name="text" translatable="yes">0.0000</property>
+                        <property name="overwrite-mode">True</property>
+                        <property name="input-purpose">number</property>
+                        <property name="climb-rate">0.01</property>
+                        <property name="digits">4</property>
+                        <property name="numeric">True</property>
+                        <signal name="value-changed" handler="B_Set_Move_Dist" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="left-attach">1</property>
+                        <property name="top-attach">12</property>
+                        <property name="width">2</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="uom_B">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label" translatable="yes">deg</property>
+                        <property name="width-chars">6</property>
+                        <property name="xalign">0.05000000074505806</property>
+                      </object>
+                      <packing>
+                        <property name="left-attach">3</property>
+                        <property name="top-attach">12</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="V_axis_comment1">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">start</property>
+                        <property name="valign">center</property>
+                        <property name="hexpand">True</property>
+                        <property name="label" translatable="yes">⊖ CCW / ⊕ CW.  B is rotation about Y</property>
+                        <property name="wrap">True</property>
+                        <property name="xalign">0.05000000074505806</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans 10"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">9</property>
+                        <property name="top-attach">12</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Bottom_Page_Comment">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">start</property>
+                        <property name="valign">end</property>
+                        <property name="vexpand">True</property>
+                        <property name="label" translatable="yes">★ Be sure to ENAble the selected axes for movement using the pane to the right.</property>
+                        <property name="wrap">True</property>
+                        <attributes>
+                          <attribute name="font-desc" value="Sans 12"/>
+                          <attribute name="foreground" value="#a5a51d1d2d2d"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="left-attach">0</property>
+                        <property name="top-attach">13</property>
+                        <property name="width">10</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                  </object>
+                  <packing>
+                    <property name="expand">True</property>
+                    <property name="fill">True</property>
+                    <property name="padding">1</property>
+                    <property name="position">0</property>
+                  </packing>
+                </child>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+  </object>
+</interface>

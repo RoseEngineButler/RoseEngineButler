@@ -1,0 +1,170 @@
+# HAL config file for vismach simulation of vertical milling machine
+# This file deomstrates closed-loop spindle control in both position and 
+
+
+
+
+# encoder is used for software counting of quadrature encoder signals
+# Manual:  https://linuxcnc.org/docs/html/man/man9/encoder.9.html
+# loadrt encoder num_chan=2
+loadrt encoder                              names=encoder.s0,encoder.s1
+
+# abs is used to compute the absolute value and sign of the input signal
+# Manual:  https://linuxcnc.org/docs/html/man/man9/abs.9.html
+loadrt abs                                  count=1
+
+# Scale is the LinuxCNC HAL component that applies a scale and offset to its input
+# Manual:  https://linuxcnc.org/docs/html/man/man9/scale.9.html
+loadrt scale                                count=1
+
+# Lowpass is a low-pass filter
+# Manual:  https://linuxcnc.org/docs/html/man/man9/lowpass.9.html
+loadrt lowpass                              count=1
+
+# pwmgen is used to generate PWM (pulse width modulation) or PDM 
+# (pulse density modulation) signals. The maximum PWM frequency and the 
+# resolution is quite limited compared to hardware-based approaches, 
+# but in many cases software PWM can be very useful.
+# Manual:  https://linuxcnc.org/docs/html/man/man9/pwmgen.9.html
+loadrt pwmgen                               output_type=1
+
+# or2 is a two-input OR gate 
+# Manual:  https://linuxcnc.org/docs/html/man/man9/or2.9.html
+loadrt or2                                  count=3
+
+addf encoder.update-counters servo-thread
+addf pwmgen.make-pulses servo-thread
+
+# mult2 is the product of two inputs
+# Manual:  https://linuxcnc.org/docs/html/man/man9/mult2.9.html
+loadrt mult2                                count=1
+
+addf mult2.0                                servo-thread
+
+addf encoder.capture-position               servo-thread
+
+addf pwmgen.update                          servo-thread
+addf abs.0                                  servo-thread
+addf scale.0                                servo-thread
+addf lowpass.0                              servo-thread
+addf or2.0                                  servo-thread
+addf or2.1                                  servo-thread
+
+net spindle-revs                            scale.0.in
+net spindle-degs                         => scale.0.out
+net spindle-pwm                         <=  pwmgen.0.pwm
+setp pwmgen.0.pwm-freq                      0.0
+setp pwmgen.0.scale                         1500.0
+setp pwmgen.0.offset                        0.133333333333
+
+setp pwmgen.0.dither-pwm                    true
+setp scale.0.gain                           360
+
+# net spindle.0-cmd-rpm                     <=  spindle.0.speed-out
+# net spindle-cmd-rpm-abs                 <=  spindle.0.speed-out-abs
+# net spindle-cmd-rps                     <=  spindle.0.speed-out-rps
+# net spindle-cmd-rps-abs                 <=  spindle.0.speed-out-rps-abs
+# net spindle-at-speed                     => spindle.0.at-speed
+# net spindle-cw                          <=  spindle.0.forward
+# net spindle-ccw                         <=  spindle.0.reverse
+
+setp encoder.s0.position-scale              800.000000
+setp encoder.s1.position-scale              800.000000
+
+net spindle.0-index-enable                    encoder.s0.index-enable <=> spindle.0.index-enable
+# net spindle-phase-a                         encoder.0.phase-A
+# net spindle-phase-b                         encoder.0.phase-B
+# net spindle-index                           encoder.0.phase-Z
+
+# setp parport.0.pin-17-out-invert            1
+# net spindle-pwm                             pwmgen.0.pwm parport.0.pin-17-out
+# net spindle-index                       <=  parport.0.pin-11-in-not
+# net spindle-phase-b                     <=  parport.0.pin-12-in
+# net spindle-phase-a                     <=  parport.0.pin-13-in
+
+# Velocity modes. 
+
+
+# First load 2x pid components. These would normally have to be loaded at
+# the same time as the Axis PID components
+
+# loadrt pid num_chan=2 
+# addf pid.s0.do-pid-calcs                     servo-thread # Velocity
+# addf pid.s1.do-pid-calcs                     servo-thread # Position
+
+
+# orient - Provide a PID command input for orientation mode based on 
+# current spindle position, target angle and orient mode 
+# Manual:  https://linuxcnc.org/docs/html/man/man9/orient.9.html
+loadrt orient count=2
+addf orient.0 								servo-thread
+addf orient.1 								servo-thread
+
+
+# ***************************************
+# testing lines
+net spindle.0-in-pos <= orient.0.is-oriented
+net spindle.0-in-pos => spindle.0.is-oriented
+# ***************************************
+
+
+# mux2 - Select from one of two input values
+# Manual:  https://linuxcnc.org/docs/html/man/man9/mux2.9.html
+loadrt mux2 count=2 #This has already been loaded in the sim_vmc.hal
+addf mux2.0 								servo-thread # chooses which pid output goes to the spindle speed control
+
+#Use this to detect that the spindle is oriented
+
+# near - Determine whether two values are roughly equal.
+# Manual:  https://linuxcnc.org/docs/html/man/man9/near.9.html
+loadrt near count=  #(loaded in sim_vmc.hal)
+
+# edge - Edge detector
+# Manual:  https://linuxcnc.org/docs/html/man/man9/edge.9.html
+loadrt edge count=2
+addf near.0         						servo-thread
+addf edge.0         						servo-thread
+setp edge.0.both 							0
+setp edge.0.in-edge 						0
+setp edge.0.out-width-ns 					10000000
+
+# net spindle-pos 							pid.s1.feedback orient.0.position
+
+# net spindle-vel   							pid.s0.feedback  encoder.0.velocity => spindle.0.speed-in
+# net spindle-vel-cmd   						spindle.0.speed-out pid.s0.command
+# net spindle-vel-pid   						pid.s0.output mux2.0.in0
+
+# net spindle-pos   							pid.s1.feedback orient.0.position near.0.in1  encoder.0.position => spindle.0.revs 
+# net spindle-pos-cmd   						orient.0.command pid.s1.command near.0.in2
+# net spindle-angle     						spindle.0.orient-angle orient.0.angle
+# net spindle-pos-pid   						pid.s1.output mux2.0.in1
+setp near.0.difference  					0.0005
+net spindle.0-in-pos-raw 						near.0.out edge.0.in #not needed v2.8+, use orient.0.is-oriented
+# net spindle.0-in-pos    						edge.0.out spindle.0.is-oriented
+
+# this switches modes
+# net orient-mode   							spindle.0.orient orient.0.enable pid.s1.enable mux2.0.sel
+# net velocity-mode 							spindle.0.on pid.s0.enable pwmgen.0.enable 
+net orient-dir        						spindle.0.orient-mode orient.0.mode
+
+
+#for a real spindle run by a VFD
+
+# net spindle-cmd-fb-filtered-rps   mux2.0.out   abs.0.in
+#net spindle-fb-filtered-cmd-abs-rpm    abs.0.out pwmgen.0.value => scale.0.in
+# setp parport.0.pin-17-out-invert 1
+# net spindle-pwm   pwmgen.0.pwm parport.0.pin-17-out
+# net spindle-fwd   abs.0.is-positive parport.0.pin-14-out
+# net spindle-rev   abs.0.is-negative parport.0.pin-16-out
+
+# Tune the PID from the INI values
+# setp pid.s0.Pgain [SPINDLE]PGAIN_V
+# setp pid.s0.Igain [SPINDLE]IGAIN_V
+# setp pid.s0.Dgain [SPINDLE]DGAIN_V
+# setp pid.s0.FF0     [SPINDLE]FF0_V
+# setp pid.s0.FF1   [SPINDLE]FF1_V
+# setp pid.s1.Pgain [SPINDLE]PGAIN_P
+# setp pid.s1.Igain [SPINDLE]IGAIN_P
+# setp pid.s1.Dgain [SPINDLE]DGAIN_P
+# setp pid.s1.FF0     [SPINDLE]FF0_P
+# setp pid.s1.FF1   [SPINDLE]FF1_P

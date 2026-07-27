@@ -1,0 +1,366 @@
+#! /home/reuben/Downloads
+#######################################################################
+#                    RRRRRR    EEEEEEEE  BBBBBBB                      #
+#                    RR   RR   EE        BB    BB                     #
+#                    RR   RR   EE        BB    BB                     #
+#                    RRRRRR    EEEEEE    BBBBBBB                      #
+#                    RR   RR   EE        BB    BB                     #
+#                    RR    RR  EE        BB    BB                     #
+#                    RR    RR  EEEEEEEE  BBBBBBB                      #
+#                                                                     #
+# Rose Engine Butler                                                  #
+#######################################################################
+#
+# LinuxCNC configuration for use with a Rose Engine
+#
+# File:
+#   Install.sh
+#
+# Purpose:
+#   This is used to install the Rose Engine Butler application.
+#
+# End User Customisation:
+#   THE END USER OF THE ROSE ENGINE BUTLER SYSTEM SHOULD NOT MODIFY
+#   THIS FILE.
+#
+#   Changes to this file are not supported by Colvin Tools nor
+#   Brainwave Embedded.
+#
+# Version
+#   1.0 - 26 Oct 2025, R. Colvin
+#   1.1 - 23 Dec 2025, R. Colvin - Changed text from "upgrade" to
+#         "update".
+#   1.2 - 22 Jan 2026, R. Colvin - Updated for the Trixie install.
+#
+# Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
+#
+# The following MIT/X Consortium License applies to the Rose Engine
+# Butler system.  Use of this system constitutes consent to the terms
+# outlined below.
+#
+# Permission is hereby granted, free of charge, to any person obtaining 
+# a copy of this software and associated documentation files (the 
+# "Software"), to deal in the Software without restriction, including 
+# without limitation the rights to use, copy, modify, merge, publish, 
+# distribute, sublicense, and/or sell copies of the Software, and to 
+# permit persons to whom the Software is furnished to do so, subject to 
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be 
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF 
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY 
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, 
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+# Except as contained in this notice, the name of COPYRIGHT HOLDERS
+# shall not be used in advertising or otherwise to promote the sale, 
+# use or other dealings in this Software without prior written 
+# authorization from COPYRIGHT HOLDERS.
+#
+# ********************************************************************
+# Colours are detailed at the end of this program
+#
+TITLE='\033[0;34;1;47m'     # Blue on Lt Gray
+KEYNOTE='\033[0;37;0;41m'   # Lt Gray on Red
+CMNTTEXT='\033[0;34;1;40m'  # Blue on Black
+NOCOLOR='\e[0m'
+#
+# ********************************************************************
+echo -e "${TITLE}#######################################################################${NOCOLOR}"
+echo -e "${TITLE}#                    RRRRRR    EEEEEEEE  BBBBBBB                      #${NOCOLOR}"
+echo -e "${TITLE}#                    RR   RR   EE        BB    BB                     #${NOCOLOR}"
+echo -e "${TITLE}#                    RR   RR   EE        BB    BB                     #${NOCOLOR}"
+echo -e "${TITLE}#                    RRRRRR    EEEEEE    BBBBBBB                      #${NOCOLOR}"
+echo -e "${TITLE}#                    RR   RR   EE        BB    BB                     #${NOCOLOR}"
+echo -e "${TITLE}#                    RR   RR   EE        BB    BB                     #${NOCOLOR}"
+echo -e "${TITLE}#                    RR    RR  EEEEEEEE  BBBBBBB                      #${NOCOLOR}"
+echo -e "${TITLE}#######################################################################${NOCOLOR}"
+echo -e "${TITLE}                                                                       ${NOCOLOR}"
+echo -e "${TITLE}Use of this system constitutes consent to the MIT/X Consortium License ${NOCOLOR}"
+echo -e "${TITLE}as it applies to the Rose Engine Butler system.                        ${NOCOLOR}"
+echo -e "${TITLE}                                                                       ${NOCOLOR}"
+echo -e "${TITLE}Installation program                                                   ${NOCOLOR}"
+echo -e "${TITLE}                                                                       ${NOCOLOR}"
+# ********************************************************************
+# Step 1 - Setup the wired Ethernet connection.
+# 
+echo -e "${TITLE}#######################################################################${NOCOLOR}"
+echo -e "${TITLE}Step 1 - Setup the wired Ethernet connection                           ${NOCOLOR}"
+#
+#
+# Add the wired Ethernet network connectin
+echo -e "${CMNTTEXT}Add the wired Ethernet network connectin${NOCOLOR}"
+# 
+nmcli con add type ethernet con-name "Wired Ethernet" ipv4.address 192.168.1.120/24 ipv4.method manual ipv4.gateway 192.168.1.1 ipv4.dns 192.168.1.1
+if [ $? != 0 ]; then
+    echo -e "${KEYNOTE}ERROR: nmcli failed.                                             ${NOCOLOR}"
+    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                   ${NOCOLOR}"
+    exit $?
+fi
+# ********************************************************************
+# Step 2 - Setup the Mesa card.
+# 
+echo -e "${TITLE}#######################################################################${NOCOLOR}"
+echo -e "${TITLE}Step 2 - Update the Mesa card                                          ${NOCOLOR}"
+#
+# Create the location where they are to be
+echo -e "${CMNTTEXT}Create the directory${NOCOLOR} /usr/lib/firmware/hm2/hostmot2"
+cd /usr/lib/firmware
+sudo mkdir hm2
+cd hm2
+if [ $? != 0 ]; then
+    echo -e "${KEYNOTE}ERROR: /usr/lib/firmware/hm2 does not exist.                         ${NOCOLOR}"
+    echo -e "${KEYNOTE}Ensure you have unzipped the REB system file                         ${NOCOLOR}"
+    echo -e "${KEYNOTE}successfully.                                                        ${NOCOLOR}"
+    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+    exit $?
+fi
+sudo mkdir hostmot2
+# if [ $? != 0 ]; then
+#    echo -e "${KEYNOTE}ERROR: mkdir /usr/lib/firmware/hm2/hostmot2 failed.                  ${NOCOLOR}"
+#    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+#    exit $?
+# fi
+#
+# Copy the files
+echo -e "${CMNTTEXT}Copy the files to /usr/lib/firmware/hm2/hostmot2                    ${NOCOLOR}"
+#
+cd /usr/lib/firmware/hm2/hostmot2
+#
+sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/MesaCard/7i92t_REB.bin .
+if [ $? != 0 ]; then
+    echo -e "${KEYNOTE}ERROR: copy of                                                       ${NOCOLOR}"
+    echo -e "${KEYNOTE}   7i92t_REB.bin to /usr/lib/firmware/hm2/hostmot2                   ${NOCOLOR}"
+    echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
+    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+    exit $?
+fi
+#
+sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/MesaCard/7i92t_REB.pin .
+if [ $? != 0 ]; then
+    echo -e "${KEYNOTE}ERROR: copy of                                                       ${NOCOLOR}"
+    echo -e "${KEYNOTE}   7i92t_REB.pin to /usr/lib/firmware/hm2/hostmot2                   ${NOCOLOR}"
+    echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
+    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+    exit $?
+fi
+#
+sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/MesaCard/PIN_REB_34.vhd .
+if [ $? != 0 ]; then
+    echo -e "${KEYNOTE}ERROR: copy of                                                       ${NOCOLOR}"
+    echo -e "${KEYNOTE}   PIN_REB_34.vhd to /usr/lib/firmware/hm2/hostmot2                  ${NOCOLOR}"
+    echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
+    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+    exit $?
+fi
+#
+# Flash the Mesa card
+echo -e "${CMNTTEXT}Flash the Mesa Card Configuration${NOCOLOR}"
+# 
+mesaflash --device 7i92t --addr 192.168.1.121 --write 7i92t_REB.bin --reload
+if [ $? != 0 ]; then
+    echo -e "${KEYNOTE}ERROR: mesaflash failed.                                             ${NOCOLOR}"
+    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+    exit $?
+fi
+#
+# ********************************************************************
+# Step 3 - Setup Rose Engine Butler file directories for LinuxCNC
+echo -e "${TITLE}#######################################################################${NOCOLOR}"
+echo -e "${TITLE}Step 3 - Setup Rose Engine Butler file directories for LinuxCNC        ${NOCOLOR}"
+#
+# Set the security for the main directory
+sudo chmod 777 -R /home/reuben/linuxcnc/configs/RoseEngineButler
+if [ $? != 0 ]; then
+    echo -e "${KEYNOTE}ERROR: chmod for /home/reuben/linuxcnc/configs/RoseEngineButler      ${NOCOLOR}"
+    echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
+    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+    exit $?
+fi
+echo -e "${CMNTTEXT}Security set on /home/reuben/linuxcnc/configs/RoseEngineButler         ${NOCOLOR}"
+echo -e "${CMNTTEXT}--------------------------------------------------------------------${NOCOLOR}"
+#
+# Create localization directories
+cd /home/reuben/linuxcnc/configs/
+sudo mkdir RoseEngineButlerLocal
+if [ $? != 0 ]; then
+    echo -e "${KEYNOTE}ERROR: Could not create RoseEngineButlerLocal directory.             ${NOCOLOR}"
+    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+    exit $?
+fi
+echo -e "${CMNTTEXT}Security set on /home/reuben/linuxcnc/configs/RoseEngineButlerLocal    ${NOCOLOR}"
+echo -e "${CMNTTEXT}--------------------------------------------------------------------${NOCOLOR}"
+cd RoseEngineButlerLocal
+#
+sudo cp -r /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Axes .
+if [ $? != 0 ]; then
+    echo -e "${KEYNOTE}ERROR: Could not copy files from                                     ${NOCOLOR}"
+    echo -e "${CMNTTEXT}   /home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Axes     ${NOCOLOR}"
+    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+    exit $?
+fi
+echo -e "${CMNTTEXT}Copied files to                                                     ${NOCOLOR}"
+echo -e "${CMNTTEXT}   /home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Axes     ${NOCOLOR}"
+echo -e "${CMNTTEXT}--------------------------------------------------------------------${NOCOLOR}"
+#
+sudo cp -r /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Custom .
+if [ $? != 0 ]; then
+    echo -e "${KEYNOTE}ERROR: Could not copy files from                                     ${NOCOLOR}"
+    echo -e "${CMNTTEXT}   /home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Custom   ${NOCOLOR}"
+    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+    exit $?
+fi
+echo -e "${CMNTTEXT}Copied files to                                                     ${NOCOLOR}"
+echo -e "${CMNTTEXT}   /home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Custom   ${NOCOLOR}"
+echo -e "${CMNTTEXT}--------------------------------------------------------------------${NOCOLOR}"
+#
+cd ..
+#
+# Set the security for the localization directories
+sudo chmod 777 -R /home/reuben/linuxcnc/configs/RoseEngineButlerLocal
+if [ $? != 0 ]; then
+    echo -e "${KEYNOTE}ERROR: chmod for /home/reuben/linuxcnc/configs/RoseEngineButlerLocal ${NOCOLOR}"
+    echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
+    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+    exit $?
+fi
+echo -e "${CMNTTEXT}Security set on /home/reuben/linuxcnc/configs/RoseEngineButlerLocal    ${NOCOLOR}"
+echo -e "${CMNTTEXT}--------------------------------------------------------------------${NOCOLOR}"
+#
+# ********************************************************************
+# Step 4 - Put key files in place
+echo -e "${TITLE}#######################################################################${NOCOLOR}"
+echo -e "${TITLE}Step 4 - Put key files in place                                        ${NOCOLOR}"
+echo -e "${TITLE}                                                                       ${NOCOLOR}"
+cd /home/reuben
+echo -e "${CMNTTEXT}    REB_Backup.sh                                                      ${NOCOLOR}"
+sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/REB_Backup.sh .
+if [ $? != 0 ]; then
+   echo -e "${KEYNOTE}ERROR: copy of REB_Backup.sh                                         ${NOCOLOR}"
+   echo -e "${KEYNOTE}    from /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup    ${NOCOLOR}"
+   echo -e "${KEYNOTE}    to /home/reuben/                                                    ${NOCOLOR}"
+   echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
+   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+   exit $?
+fi
+echo -e "${CMNTTEXT}    REB_Restore.sh                                                  ${NOCOLOR}"
+sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/REB_Restore.sh .
+if [ $? != 0 ]; then
+   echo -e "${KEYNOTE}ERROR: copy of REB_Restore.sh                                        ${NOCOLOR}"
+   echo -e "${KEYNOTE}    from /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup    ${NOCOLOR}"
+   echo -e "${KEYNOTE}    to /home/reuben/                                                    ${NOCOLOR}"
+   echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
+   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+   exit $?
+fi
+echo -e "${CMNTTEXT}    .axisrc                                                         ${NOCOLOR}"
+sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/axisrc .
+if [ $? != 0 ]; then
+   echo -e "${KEYNOTE}ERROR: copy of axisrc                                                ${NOCOLOR}"
+   echo -e "${KEYNOTE}    from /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup    ${NOCOLOR}"
+   echo -e "${KEYNOTE}    to /home/reuben/                                                    ${NOCOLOR}"
+   echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
+   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+   exit $?
+fi
+sudo mv axisrc .axisrc
+if [ $? != 0 ]; then
+   echo -e "${KEYNOTE}ERROR: rename of axisrc to .axisrc failed.                           ${NOCOLOR}"
+   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+   exit $?
+fi
+echo -e "${CMNTTEXT}    REB_Update.sh                                                  ${NOCOLOR}"
+sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/REB_Update.sh .
+if [ $? != 0 ]; then
+   echo -e "${KEYNOTE}ERROR: copy of REB_Update.sh                                        ${NOCOLOR}"
+   echo -e "${KEYNOTE}    from /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup    ${NOCOLOR}"
+   echo -e "${KEYNOTE}    to /home/reuben/                                                    ${NOCOLOR}"
+   echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
+   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+   exit $?
+fi
+#
+# ********************************************************************
+# Step 5 - Install ClamAV
+echo -e "${TITLE}#######################################################################${NOCOLOR}"
+echo -e "${TITLE}Step 5 - Install ClamAV                                                ${NOCOLOR}"
+echo -e "${TITLE}                                                                       ${NOCOLOR}"
+cd /home/reuben
+mkdir ClamAv
+if [ $? != 0 ]; then
+   echo -e "${KEYNOTE}ERROR: Could not create /home/reuben/ClamAV                             ${NOCOLOR}"
+   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+   exit $?
+fi
+cd ClamAv
+mkdir SuspiciousFiles
+if [ $? != 0 ]; then
+   echo -e "${KEYNOTE}ERROR: Could not create /home/reuben/ClamAV/SuspiciousFiles             ${NOCOLOR}"
+   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+   exit $?
+fi
+sudo apt install clamav
+if [ $? != 0 ]; then
+   echo -e "${KEYNOTE}ERROR: Could not install ClamAV                                      ${NOCOLOR}"
+   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+   exit $?
+fi
+#
+# ********************************************************************
+# Step 6 - Backup key files
+echo -e "${TITLE}#######################################################################${NOCOLOR}"
+echo -e "${TITLE}Step 6 - Create backups                                                ${NOCOLOR}"
+echo -e "${TITLE}                                                                       ${NOCOLOR}"
+echo -e "${TITLE}Backup /home/reuben/linuxcnc/configs/RoseEngineButlerLocal                ${NOCOLOR}"
+cd /home/reuben/linuxcnc/configs
+sudo mkdir RoseEngineButlerLocal_Backup
+cd RoseEngineButlerLocal_Backup
+#
+echo -e "${CMNTTEXT}--------------------------------------------------------------------${NOCOLOR}"
+echo -e "${CMNTTEXT}Backup /home/reuben/linuxcnc/Backup/REB/REB_Axes                       ${NOCOLOR}"
+sudo mkdir REB_Axes
+cd REB_Axes
+sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Axes/*.* .
+cd ..
+#
+echo -e "${CMNTTEXT}--------------------------------------------------------------------${NOCOLOR}"
+echo -e "${CMNTTEXT}Backup /home/reuben/linuxcnc/Backup/REB/REB_Custom                     ${NOCOLOR}"
+sudo mkdir REB_Custom
+cd REB_Custom
+sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Custom/*.* .
+## ********************************************************************
+# Success
+echo -e "${TITLE}System successfully installed.                                         ${NOCOLOR}"
+echo -e "${TITLE}#######################################################################${NOCOLOR}"
+#
+# ********************************************************************
+# Nothing follows
+exit 0
+# ********************************************************************
+# Display Colours
+#
+#             Fore    Back
+# Colors       Gnd     Gnd
+# ----------- ----    ----
+# Black         30      40
+# Red           31      41
+# Green         32      42
+# Yellow        33      43
+# Blue          34      44
+# Purple        35      45
+# Cyan          36      46
+# Lt Gray       37      47
+#
+# Highlight          Code
+# ------------------ ----
+# Simple text           0
+# Bold text             1
+# Low intensity text    2
+# Underline text        4
+# Blinking text         5
+# Strickthrough Text    9
