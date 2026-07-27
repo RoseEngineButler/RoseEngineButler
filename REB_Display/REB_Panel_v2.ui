@@ -171,8 +171,8 @@
     <property name="page-increment">0.10</property>
   </object>
   <object class="GtkAdjustment" id="Sp1_Feed_Rate">
-    <property name="lower">-100</property>
-    <property name="upper">100</property>
+    <property name="lower">-1000</property>
+    <property name="upper">1000</property>
     <property name="value">100</property>
     <property name="step-increment">0.01</property>
     <property name="page-increment">0.10</property>
