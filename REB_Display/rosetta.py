@@ -1866,9 +1866,6 @@ class HandlerClass:
         _clear_ena_override('Sp1')
 
 
-
-
-
 #######################################################################
 # __init__
 # Purpose:              This is used to initialize everything.
@@ -1983,30 +1980,16 @@ class HandlerClass:
         # call in every component other than the main panel.
         GLib.timeout_add(100, self._sync_run_operation_buttons)
 
-        self.U_Feed         = 1.0       # U axis feed rate
-        self.U_Idx_Dist     = 0.0       # U axis index distance
-        self.U_Idx_Qty      = 0         # U axis index counter
-        self.U_Move_Dist    = 0.0       # U axis move distance
-
-        self.V_Feed         = 1.0       # V axis feed rate
-        self.V_Idx_Dist     = 0.0       # V axis index distance
-        self.V_Idx_Qty      = 0         # V axis index counter
-        self.V_Move_Dist    = 0.0       # V axis move distance
-
-        self.W_Feed         = 1.0       # W axis feed rate
-        self.W_Idx_Dist     = 0.0       # W axis index distance
-        self.W_Idx_Qty      = 0         # W axis index counter
-        self.W_Move_Dist    = 0.0       # W axis move distance
-
-        self.X_Feed         = 1.0       # X axis feed rate
-        self.X_Idx_Dist     = 0.0       # X axis index distance
-        self.X_Idx_Qty      = 0         # X axis index counter
-        self.X_Move_Dist    = 0.0       # X axis move distance
-
-        self.Z_Feed         = 1.0       # Z axis feed rate
-        self.Z_Idx_Dist     = 0.0       # Z axis index distance
-        self.Z_Idx_Qty      = 0         # Z axis index counter
-        self.Z_Move_Dist    = 0.0       # Z axis move distance
+        # Per-axis state for the five linear axes (LINEAR_AXES, defined
+        # below with the generated Idx_Minus/Set_Feed/etc. methods that
+        # read/write these same attributes via getattr/setattr). B and
+        # Sp0/Sp1 keep their own hand-written state above - not the same
+        # shape (DegDiv fields, Idx_Bool checkboxes, no Move_Dist, etc.).
+        for axis in LINEAR_AXES:
+            setattr(self, axis + "_Feed", 1.0)
+            setattr(self, axis + "_Idx_Dist", 0.0)
+            setattr(self, axis + "_Idx_Qty", 0)
+            setattr(self, axis + "_Move_Dist", 0.0)
 
 # ------------------------------------------------------------------
 # Generated per-axis handlers (linear axes: X, Z, U, V, W).
