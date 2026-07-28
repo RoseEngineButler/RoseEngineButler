@@ -71,6 +71,8 @@ import subprocess
 import re
 from gi.repository import Gdk
 from xml.sax.saxutils import escape, unescape
+from gi.repository import Gtk
+from gi.repository import GLib
 
 # Axis id (as used in REB_Settings_v1.ini and the Settings tab spin
 # buttons) -> hm2_7i92.0 stepgen channel. Verified against the actual
@@ -96,6 +98,166 @@ COMMENT_AXES = ("X", "Z", "U", "V", "W", "B")
 # Establish connection to command and status channels
 c = linuxcnc.command()
 s = linuxcnc.stat()
+
+# Temporary diagnostic log for the Sp0/Sp1 indexing checkbox investigation.
+# The panel is normally launched with Terminal=false (see the desktop
+# launcher), so print() output has nowhere visible to go - this mirrors the
+# relevant prints to a file so they can be watched during live testing.
+IDX_LOG_PATH = "/home/reuben/linuxcnc/configs/RoseEngineButler/REB_Display/idx_debug.log"
+
+def idx_log(msg):
+    print(msg)
+    try:
+        with open(IDX_LOG_PATH, "a") as f:
+            f.write(time.strftime("%H:%M:%S") + " " + msg + "\n")
+            f.flush()
+    except Exception:
+        pass
+
+def _clear_ena_override(axis_id):
+    # The *_Set_Ena handlers fire from whichever component owns that
+    # axis's ENA button (the main panel, "gladevcp") - but the real,
+    # netted *_Ena_Override pin (see REB_PostGUI.hal) lives on the
+    # Settings tab's component ("REBCnfg"), a different process. Writing
+    # to self.halcomp there would only touch this component's own,
+    # unconnected pin of the same name - a no-op. Cross the process
+    # boundary via halcmd instead, the same way Sp0_Set_Scale already
+    # does in the other direction for *_ENA_Status.
+    #
+    # Once a pin is netted to a signal, halcmd can't "setp" the pin
+    # directly ("pin is connected to a signal") - the signal itself has
+    # to be set instead, via "halcmd sets". The signal name follows the
+    # <axis>-ena-settings-allow convention in REB_PostGUI.hal.
+    hal_signal = axis_id.lower() + "-ena-settings-allow"
+    idx_log("_clear_ena_override(" + axis_id + ") -> " + hal_signal)
+
+    # Was the override actually blocking anything? Only true right after
+    # a scale change (Set_Scale) forced it False. If it's already True,
+    # this ENA press is routine day-to-day toggling and must be left
+    # alone below - forcing the panel bit in that case would turn
+    # "click to disable" into a no-op.
+    was_blocked = False
+    try:
+        result = subprocess.run(["halcmd", "gets", hal_signal], check=True, capture_output=True, text=True)
+        was_blocked = result.stdout.strip().upper() not in ("TRUE", "1")
+    except subprocess.CalledProcessError as e:
+        idx_log("Error reading " + hal_signal + ": " + str(e.stderr))
+    except FileNotFoundError:
+        idx_log("halcmd not found - is the LinuxCNC environment sourced?")
+
+    try:
+        subprocess.run(["halcmd", "sets", hal_signal, "TRUE"], check=True, capture_output=True, text=True)
+        idx_log("Set " + hal_signal + " = TRUE")
+    except subprocess.CalledProcessError as e:
+        idx_log("Error setting " + hal_signal + ": " + str(e.stderr))
+    except FileNotFoundError:
+        idx_log("halcmd not found - is the LinuxCNC environment sourced?")
+
+    if was_blocked:
+        # The same ENA press that got us here also clocks the flipflop's
+        # own toggle bit (REB_PostGUI.hal) via the ordinary clk input -
+        # since that bit never moved while the override was blocking
+        # things, this click would otherwise flip a previously-on panel
+        # state OFF, undoing the very re-enable just requested (this is
+        # exactly the "press ENA and nothing happens, need a confusing
+        # second press" behavior from live testing). Force the panel bit
+        # on deterministically via the flipflop's own set/reset override
+        # pins instead of leaving it to toggle-parity guesswork.
+        flip_set_pin = axis_id.lower() + "-ena-flip.set"
+        try:
+            subprocess.run(["halcmd", "setp", flip_set_pin, "TRUE"], check=True, capture_output=True, text=True)
+            subprocess.run(["halcmd", "setp", flip_set_pin, "FALSE"], check=True, capture_output=True, text=True)
+            idx_log("Forced " + axis_id.lower() + "-ena-panel ON (override had been blocking)")
+        except subprocess.CalledProcessError as e:
+            idx_log("Error pulsing " + flip_set_pin + ": " + str(e.stderr))
+        except FileNotFoundError:
+            idx_log("halcmd not found - is the LinuxCNC environment sourced?")
+
+def _show_no_spindle_enabled_popup(widget):
+    dialog = Gtk.MessageDialog(
+        transient_for=widget.get_toplevel(),
+        flags=0,
+        message_type=Gtk.MessageType.WARNING,
+        buttons=Gtk.ButtonsType.OK,
+        text="No spindle is enabled",
+    )
+    dialog.run()
+    dialog.destroy()
+
+# The indexing Fwd/Rev handlers block on c.wait_complete() for as long as
+# each M19 takes to converge (or time out), which otherwise leaves the UI
+# looking unresponsive with no feedback that anything is happening.
+def _set_busy_cursor(widget, busy):
+    win = widget.get_toplevel().get_window()
+    if win is None:
+        return
+    win.set_cursor(Gdk.Cursor.new_from_name(win.get_display(), "wait") if busy else None)
+    # Force the cursor change to actually paint before the blocking MDI
+    # calls take over the main loop.
+    while Gtk.events_pending():
+        Gtk.main_iteration()
+
+# Used to show a plain HAL_Button as depressed/darkened while a move or
+# an operation is active (X_Idx_Minus/Plus, Sp0_Move_Fwd/Rev).
+# Deliberately NOT done via HAL_ToggleButton.set_active(): a real
+# GtkToggleButton also flips its own active state on click or on the
+# theme's native (and here, barely visible) "checked" rendering, and
+# for the blocking X_Idx_Minus/Plus case specifically, the
+# release-driven auto-flip happens right after our own code sets it
+# back to False - undoing it and leaving the button stuck depressed
+# (confirmed live). A custom CSS class on a plain, non-toggle button has
+# no such built-in behavior to fight - only this code ever touches it,
+# and the darkened background makes the state obvious regardless of
+# theme.
+_DEPRESS_CSS = b"""
+button.reb-depressed,
+button.reb-depressed:hover,
+button.reb-depressed:focus,
+button.reb-depressed:active {
+    background-color: shade(@theme_bg_color, 0.6);
+    background-image: none;
+    box-shadow: inset 2px 2px 4px rgba(0,0,0,0.6), inset -1px -1px 2px rgba(255,255,255,0.15);
+}
+"""
+
+def _install_depress_css():
+    try:
+        provider = Gtk.CssProvider()
+        provider.load_from_data(_DEPRESS_CSS)
+        screen = Gdk.Screen.get_default()
+        Gtk.StyleContext.add_provider_for_screen(
+            screen,
+            provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+        idx_log("_install_depress_css OK, screen=" + str(screen))
+    except Exception as e:
+        idx_log("_install_depress_css FAILED: " + str(e))
+
+def _set_depressed(widget, depressed):
+    ctx = widget.get_style_context()
+    was_depressed = ctx.has_class("reb-depressed")
+    if depressed:
+        ctx.add_class("reb-depressed")
+    else:
+        ctx.remove_class("reb-depressed")
+    # Only log actual transitions - the Run Operation poll calls this
+    # every 100ms regardless of whether anything changed, which was
+    # flooding idx_debug.log and triggering the monitor's own rate
+    # limiting.
+    if was_depressed != depressed:
+        idx_log("_set_depressed(" + Gtk.Buildable.get_name(widget) + ", " + str(depressed)
+                + ") classes=" + str(ctx.list_classes()))
+    # Force the style change to actually paint now, the same reason
+    # _set_busy_cursor does this - callers that bracket a blocking MDI
+    # call (X_Idx_Minus/Plus) would otherwise freeze the main loop
+    # before GTK gets a chance to repaint the new class, so the darkened
+    # look barely shows (confirmed live: "hardly noticeable"). Periodic
+    # callers (the Run Operation poll) don't strictly need this - they
+    # get repainted on the next idle cycle regardless - but it's
+    # harmless there too.
+    while Gtk.events_pending():
+        Gtk.main_iteration()
 
 class HandlerClass:
     '''
@@ -142,6 +304,56 @@ class HandlerClass:
             return True
 
         return False
+
+    def _set_checkbox_active(self, widget_id, active):
+        '''
+        Forces a checkbox to the given state. Only the main panel
+        component has these widgets - every other tab/panel finds
+        the widget missing and no-ops.
+
+        Deferred via GLib.idle_add (see __init__) rather than set
+        directly during __init__: the checkbox doesn't reliably end up
+        checked from the .ui file's active="True" alone once the panel
+        is actually interactive (confirmed live), so this runs after
+        gladevcp's own startup sequence has settled instead of risking
+        being overwritten by whatever resets it otherwise.
+        '''
+        widget = self.builder.get_object(widget_id)
+        if widget is not None:
+            widget.set_active(active)
+        return False
+
+    def _sync_run_operation_buttons(self):
+        '''
+        Keeps the Run Operation tab's Fwd/Rev buttons visually depressed/
+        darkened for as long as the spindle is actually running in that
+        direction, reading the real HAL state (spindle.0.forward /
+        spindle.0.reverse) rather than just whatever the last click did -
+        so the button reflects reality even if a move ends some other
+        way (e.g. M5 from elsewhere, a fault, etc). Runs on a timer
+        rather than once, since gladevcp has no built-in live binding
+        for an arbitrary read-only HAL pin like this (unlike HAL_LED,
+        which is built for exactly this but doesn't give a "look
+        pressed" visual).
+
+        Uses _set_depressed (a plain HAL_Button plus a CSS class), not
+        HAL_ToggleButton.set_active() - the theme's native "checked"
+        look for a toggle button wasn't visibly different enough to
+        read as "pressed" (confirmed live: hover-highlight only, no
+        visible change on click).
+
+        Only the main panel component has these widgets; every other
+        tab/panel finds them missing and this becomes a no-op (but the
+        timer itself, once started, keeps calling it - see __init__).
+        '''
+        fwd = self.builder.get_object('Sp0_Move_Fwd')
+        rev = self.builder.get_object('Sp0_Move_Rev')
+        if fwd is None or rev is None:
+            return False
+
+        _set_depressed(fwd, bool(hal.get_value('spindle.0.forward')))
+        _set_depressed(rev, bool(hal.get_value('spindle.0.reverse')))
+        return True
 
     def _load_scale_settings(self):
         '''
@@ -555,6 +767,25 @@ class HandlerClass:
             print("halcmd not found - is the LinuxCNC environment sourced?")
 
 #######################################################################
+# B_Set_Ena
+# Purpose:              Clears this axis's Ena_Override veto whenever
+#                           the ENA button is pressed, so an axis that
+#                           was force-disabled by a scale change
+#                           (B_Set_Scale) can be re-enabled by the
+#                           operator afterward. Does not touch the
+#                           panel's own toggle state - see
+#                           REB_PostGUI.hal for the flip-flop that
+#                           tracks that.
+# ---------------------------------------------------------------------
+# Called from:
+#   UI:                 REB_Panel
+#   Button:             B_ENA
+#   Signal:             GtkButton/pressed
+#######################################################################
+    def B_Set_Ena(self,widget):
+        _clear_ena_override('B')
+
+#######################################################################
 # B_Set_Idx_Dist
 # Purpose:              This is used to set the rotational distance
 #                       (degrees or divisions of a circle) for the B
@@ -911,37 +1142,74 @@ class HandlerClass:
 #######################################################################
     def Sp0_Move_Idx_Fwd(self,widget):
 
-        print("=================================================")
-        print("FUNCTION Sp0_Move_Idx_Fwd")
+        idx_log("=================================================")
+        idx_log("FUNCTION Sp0_Move_Idx_Fwd")
+        idx_log("Sp0_Idx_Bool = " + str(self.Sp0_Idx_Bool) + "  Sp1_Idx_Bool = " + str(self.Sp1_Idx_Bool))
 
-        # Ensure the system is in MDI mode
-        s.poll()
-        if s.task_state != linuxcnc.MODE_MDI:
-                c.mode(linuxcnc.MODE_MDI)
-                c.wait_complete() # Wait for mode change to complete
+        if not self.Sp0_Idx_Bool and not self.Sp1_Idx_Bool:
+            idx_log("No spindle enabled - aborting move")
+            _show_no_spindle_enabled_popup(widget)
+            return
 
-        # Set spindle rotational speeds
-        GcodeStr1 = "S0 " + str(self.Sp0_Feed)
-        print(GcodeStr1)
+        _set_busy_cursor(widget, True)
+        try:
+            # Ensure the system is in MDI mode
+            s.poll()
+            if s.task_state != linuxcnc.MODE_MDI:
+                    c.mode(linuxcnc.MODE_MDI)
+                    c.wait_complete() # Wait for mode change to complete
 
-        Sp1_Feed = self.Sp0_Feed * self.Sp1_Pct / 100
-        GcodeStr2 = "S1 " + str(Sp1_Feed)
-        print(GcodeStr2)
+            # Set spindle rotational speeds
+            GcodeStr1 = "S0 " + str(self.Sp0_Feed)
+            idx_log(GcodeStr1)
 
-        c.mdi(GcodeStr1)
-        c.mdi(GcodeStr2)
+            Sp1_Feed = self.Sp0_Feed * self.Sp1_Pct / 100
+            GcodeStr2 = "S1 " + str(Sp1_Feed)
+            idx_log(GcodeStr2)
 
-        # Send MDI command to start spindles rotating.
-        GcodeStr3 = "M19 R" + str(self.Sp0_Idx_Deg) + " Q10 P1 $0"
-        print(GcodeStr3)
-        c.mdi(GcodeStr3)
+            c.mdi(GcodeStr1)
+            c.mdi(GcodeStr2)
 
-        GcodeStr4 = "M19 R" + str(self.Sp0_Idx_Deg) + " Q10 P1 $1"
-        print(GcodeStr4)
-        c.mdi(GcodeStr4)
+            # M19 orients to an absolute angle, not a relative step, so compute
+            # the next target from each spindle's own actual current angle
+            # rather than sending Sp0_Idx_Deg itself as R each time (which
+            # would just re-target the same fixed angle on every press). The
+            # Sp0/Sp1 checkboxes on the Indexing panel gate which spindle(s)
+            # actually get an M19 - a spindle with no orient HAL chain (or one
+            # the operator hasn't enabled) is simply skipped rather than
+            # sent a command that can only time out.
+            if self.Sp0_Idx_Bool:
+                current_angle = (hal.get_value('spindle.0-position-fb') % 1.0) * 360.0
+                target_angle = (current_angle + self.Sp0_Idx_Deg) % 360.0
 
-        # Wait for the command to complete
-        c.wait_complete()
+                # NOTE: P0 = shortest path. Forcing a specific CW/CCW direction
+                # (P1/P2) was tried and empirically always took the long ~270
+                # deg way around to reach the same (correct) target angle -
+                # see the live HAL trace analysis in conversation. P0 takes
+                # the direct ~90 deg route to the same destination.
+                GcodeStr3 = "M19 R" + str(target_angle) + " Q20 P0 $0"
+                idx_log(GcodeStr3)
+                c.mdi(GcodeStr3)
+                # Let Sp0's orient fully resolve before Sp1's M19 is even sent -
+                # queuing both back-to-back with a single wait_complete() at the
+                # end let Sp0's move interfere with Sp1's (see conversation: with
+                # both checkboxes on, only Sp0 actually moved).
+                c.wait_complete()
+            else:
+                idx_log("Sp0 M19 skipped (Sp0_Idx_Bool is False)")
+
+            if self.Sp1_Idx_Bool:
+                current_angle_1 = (hal.get_value('spindle.1-position-fb') % 1.0) * 360.0
+                target_angle_1 = (current_angle_1 + self.Sp0_Idx_Deg) % 360.0
+
+                GcodeStr4 = "M19 R" + str(target_angle_1) + " Q20 P0 $1"
+                idx_log(GcodeStr4)
+                c.mdi(GcodeStr4)
+                c.wait_complete()
+            else:
+                idx_log("Sp1 M19 skipped (Sp1_Idx_Bool is False)")
+        finally:
+            _set_busy_cursor(widget, False)
 
 #######################################################################
 # Sp0_Move_Idx_Rev
@@ -967,36 +1235,62 @@ class HandlerClass:
 #######################################################################
     def Sp0_Move_Idx_Rev(self,widget):
 
-        print("=================================================")
-        print("FUNCTION Sp0_Move_Idx_Rev")
+        idx_log("=================================================")
+        idx_log("FUNCTION Sp0_Move_Idx_Rev")
+        idx_log("Sp0_Idx_Bool = " + str(self.Sp0_Idx_Bool) + "  Sp1_Idx_Bool = " + str(self.Sp1_Idx_Bool))
 
-        # Ensure the system is in MDI mode
-        s.poll()
-        if s.task_state != linuxcnc.MODE_MDI:
-                c.mode(linuxcnc.MODE_MDI)
-                c.wait_complete() # Wait for mode change to complete
+        if not self.Sp0_Idx_Bool and not self.Sp1_Idx_Bool:
+            idx_log("No spindle enabled - aborting move")
+            _show_no_spindle_enabled_popup(widget)
+            return
 
-        # Set spindle rotational speeds
-        GcodeStr1 = "S0 " + str(self.Sp0_Feed)
-        print(GcodeStr1)
+        _set_busy_cursor(widget, True)
+        try:
+            # Ensure the system is in MDI mode
+            s.poll()
+            if s.task_state != linuxcnc.MODE_MDI:
+                    c.mode(linuxcnc.MODE_MDI)
+                    c.wait_complete() # Wait for mode change to complete
 
-        Sp1_Feed = self.Sp0_Feed * self.Sp1_Pct / 100
-        GcodeStr2 = "S1 " + str(Sp1_Feed)
-        print(GcodeStr2)
+            # Set spindle rotational speeds
+            GcodeStr1 = "S0 " + str(self.Sp0_Feed)
+            idx_log(GcodeStr1)
 
-        c.mdi(GcodeStr1)
-        c.mdi(GcodeStr2)
+            Sp1_Feed = self.Sp0_Feed * self.Sp1_Pct / 100
+            GcodeStr2 = "S1 " + str(Sp1_Feed)
+            idx_log(GcodeStr2)
 
-        # Send MDI commands to start spindles rotating.
-        GcodeStr3 = "M19 R" + str(self.Sp0_Idx_Deg) + " Q10 P2 $0"
-        print(GcodeStr3)
-        GcodeStr4 = "M19 R" + str(Sp1_Idx_Deg) + " Q10 P1 $1"
-        print(GcodeStr4)
+            c.mdi(GcodeStr1)
+            c.mdi(GcodeStr2)
 
-        c.mdi(GcodeStr3)
+            # See Sp0_Move_Idx_Fwd for why the target is computed per-spindle
+            # from live position, and why the checkboxes gate each M19.
+            if self.Sp0_Idx_Bool:
+                current_angle = (hal.get_value('spindle.0-position-fb') % 1.0) * 360.0
+                target_angle = (current_angle - self.Sp0_Idx_Deg) % 360.0
 
-        # Wait for the command to complete
-        c.wait_complete()
+                # NOTE: P0 = shortest path - see matching note in Sp0_Move_Idx_Fwd.
+                GcodeStr3 = "M19 R" + str(target_angle) + " Q20 P0 $0"
+                idx_log(GcodeStr3)
+                c.mdi(GcodeStr3)
+                # See matching note in Sp0_Move_Idx_Fwd - let Sp0 fully resolve
+                # before Sp1's M19 is sent.
+                c.wait_complete()
+            else:
+                idx_log("Sp0 M19 skipped (Sp0_Idx_Bool is False)")
+
+            if self.Sp1_Idx_Bool:
+                current_angle_1 = (hal.get_value('spindle.1-position-fb') % 1.0) * 360.0
+                target_angle_1 = (current_angle_1 - self.Sp0_Idx_Deg) % 360.0
+
+                GcodeStr4 = "M19 R" + str(target_angle_1) + " Q20 P0 $1"
+                idx_log(GcodeStr4)
+                c.mdi(GcodeStr4)
+                c.wait_complete()
+            else:
+                idx_log("Sp1 M19 skipped (Sp1_Idx_Bool is False)")
+        finally:
+            _set_busy_cursor(widget, False)
 
 #######################################################################
 # Sp0_Move_Rev
@@ -1175,21 +1469,30 @@ class HandlerClass:
 #######################################################################
     def Sp0_Set_Idx_DegDiv(self,widget):
 
-        print("=================================================")
-        print("FUNCTION Sp0_Set_Idx_DegDiv")
+        idx_log("=================================================")
+        idx_log("FUNCTION Sp0_Set_Idx_DegDiv")
 
-        if self.Sp0_Idx_DegDiv == "Deg":
-                        self.Sp0_Idx_DegDiv = "Div"
-                        self.Sp0_Idx_Deg = round(360 / self.Sp0_Idx_Dist, 1)
+        # Sp0_Set_Idx_bW_Deg and Sp0_Set_Idx_bW_Div are a GTK radio pair
+        # sharing this one "toggled" handler - clicking either one fires
+        # this handler TWICE (once for the button going active, once for
+        # its paired sibling going inactive). Blindly flipping our own
+        # mode flag on every call meant one click flipped it there and
+        # back, net no-op - Div mode could never actually engage. Reading
+        # the widget directly and ignoring the "going inactive" call fixes
+        # it the same way the Sp0/Sp1 index checkboxes were fixed earlier.
+        if not widget.get_active():
+            idx_log("Sp0_Set_Idx_DegDiv ignored (widget going inactive)")
+            return
+
+        self.Sp0_Idx_DegDiv = "Div" if Gtk.Buildable.get_name(widget) == "Sp0_Set_Idx_bW_Div" else "Deg"
+
+        if self.Sp0_Idx_DegDiv == "Div":
+            self.Sp0_Idx_Deg = round(360 / self.Sp0_Idx_Dist, 1)
         else:
-                        self.Sp0_Idx_DegDiv = "Deg"
-                        self.Sp0_Idx_Deg = round(self.Sp0_Idx_Dist, 1)
+            self.Sp0_Idx_Deg = round(self.Sp0_Idx_Dist, 1)
 
-        Prt1 = "Sp0_Idx_Deg = " + str(self.Sp0_Idx_Deg)
-        print(Prt1)
-
-        Prt2 = "self.Sp0_Idx_DegDiv = " + self.Sp0_Idx_DegDiv
-        print(Prt2)
+        idx_log("Sp0_Idx_DegDiv = " + self.Sp0_Idx_DegDiv)
+        idx_log("Sp0_Idx_Deg = " + str(self.Sp0_Idx_Deg))
 
 #######################################################################
 # Sp0_Set_Idx_Dist
@@ -1215,11 +1518,22 @@ class HandlerClass:
 #######################################################################
     def Sp0_Set_Idx_Dist(self,widget):
 
-        print("=================================================")
-        print("FUNCTION Sp0_Set_Idx_Dist")
+        idx_log("=================================================")
+        idx_log("FUNCTION Sp0_Set_Idx_Dist")
 
         self.Sp0_Idx_Dist = round(widget.get_value(), 1)
-        print("self.Sp0_Idx_Dist = " + str(self.Sp0_Idx_Dist))
+        idx_log("self.Sp0_Idx_Dist = " + str(self.Sp0_Idx_Dist))
+
+        # Sp0_Idx_Deg is what every M19 move actually uses, and it must
+        # track the current Deg/Div mode here too - previously it was only
+        # recalculated inside Sp0_Set_Idx_DegDiv (the mode toggle), so
+        # changing the distance value while already in Div mode had no
+        # effect on the actual move size until the mode was toggled again.
+        if self.Sp0_Idx_DegDiv == "Div":
+            self.Sp0_Idx_Deg = round(360 / self.Sp0_Idx_Dist, 1)
+        else:
+            self.Sp0_Idx_Deg = round(self.Sp0_Idx_Dist, 1)
+        idx_log("self.Sp0_Idx_Deg = " + str(self.Sp0_Idx_Deg))
 
 #######################################################################
 # Sp0_Set_Idx_OnOff
@@ -1243,15 +1557,15 @@ class HandlerClass:
 #######################################################################
     def Sp0_Set_Idx_OnOff(self,widget):
 
-        print("=================================================")
-        print("FUNCTION Sp0_Set_Idx_OnOff")
+        idx_log("=================================================")
+        idx_log("FUNCTION Sp0_Set_Idx_OnOff")
 
-        if self.Sp0_Idx_Bool:
-                self.Sp0_Idx_Bool = False
-                print("Sp0_Idx_Bool = False")
-        else:
-                self.Sp0_Idx_Bool = True
-                print("Sp0_Idx_Bool = True")
+        # Read the checkbox's actual state rather than blindly flipping our
+        # own flag - the "toggled" signal isn't guaranteed to fire exactly
+        # once per user click, so blindly flipping let this drift out of
+        # sync with what the checkbox visually shows.
+        self.Sp0_Idx_Bool = widget.get_active()
+        idx_log("Sp0_Idx_Bool = " + str(self.Sp0_Idx_Bool))
 
 #######################################################################
 # Sp0_Set_Scale
@@ -1280,6 +1594,18 @@ class HandlerClass:
 
         print("=================================================")
         print("FUNCTION Sp0_Set_Scale")
+
+        # Stop any Run Operation spindle rotation (M3/M4) before this
+        # scale change lands - a large change to position-scale while
+        # the spindle is actively spinning under S-word/M3/M4 control
+        # could otherwise cause a runaway once the new scale takes
+        # effect (see conversation).
+        s.poll()
+        if s.task_state != linuxcnc.MODE_MDI:
+                c.mode(linuxcnc.MODE_MDI)
+                c.wait_complete()
+        c.mdi("M5")
+        c.wait_complete()
 
         Sp0_Scale = round(widget.get_value(), 1)
 
@@ -1326,6 +1652,13 @@ class HandlerClass:
             print("Error setting " + hal_pin + ": " + e.stderr)
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
+
+#######################################################################
+# Sp0_Set_Ena
+# Purpose:              See B_Set_Ena - same pattern, for Sp0.
+#######################################################################
+    def Sp0_Set_Ena(self,widget):
+        _clear_ena_override('Sp0')
 
 # ********************************************************************
 #  SSSSSS  PPPPPPP  IIIIIIII N     NN DDDDDDD  LL       EEEEEEEE  1111
@@ -1386,15 +1719,13 @@ class HandlerClass:
 #######################################################################
     def Sp1_Set_Idx_OnOff(self,widget):
 
-        print("=================================================")
-        print("FUNCTION Sp1_Set_Idx_OnOff")
+        idx_log("=================================================")
+        idx_log("FUNCTION Sp1_Set_Idx_OnOff")
 
-        if self.Sp1_Idx_Bool:
-                self.Sp1_Idx_Bool = False
-                print("Sp1_Idx_Bool = False")
-        else:
-                self.Sp1_Idx_Bool = True
-                print("Sp1_Idx_Bool = True")
+        # See Sp0_Set_Idx_OnOff for why this reads the widget directly
+        # instead of flipping a separately-tracked flag.
+        self.Sp1_Idx_Bool = widget.get_active()
+        idx_log("Sp1_Idx_Bool = " + str(self.Sp1_Idx_Bool))
 
 #######################################################################
 # Sp1_Set_Move_Pct
@@ -1472,6 +1803,15 @@ class HandlerClass:
         print("=================================================")
         print("FUNCTION Sp1_Set_Scale")
 
+        # See Sp0_Set_Scale for why this stops Run Operation rotation
+        # before the scale change lands.
+        s.poll()
+        if s.task_state != linuxcnc.MODE_MDI:
+                c.mode(linuxcnc.MODE_MDI)
+                c.wait_complete()
+        c.mdi("M5")
+        c.wait_complete()
+
         Sp1_Scale = round(widget.get_value(), 1)
 
         # Sp1_ENA_Status belongs to the main panel's HAL component
@@ -1517,6 +1857,14 @@ class HandlerClass:
             print("Error setting " + hal_pin + ": " + e.stderr)
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
+
+#######################################################################
+# Sp1_Set_Ena
+# Purpose:              See B_Set_Ena - same pattern, for Sp1.
+#######################################################################
+    def Sp1_Set_Ena(self,widget):
+        _clear_ena_override('Sp1')
+
 
 # ********************************************************************
 #    AA    XX    XX IIIIIIII  SSSSSS      UU    UU
@@ -1772,6 +2120,13 @@ class HandlerClass:
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
 
+#######################################################################
+# U_Set_Ena
+# Purpose:              See B_Set_Ena - same pattern, for U.
+#######################################################################
+    def U_Set_Ena(self,widget):
+        _clear_ena_override('U')
+
 # ********************************************************************
 #    AA    XX    XX IIIIIIII  SSSSSS      VV    VV
 #   AAAA    XX  XX    II     SS    SS     VV    VV
@@ -2025,6 +2380,14 @@ class HandlerClass:
             print("Error setting " + hal_pin + ": " + e.stderr)
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
+
+#######################################################################
+# V_Set_Ena
+# Purpose:              See B_Set_Ena - same pattern, for V.
+#######################################################################
+    def V_Set_Ena(self,widget):
+        _clear_ena_override('V')
+
 
 # ********************************************************************
 #    AA    XX    XX IIIIIIII  SSSSSS      WW       WW
@@ -2280,6 +2643,14 @@ class HandlerClass:
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
 
+#######################################################################
+# W_Set_Ena
+# Purpose:              See B_Set_Ena - same pattern, for W.
+#######################################################################
+    def W_Set_Ena(self,widget):
+        _clear_ena_override('W')
+
+
 # ********************************************************************
 #    AA    XX    XX IIIIIIII  SSSSSS      YY    YY
 #   AAAA    XX  XX    II     SS    SS      YY  YY
@@ -2315,20 +2686,26 @@ class HandlerClass:
         print("=================================================")
         print("FUNCTION X_Idx_Minus")
 
-        # Ensure the system is in MDI mode
-        s.poll()
-        if s.task_state != linuxcnc.MODE_MDI:
-                c.mode(linuxcnc.MODE_MDI)
-                c.wait_complete() # Wait for mode change to complete
+        # Depress the button for the duration of the move (see
+        # _set_depressed for why this isn't a HAL_ToggleButton).
+        _set_depressed(widget, True)
+        try:
+            # Ensure the system is in MDI mode
+            s.poll()
+            if s.task_state != linuxcnc.MODE_MDI:
+                    c.mode(linuxcnc.MODE_MDI)
+                    c.wait_complete() # Wait for mode change to complete
 
-        # Send an MDI command to move along the axis.
-        Gcode = "G0 X-" + str(self.X_Idx_Dist) + " F" + str(self.X_Feed)
+            # Send an MDI command to move along the axis.
+            Gcode = "G0 X-" + str(self.X_Idx_Dist) + " F" + str(self.X_Feed)
 
-        print(Gcode)
-        c.mdi(Gcode)
+            print(Gcode)
+            c.mdi(Gcode)
 
-        # Wait for the command to complete
-        c.wait_complete()
+            # Wait for the command to complete
+            c.wait_complete()
+        finally:
+            _set_depressed(widget, False)
 
 #######################################################################
 # X_Idx_Plus
@@ -2354,22 +2731,27 @@ class HandlerClass:
     def X_Idx_Plus(self,widget):
 
         print("=================================================")
-        print("FUNCTION X_Idx_Minus")
+        print("FUNCTION X_Idx_Plus")
 
-        # Ensure the system is in MDI mode
-        s.poll()
-        if s.task_state != linuxcnc.MODE_MDI:
-                c.mode(linuxcnc.MODE_MDI)
-                c.wait_complete() # Wait for mode change to complete
+        # See X_Idx_Minus for _set_depressed.
+        _set_depressed(widget, True)
+        try:
+            # Ensure the system is in MDI mode
+            s.poll()
+            if s.task_state != linuxcnc.MODE_MDI:
+                    c.mode(linuxcnc.MODE_MDI)
+                    c.wait_complete() # Wait for mode change to complete
 
-        # Send an MDI command to move along the axis.
-        Gcode = "G0 X" + str(self.X_Idx_Dist) + " F" + str(self.X_Feed)
+            # Send an MDI command to move along the axis.
+            Gcode = "G0 X" + str(self.X_Idx_Dist) + " F" + str(self.X_Feed)
 
-        print(Gcode)
-        c.mdi(Gcode)
+            print(Gcode)
+            c.mdi(Gcode)
 
-        # Wait for the command to complete
-        c.wait_complete()
+            # Wait for the command to complete
+            c.wait_complete()
+        finally:
+            _set_depressed(widget, False)
 
 #######################################################################
 # X_Set_Feed
@@ -2488,6 +2870,15 @@ class HandlerClass:
         print("=================================================")
         print("FUNCTION X_Set_Scale")
 
+        # Cancel any in-progress move (e.g. X_Idx_Plus/Minus) before this
+        # scale change lands - a large change to position-scale while a
+        # coordinated move is still executing could otherwise leave the
+        # physical axis somewhere unexpected once the new scale takes
+        # effect (same class of risk as the Run Operation spindle case -
+        # see conversation).
+        c.abort()
+        c.wait_complete()
+
         X_Scale = round(widget.get_value(), 1)
 
         # X_ENA_Status belongs to the main panel's HAL component
@@ -2534,6 +2925,14 @@ class HandlerClass:
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
 
+#######################################################################
+# X_Set_Ena
+# Purpose:              See B_Set_Ena - same pattern, for X.
+#######################################################################
+    def X_Set_Ena(self,widget):
+        _clear_ena_override('X')
+
+
 # ********************************************************************
 #    AA    XX    XX IIIIIIII  SSSSSS      ZZZZZZZZ
 #   AAAA    XX  XX    II     SS    SS          ZZ
@@ -2569,20 +2968,25 @@ class HandlerClass:
         print("=================================================")
         print("FUNCTION Z_Idx_Minus")
 
-        # Ensure the system is in MDI mode
-        s.poll()
-        if s.task_state != linuxcnc.MODE_MDI:
-                c.mode(linuxcnc.MODE_MDI)
-                c.wait_complete() # Wait for mode change to complete
+        # See X_Idx_Minus for _set_depressed.
+        _set_depressed(widget, True)
+        try:
+            # Ensure the system is in MDI mode
+            s.poll()
+            if s.task_state != linuxcnc.MODE_MDI:
+                    c.mode(linuxcnc.MODE_MDI)
+                    c.wait_complete() # Wait for mode change to complete
 
-        # Send an MDI command to move along the axis.
-        Gcode = "G0 Z-" + str(self.Z_Idx_Dist) + " F" + str(self.Z_Feed)
+            # Send an MDI command to move along the axis.
+            Gcode = "G0 Z-" + str(self.Z_Idx_Dist) + " F" + str(self.Z_Feed)
 
-        print(Gcode)
-        c.mdi(Gcode)
+            print(Gcode)
+            c.mdi(Gcode)
 
-        # Wait for the command to complete
-        c.wait_complete()
+            # Wait for the command to complete
+            c.wait_complete()
+        finally:
+            _set_depressed(widget, False)
 
 #######################################################################
 # Z_Idx_Plus
@@ -2608,22 +3012,27 @@ class HandlerClass:
     def Z_Idx_Plus(self,widget):
 
         print("=================================================")
-        print("FUNCTION Z_Idx_Minus")
+        print("FUNCTION Z_Idx_Plus")
 
-        # Ensure the system is in MDI mode
-        s.poll()
-        if s.task_state != linuxcnc.MODE_MDI:
-                c.mode(linuxcnc.MODE_MDI)
-                c.wait_complete() # Wait for mode change to complete
+        # See X_Idx_Minus for _set_depressed.
+        _set_depressed(widget, True)
+        try:
+            # Ensure the system is in MDI mode
+            s.poll()
+            if s.task_state != linuxcnc.MODE_MDI:
+                    c.mode(linuxcnc.MODE_MDI)
+                    c.wait_complete() # Wait for mode change to complete
 
-        # Send an MDI command to move along the axis.
-        Gcode = "G0 Z" + str(self.Z_Idx_Dist) + " F" + str(self.Z_Feed)
+            # Send an MDI command to move along the axis.
+            Gcode = "G0 Z" + str(self.Z_Idx_Dist) + " F" + str(self.Z_Feed)
 
-        print(Gcode)
-        c.mdi(Gcode)
+            print(Gcode)
+            c.mdi(Gcode)
 
-        # Wait for the command to complete
-        c.wait_complete()
+            # Wait for the command to complete
+            c.wait_complete()
+        finally:
+            _set_depressed(widget, False)
 
 #######################################################################
 # Z_Set_Feed
@@ -2789,6 +3198,14 @@ class HandlerClass:
             print("halcmd not found - is the LinuxCNC environment sourced?")
 
 #######################################################################
+# Z_Set_Ena
+# Purpose:              See B_Set_Ena - same pattern, for Z.
+#######################################################################
+    def Z_Set_Ena(self,widget):
+        _clear_ena_override('Z')
+
+
+#######################################################################
 # __init__
 # Purpose:              This is used to initialize everything.
 # Updated:              ver 1.0, 21 July 2026, R. Colvin
@@ -2810,11 +3227,23 @@ class HandlerClass:
         self.builder        = builder
         self.nhits          = 0
 
+        _install_depress_css()
+
         # Independent pins this component owns, used to force each
         # axis disabled from this tab regardless of what the main
         # panel's own enable button is doing. Each defaults to "allow
         # enabled". ANDed with the panel button per-axis in
-        # REB_PostGUI.hal (REBHlp.<Axis>_Ena_Override).
+        # REB_PostGUI.hal (REBCnfg.<Axis>_Ena_Override).
+        #
+        # HAL_IO, not HAL_OUT: this component's own Set_Scale handlers
+        # clear an axis to False, but re-arming it happens from the main
+        # panel's ENA button - a different process - via
+        # `halcmd setp REBCnfg.<Axis>_Ena_Override TRUE` (see
+        # _clear_ena_override). An OUT pin can only ever be driven by
+        # its owning component; halcmd setp on one fails outright
+        # ("pin is not writable"). IO allows the legitimate external
+        # write while this component's own self.halcomp[...] = value
+        # writes still work exactly the same as before.
         #
         # Per the GladeVCP docs, an output pin must be created via
         # hal_glib.GPin(halcomp.newpin(...)) - not a bare newpin() -
@@ -2825,7 +3254,7 @@ class HandlerClass:
         for axis_id in AXIS_STEPGEN:
             pin_name = axis_id + "_Ena_Override"
             self._ena_override_pins[axis_id] = hal_glib.GPin(
-                self.halcomp.newpin(pin_name, hal.HAL_BIT, hal.HAL_OUT)
+                self.halcomp.newpin(pin_name, hal.HAL_BIT, hal.HAL_IO)
             )
             self.halcomp[pin_name] = True
 
@@ -2867,16 +3296,28 @@ class HandlerClass:
         self.B_Move_Dist    = 0.0       # B axis move distance
 
         self.Sp0_Feed       = 1.0       # Sp0 Speed
-        self.Sp0_Idx_Bool   = False     # Index this spindle?
+        self.Sp0_Idx_Bool   = True      # Index this spindle? Default enabled at startup. The checkbox itself doesn't reliably render checked from the .ui file's active="True" alone (confirmed live) - _set_checkbox_active below forces it to match once the panel is up.
         self.Sp0_Idx_DegDiv = "Deg"     # Sp0 & Sp1 spindles: index by degrees or divisions
         self.Sp0_Idx_Deg    = 90.0      # Sp0 index degrees
         self.Sp0_Idx_Dist   = 90.0      # B axis index distance
         self.Sp0_Idx_Qty    = 0         # Sp0 axis index counter
 
-        self.Sp1_Idx_Bool   = False     # Index this spindle?
+        self.Sp1_Idx_Bool   = False     # Index this spindle? See Sp0_Idx_Bool - the checkbox renders unchecked at launch regardless of the .ui default.
         self.Sp1_Idx_Dist   = 90.0      # Sp1 index degrees
         self.Sp1_Idx_Qty    = 0         # Sp1 axis index counter
         self.Sp1_Pct        = 100.0     # Sp1 speed percentage of Sp0 speed
+
+        # Match the on-screen checkboxes to the defaults above (see
+        # _set_checkbox_active for why this is deferred rather than done
+        # here directly).
+        GLib.idle_add(self._set_checkbox_active, 'Sp0_Set_Idx_OnOff', self.Sp0_Idx_Bool)
+        GLib.idle_add(self._set_checkbox_active, 'Sp1_Set_Idx_OnOff', self.Sp1_Idx_Bool)
+
+        # Keep the Run Operation tab's Fwd/Rev buttons showing pressed
+        # for as long as the spindle is actually running that direction
+        # (see _sync_run_operation_buttons). No-ops itself out after one
+        # call in every component other than the main panel.
+        GLib.timeout_add(100, self._sync_run_operation_buttons)
 
         self.U_Feed         = 1.0       # U axis feed rate
         self.U_Idx_Dist     = 0.0       # U axis index distance

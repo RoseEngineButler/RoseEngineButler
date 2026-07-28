@@ -1,6 +1,13 @@
+.DS_Store
+
+# Python bytecode cache
 __pycache__/
 *.pyc
 *~
-sim.var
-sim.var.bak
-REB_Display/.DS_Store
+
+# Generated/runtime files
+/REB.ini.expanded
+/sim.var
+/sim.var.bak
+REB_Display/idx_debug.log
+/memory.md

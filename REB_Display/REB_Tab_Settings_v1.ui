@@ -158,7 +158,7 @@
                 <property name="can-focus">False</property>
                 <property name="halign">start</property>
                 <property name="hexpand">True</property>
-                <property name="label" translatable="yes">Configure Axes</property>
+                <property name="label" translatable="yes">Axis Scaling</property>
                 <property name="justify">center</property>
                 <attributes>
                   <attribute name="font-desc" value="DejaVu Serif 20"/>
