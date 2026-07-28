@@ -785,6 +785,7 @@ setp pid.p0.FF1                             [SPINDLE_0]FF1_POS
 setp pid.p0.FF2                             [SPINDLE_0]FF2_POS
 setp orient.0.tolerance                     [SPINDLE_0]ORIENT_TOLERANCE
 setp pid.p0.maxoutput                       [SPINDLE_0]MAX_OUTPUT_POS
+setp pid.p0.maxerrorI                       [SPINDLE_0]MAX_ERROR_I_POS
 
 setp pid.s0.Pgain                           [SPINDLE_0]P_VEL
 setp pid.s0.Igain                           [SPINDLE_0]I_VEL
@@ -923,6 +924,7 @@ setp pid.p1.FF1                             [SPINDLE_1]FF1_POS
 setp pid.p1.FF2                             [SPINDLE_1]FF2_POS
 setp orient.1.tolerance                     [SPINDLE_1]ORIENT_TOLERANCE
 setp pid.p1.maxoutput                       [SPINDLE_1]MAX_OUTPUT_POS
+setp pid.p1.maxerrorI                       [SPINDLE_1]MAX_ERROR_I_POS
 
 setp pid.s1.Pgain                           [SPINDLE_1]P_VEL
 setp pid.s1.Igain                           [SPINDLE_1]I_VEL
