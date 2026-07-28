@@ -782,7 +782,7 @@ class HandlerClass:
 #   Button:             B_ENA
 #   Signal:             GtkButton/pressed
 #######################################################################
-    def B_Set_Ena(self,widget):
+    def B_Set_Ena(self,widget,*args):
         _clear_ena_override('B')
 
 #######################################################################
@@ -1657,7 +1657,7 @@ class HandlerClass:
 # Sp0_Set_Ena
 # Purpose:              See B_Set_Ena - same pattern, for Sp0.
 #######################################################################
-    def Sp0_Set_Ena(self,widget):
+    def Sp0_Set_Ena(self,widget,*args):
         _clear_ena_override('Sp0')
 
 # ********************************************************************
@@ -1862,7 +1862,7 @@ class HandlerClass:
 # Sp1_Set_Ena
 # Purpose:              See B_Set_Ena - same pattern, for Sp1.
 #######################################################################
-    def Sp1_Set_Ena(self,widget):
+    def Sp1_Set_Ena(self,widget,*args):
         _clear_ena_override('Sp1')
 
 
@@ -2124,7 +2124,7 @@ class HandlerClass:
 # U_Set_Ena
 # Purpose:              See B_Set_Ena - same pattern, for U.
 #######################################################################
-    def U_Set_Ena(self,widget):
+    def U_Set_Ena(self,widget,*args):
         _clear_ena_override('U')
 
 # ********************************************************************
@@ -2385,7 +2385,7 @@ class HandlerClass:
 # V_Set_Ena
 # Purpose:              See B_Set_Ena - same pattern, for V.
 #######################################################################
-    def V_Set_Ena(self,widget):
+    def V_Set_Ena(self,widget,*args):
         _clear_ena_override('V')
 
 
@@ -2647,7 +2647,7 @@ class HandlerClass:
 # W_Set_Ena
 # Purpose:              See B_Set_Ena - same pattern, for W.
 #######################################################################
-    def W_Set_Ena(self,widget):
+    def W_Set_Ena(self,widget,*args):
         _clear_ena_override('W')
 
 
@@ -2920,7 +2920,7 @@ class HandlerClass:
 # Z_Set_Ena
 # Purpose:              See B_Set_Ena - same pattern, for Z.
 #######################################################################
-    def Z_Set_Ena(self,widget):
+    def Z_Set_Ena(self,widget,*args):
         _clear_ena_override('Z')
 
 
@@ -3214,7 +3214,7 @@ def _axis_set_scale(axis):
     return handler
 
 def _axis_set_ena(axis):
-    def handler(self, widget):
+    def handler(self, widget, *args):
         _clear_ena_override(axis)
     handler.__name__ = axis + "_Set_Ena"
     return handler
