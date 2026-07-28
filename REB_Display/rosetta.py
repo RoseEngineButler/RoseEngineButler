@@ -122,7 +122,7 @@ def _clear_ena_override(axis_id):
     # to self.halcomp there would only touch this component's own,
     # unconnected pin of the same name - a no-op. Cross the process
     # boundary via halcmd instead, the same way Sp0_Set_Scale already
-    # does in the other direction for *_ENA_Status.
+    # does in the other direction for *_ENA-light.
     #
     # Once a pin is netted to a signal, halcmd can't "setp" the pin
     # directly ("pin is connected to a signal") - the signal itself has
@@ -722,12 +722,12 @@ class HandlerClass:
 
         B_Scale = round(widget.get_value(), 1)
 
-        # B_ENA_Status belongs to the main panel's HAL component
+        # B_ENA-light belongs to the main panel's HAL component
         # ("gladevcp"); read it cross-component via halcmd. To disable
         # the axis, drive this component's own B_Ena_Override pin
         # (ANDed with the panel button in REB_PostGUI.hal) instead of
         # trying to write another component's pin directly.
-        status_pin = "gladevcp.B_ENA_Status"
+        status_pin = "gladevcp.B_ENA-light"
 
         try:
             result = subprocess.run(
@@ -1609,12 +1609,12 @@ class HandlerClass:
 
         Sp0_Scale = round(widget.get_value(), 1)
 
-        # Sp0_ENA_Status belongs to the main panel's HAL component
+        # Sp0_ENA-light belongs to the main panel's HAL component
         # ("gladevcp"); read it cross-component via halcmd. To disable
         # the axis, drive this component's own Sp0_Ena_Override pin
         # (ANDed with the panel button in RESp0_PostGUI.hal) instead of
         # trying to write another component's pin directly.
-        status_pin = "gladevcp.Sp0_ENA_Status"
+        status_pin = "gladevcp.Sp0_ENA-light"
 
         try:
             result = subprocess.run(
@@ -1814,12 +1814,12 @@ class HandlerClass:
 
         Sp1_Scale = round(widget.get_value(), 1)
 
-        # Sp1_ENA_Status belongs to the main panel's HAL component
+        # Sp1_ENA-light belongs to the main panel's HAL component
         # ("gladevcp"); read it cross-component via halcmd. To disable
         # the axis, drive this component's own Sp1_Ena_Override pin
         # (ANDed with the panel button in RESp1_PostGUI.hal) instead of
         # trying to write another component's pin directly.
-        status_pin = "gladevcp.Sp1_ENA_Status"
+        status_pin = "gladevcp.Sp1_ENA-light"
 
         try:
             result = subprocess.run(
@@ -2076,12 +2076,12 @@ class HandlerClass:
 
         U_Scale = round(widget.get_value(), 1)
 
-        # U_ENA_Status belongs to the main panel's HAL component
+        # U_ENA-light belongs to the main panel's HAL component
         # ("gladevcp"); read it cross-component via halcmd. To disable
         # the axis, drive this component's own U_Ena_Override pin
         # (ANDed with the panel button in REU_PostGUI.hal) instead of
         # trying to write another component's pin directly.
-        status_pin = "gladevcp.U_ENA_Status"
+        status_pin = "gladevcp.U_ENA-light"
 
         try:
             result = subprocess.run(
@@ -2337,12 +2337,12 @@ class HandlerClass:
 
         V_Scale = round(widget.get_value(), 1)
 
-        # V_ENA_Status belongs to the main panel's HAL component
+        # V_ENA-light belongs to the main panel's HAL component
         # ("gladevcp"); read it cross-component via halcmd. To disable
         # the axis, drive this component's own V_Ena_Override pin
         # (ANDed with the panel button in REV_PostGUI.hal) instead of
         # trying to write another component's pin directly.
-        status_pin = "gladevcp.V_ENA_Status"
+        status_pin = "gladevcp.V_ENA-light"
 
         try:
             result = subprocess.run(
@@ -2599,12 +2599,12 @@ class HandlerClass:
 
         W_Scale = round(widget.get_value(), 1)
 
-        # W_ENA_Status belongs to the main panel's HAL component
+        # W_ENA-light belongs to the main panel's HAL component
         # ("gladevcp"); read it cross-component via halcmd. To disable
         # the axis, drive this component's own W_Ena_Override pin
         # (ANDed with the panel button in REB_PostGUI.hal) instead of
         # trying to write another component's pin directly.
-        status_pin = "gladevcp.W_ENA_Status"
+        status_pin = "gladevcp.W_ENA-light"
 
         try:
             result = subprocess.run(
@@ -2872,12 +2872,12 @@ class HandlerClass:
 
         Z_Scale = round(widget.get_value(), 1)
 
-        # Z_ENA_Status belongs to the main panel's HAL component
+        # Z_ENA-light belongs to the main panel's HAL component
         # ("gladevcp"); read it cross-component via halcmd. To disable
         # the axis, drive this component's own Z_Ena_Override pin
         # (ANDed with the panel button in REB_PostGUI.hal) instead of
         # trying to write another component's pin directly.
-        status_pin = "gladevcp.Z_ENA_Status"
+        status_pin = "gladevcp.Z_ENA-light"
 
         try:
             result = subprocess.run(
@@ -3151,7 +3151,7 @@ def _axis_set_move_dist(axis):
 def _axis_set_scale(axis):
     stepgen_ch = AXIS_STEPGEN[axis]
     hal_pin = "hm2_7i92.0.stepgen." + stepgen_ch + ".position-scale"
-    status_pin = "gladevcp." + axis + "_ENA_Status"
+    status_pin = "gladevcp." + axis + "_ENA-light"
     def handler(self, widget):
         print("=================================================")
         print("FUNCTION " + axis + "_Set_Scale")
@@ -3171,7 +3171,7 @@ def _axis_set_scale(axis):
 
         scale = round(widget.get_value(), 1)
 
-        # <Axis>_ENA_Status belongs to the main panel's HAL component
+        # <Axis>_ENA-light belongs to the main panel's HAL component
         # ("gladevcp"); read it cross-component via halcmd. To disable
         # the axis, drive this component's own <Axis>_Ena_Override pin
         # (ANDed with the panel button in REB_PostGUI.hal) instead of
