@@ -622,11 +622,18 @@ net w-pos-fb                             => joint.5.motor-pos-fb
 # net w-pos-fb                             => pid.w.feedback
 
 # net w-output                            <=  pid.w.output
-net w-output                             => hm2_7i92.0.stepgen.00.velocity-cmd
+# net w-output                             => hm2_7i92.0.stepgen.00.velocity-cmd
 
 net w-pos-limit                          => joint.5.pos-lim-sw-in
 
+# W has no PID (open-loop stepgen) - feed joint.5's velocity command
+# straight to the stepgen instead of through pid.w.output. Previously
+# w-output had no writer (pid.w.output's net was commented out when
+# PID was disabled for W) while w-vel-cmd had no reader, so the
+# stepgen's velocity-cmd was permanently stuck at 0 - W would enable
+# and hold torque but never step, regardless of jog/MDI/panel input.
 net w-vel-cmd                           <=  joint.5.vel-cmd
+net w-vel-cmd                            => hm2_7i92.0.stepgen.00.velocity-cmd
 
 # ********************************************************************
 #  Set pin values
