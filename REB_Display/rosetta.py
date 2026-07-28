@@ -720,7 +720,7 @@ class HandlerClass:
         print("=================================================")
         print("FUNCTION B_Set_Scale")
 
-        B_Scale = round(widget.get_value(), 1)
+        B_Scale = round(widget.get_value(), 3)
 
         # B_ENA-light belongs to the main panel's HAL component
         # ("gladevcp"); read it cross-component via halcmd. To disable
