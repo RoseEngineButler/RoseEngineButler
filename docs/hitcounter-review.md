@@ -6,6 +6,15 @@ of live bug-fixing on the indexing panel, ENA override handling, and X/Z axis
 tuning, to capture what a senior Python reviewer would flag about the file's
 overall shape.
 
+**Status (2026-07-28):** Issue 1 has a concrete implementation plan.
+Scope is X/Z/U/V/W only — B and Sp0/Sp1 are intentionally excluded (see
+Issue 1 below for why). While designing it, two live bugs also surfaced
+and are being fixed as part of the same work: `REB_Panel_v2.ui` has
+`V_Idx_Minus` wired to the `W_Idx_Minus` handler (wrong axis) and
+`W_Idx_Minus`/`W_Idx_Plus` swapped with each other; and only X currently
+has the `c.abort()` safety-stop-before-rescale and button-depress UI
+feedback that all five axes are being standardized on.
+
 ## Summary
 
 The file is 3,259 lines, one class (`HandlerClass`), 72 methods, plus a
@@ -45,15 +54,27 @@ differing only in the axis letter and stepgen channel number.
 This isn't just a style complaint - it's why the accel/PID misconfiguration
 found on X existed identically on all five linear axes, and had to be
 manually re-verified and reapplied four more times instead of being fixed
-once in one place.
+once in one place. The same investigation also found `Set_Ena` (all 8
+axes/spindles) may be entirely unreachable from the UI - no `.ui` file
+wires a `<signal>` to it - which the plan verifies live before deciding
+whether to delete or keep it.
 
-**Suggested fix:** a small `AxisHandlers` helper (or a dict-driven dispatch
-keyed by axis id, using the `AXIS_STEPGEN` mapping that already exists)
-implementing each behavior once, instantiated per axis. Since GladeVCP wires
-signal names to method names by string lookup, this would need either
-`functools.partial`-style bound methods registered under the expected names,
-or a `__getattr__` dispatcher - doable, and would likely collapse ~1,500
-lines into something like 300.
+**Fix (planned):** generate real bound methods via `setattr` on
+`HandlerClass` itself at module-load time, one factory function per
+pattern (`_axis_idx_move`, `_axis_set_feed`, `_axis_set_scale`, etc.)
+looped over `LINEAR_AXES = ("X", "Z", "U", "V", "W")`, using the existing
+`AXIS_STEPGEN` mapping for stepgen channels. A bare `__getattr__`
+dispatcher was considered and ruled out: GladeVCP discovers handlers via
+`dir(instance)` fed into `builder.connect_signals()`, and `dir()` doesn't
+enumerate names produced only through `__getattr__` - a button wired to
+a `__getattr__`-only name would silently stop working with no error.
+Class-level `setattr` produces real, `dir()`-visible, individually
+named methods (`handler.__name__` set explicitly), avoiding that trap.
+`B`/`Sp0`/`Sp1` are excluded from this collapse: `B` has Deg/Div-toggle
+logic with no linear-axis equivalent, and `Sp0`/`Sp1` indexing is a
+different mechanism entirely (M19 absolute-angle orient vs. relative G1
+moves) - forcing them into the same dispatch would obscure real
+differences rather than removing duplication.
 
 ## Issue 2: Logging is in a transitional, inconsistent state
 
