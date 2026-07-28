@@ -138,7 +138,7 @@ assumption: sending `P1` produced `orient.0.mode = 2`, and vice versa.
 
 **Fix (temporary, later superseded — see Problem 7):** swapped the
 literal `P1`/`P2` sent by `Sp0_Move_Idx_Fwd` / `Sp0_Move_Idx_Rev` in
-`REB_Display/hitcounter.py` so Fwd produced the intended clockwise motion.
+`REB_Display/rosetta.py` so Fwd produced the intended clockwise motion.
 
 ## Problem 6: `M19 R<angle>` is an absolute target, not a relative step
 
@@ -156,7 +156,7 @@ way" was blocked by the direction constraint, it had to travel almost a
 full revolution to reach the same spot from the other side.
 
 **Fix:** `Sp0_Move_Idx_Fwd` and `Sp0_Move_Idx_Rev`
-(`REB_Display/hitcounter.py`, functions starting at lines 798 and 867)
+(`REB_Display/rosetta.py`, functions starting at lines 798 and 867)
 now read the spindle's **actual current angle live from HAL**
 (`hal.get_value('spindle.0-position-fb')`, converted from revolutions to
 degrees) and compute the target as `current ± Sp0_Idx_Deg`, wrapped to
@@ -201,7 +201,7 @@ timeout window and then failed, one command behind the real (successful)
 Sp0 move.
 
 **Fix (temporary, later superseded — see Problem 9):** Removed the `$1`
-M19 call from both handlers (`REB_Display/hitcounter.py`). Once Sp1's own
+M19 call from both handlers (`REB_Display/rosetta.py`). Once Sp1's own
 `orient`/`pid` chain was built out, the `$1` call was reinstated —
 properly gated this time, per Problem 9.
 
@@ -234,7 +234,7 @@ realistically achieve, moves will always time out instead of succeeding.
 The gain `P_POS = 1.0` in the same file gives roughly a 1-second time
 constant, so a typical 90° move should comfortably reach 0.1° in well
 under the 20-second timeout (`Q20`, set in the `M19` strings in
-`hitcounter.py`). If a tighter tolerance is ever needed, `P_POS` can be
+`rosetta.py`). If a tighter tolerance is ever needed, `P_POS` can be
 raised further — the no-overshoot ceiling is
 `P_POS ≤ 2 × STEPGEN_MAXACCEL / MAX_OUTPUT_POS` (currently `2.0`; see
 Problem 2) — or a small `I_POS` can be added to eliminate any residual
@@ -310,7 +310,7 @@ actually commanded to orient on the real machine. It converged correctly
 carried over by analogy in Problem 9 held up as-is with no retuning.
 Live testing did surface four Python-side bugs, unrelated to the HAL/PID
 work, all fixed in the same session in
-`REB_Display/hitcounter.py`.
+`REB_Display/rosetta.py`.
 
 **Bug A — index checkboxes drifted out of sync with the display.**
 `Sp0_Set_Idx_OnOff`/`Sp1_Set_Idx_OnOff` blindly flipped their own
@@ -438,7 +438,7 @@ slowly than what was observed during this session, and may want to retune
   `ORIENT_TOLERANCE`.
 - `REB_Axes/REB_Spindle1.inc`, **both copies** — same four keys, same
   pattern, added in Problem 9.
-- `REB_Display/hitcounter.py` (git-managed) — `Sp0_Move_Idx_Fwd` /
+- `REB_Display/rosetta.py` (git-managed) — `Sp0_Move_Idx_Fwd` /
   `Sp0_Move_Idx_Rev`: incremental (not absolute) per-spindle target-angle
   computation, shortest-path (`P0`) direction, the Sp0/Sp1 checkbox gating
   and matching `__init__` default fix from Problem 9, and a fix to a
