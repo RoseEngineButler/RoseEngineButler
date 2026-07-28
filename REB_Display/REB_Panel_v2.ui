@@ -565,7 +565,7 @@
                 <property name="image">Image_W_Up</property>
                 <property name="use-underline">True</property>
                 <property name="image-position">top</property>
-                <signal name="pressed" handler="W_Idx_Plus" swapped="no"/>
+                <signal name="pressed" handler="W_Idx_Minus" swapped="no"/>
               </object>
               <packing>
                 <property name="left-attach">12</property>
@@ -581,7 +581,7 @@
                 <property name="valign">center</property>
                 <property name="image">Image_W_Down</property>
                 <property name="image-position">top</property>
-                <signal name="pressed" handler="W_Idx_Minus" swapped="no"/>
+                <signal name="pressed" handler="W_Idx_Plus" swapped="no"/>
               </object>
               <packing>
                 <property name="left-attach">13</property>
@@ -687,7 +687,7 @@
                 <property name="image">Image_V_Up</property>
                 <property name="use-underline">True</property>
                 <property name="image-position">top</property>
-                <signal name="pressed" handler="W_Idx_Minus" swapped="no"/>
+                <signal name="pressed" handler="V_Idx_Minus" swapped="no"/>
               </object>
               <packing>
                 <property name="left-attach">13</property>
