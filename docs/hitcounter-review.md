@@ -55,9 +55,15 @@ This isn't just a style complaint - it's why the accel/PID misconfiguration
 found on X existed identically on all five linear axes, and had to be
 manually re-verified and reapplied four more times instead of being fixed
 once in one place. The same investigation also found `Set_Ena` (all 8
-axes/spindles) may be entirely unreachable from the UI - no `.ui` file
-wires a `<signal>` to it - which the plan verifies live before deciding
-whether to delete or keep it.
+axes/spindles) was orphaned, not dead: the ENA buttons' widget type
+changed from `HAL_Button` (fired a `pressed` signal) to `HAL_LightButton`
+(only emits `clicked`) at some point, and the signal wiring was never
+carried over - silently disconnecting `_clear_ena_override()`'s existing
+fix for a "press ENA and nothing happens, need a confusing second press"
+bug that resurfaced live during this refactor. Fixed by wiring all 8 ENA
+buttons' `clicked` signal to their `<Axis>_Set_Ena` handler in
+`REB_Panel_v2.ui`, and generating `Set_Ena` for every migrated axis
+instead of skipping it.
 
 **Fix (planned):** generate real bound methods via `setattr` on
 `HandlerClass` itself at module-load time, one factory function per

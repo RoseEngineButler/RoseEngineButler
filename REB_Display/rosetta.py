@@ -2651,287 +2651,6 @@ class HandlerClass:
         _clear_ena_override('W')
 
 
-# ********************************************************************
-#    AA    XX    XX IIIIIIII  SSSSSS      YY    YY
-#   AAAA    XX  XX    II     SS    SS      YY  YY
-#  AA  AA    XXXX     II      SSS           YYYY
-# AAAAAAAA   XXXX     II         SSS        XXXX
-# AA    AA  XX  XX    II     SS    SS      XX   XX
-# AA    AA XX    XX IIIIIIII  SSSSSS      XX     XX
-# ********************************************************************
-
-#######################################################################
-# X_Idx_Minus
-# Purpose:              This is used to index the X axis in the
-#                           minus direction.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Panel
-#   Button:             X_Idx_Minus
-#   Signal:             GtkButton/pressed
-# ---------------------------------------------------------------------
-# Data
-#   Read from UI:       (none)
-#   Program Variables
-#       Referenced:     self.X_Feed
-#                       self.X_Idx_Dist
-#       Set:            (none)
-#   Written to UI:      (none)
-# ---------------------------------------------------------------------
-# Gcodes Called:        G0
-#######################################################################
-    def X_Idx_Minus(self,widget):
-
-        print("=================================================")
-        print("FUNCTION X_Idx_Minus")
-
-        # Depress the button for the duration of the move (see
-        # _set_depressed for why this isn't a HAL_ToggleButton).
-        _set_depressed(widget, True)
-        try:
-            # Ensure the system is in MDI mode
-            s.poll()
-            if s.task_state != linuxcnc.MODE_MDI:
-                    c.mode(linuxcnc.MODE_MDI)
-                    c.wait_complete() # Wait for mode change to complete
-
-            # Send an MDI command to move along the axis.
-            Gcode = "G1 X-" + str(self.X_Idx_Dist) + " F" + str(self.X_Feed)
-
-            print(Gcode)
-            c.mdi(Gcode)
-
-            # Wait for the command to complete
-            c.wait_complete()
-        finally:
-            _set_depressed(widget, False)
-
-#######################################################################
-# X_Idx_Plus
-# Purpose:              This is used to index the X axis in the
-#                           plus direction.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Panel
-#   Button:             X_Idx_Plus
-#   Signal:             GtkButton/pressed
-# ---------------------------------------------------------------------
-# Data
-#   Read from UI:       (none)
-#   Program Variables
-#       Referenced:     self.X_Feed
-#                       self.X_Idx_Dist
-#       Set:            (none)
-#   Written to UI:      (none)
-# ---------------------------------------------------------------------
-# Gcodes Called:        G0
-#######################################################################
-    def X_Idx_Plus(self,widget):
-
-        print("=================================================")
-        print("FUNCTION X_Idx_Plus")
-
-        # See X_Idx_Minus for _set_depressed.
-        _set_depressed(widget, True)
-        try:
-            # Ensure the system is in MDI mode
-            s.poll()
-            if s.task_state != linuxcnc.MODE_MDI:
-                    c.mode(linuxcnc.MODE_MDI)
-                    c.wait_complete() # Wait for mode change to complete
-
-            # Send an MDI command to move along the axis.
-            Gcode = "G1 X" + str(self.X_Idx_Dist) + " F" + str(self.X_Feed)
-
-            print(Gcode)
-            c.mdi(Gcode)
-
-            # Wait for the command to complete
-            c.wait_complete()
-        finally:
-            _set_depressed(widget, False)
-
-#######################################################################
-# X_Set_Feed
-# Purpose:              This is used to set the movement speed for the
-#                           X axis.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Tab_Linear
-#   Button:             X_Feed (on setting the value)
-#   Signal:             GtkSpinButton/value-changed
-# ---------------------------------------------------------------------
-# Data
-#   Read from UI:       X_Feed
-#   Program Variables
-#       Referenced:     (none)
-#       Set:            self.X_Feed
-#   Written to UI:      (none)
-# ---------------------------------------------------------------------
-# Gcodes Called:        (none)
-#######################################################################
-    def X_Set_Feed(self,widget):
-
-        print("=================================================")
-        print("FUNCTION X_Set_Feed")
-
-        self.X_Feed = round(widget.get_value(), 1)
-
-        print("X_Set_Feed =")
-        print(self.X_Feed)
-
-#######################################################################
-# X_Set_Idx_Dist
-# Purpose:              This is used to set the movement distance for
-#                           the X axis.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Tab_Linear
-#   Button:             X_Idx_Dist (on setting the value)
-#   Signal:             GtkSpinButton/value-changed
-# ---------------------------------------------------------------------
-# Data
-#   Read from UI:       X_Idx_Dist
-#   Program Variables
-#       Referenced:     (none)
-#       Set:            self.X_Idx_Dist
-#   Written to UI:      (none)
-# ---------------------------------------------------------------------
-# Gcodes Called:        (none)
-#######################################################################
-    def X_Set_Idx_Dist(self,widget):
-
-        print("=================================================")
-        print("FUNCTION X_Set_Idx_Dist")
-
-        self.X_Idx_Dist = widget.get_value()
-
-        print("X_Idx_Dist =")
-        print(self.X_Idx_Dist)
-
-#######################################################################
-# X_Set_Move_Dist
-# Purpose:              This is used to set the movement distance for
-#                           the X axis.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Panel
-#   Button:             X_Move_Dist (on setting the value)
-#   Signal:             GtkSpinButton/value-changed
-# ---------------------------------------------------------------------
-# Data
-#   Read from UI:       X_Move_Dist
-#   Program Variables
-#       Referenced:     (none)
-#       Set:            self.X_Move_Dist
-#   Written to UI:      (none)
-# ---------------------------------------------------------------------
-# Gcodes Called:        (none)
-#######################################################################
-    def X_Set_Move_Dist(self,widget):
-
-        print("=================================================")
-        print("FUNCTION X_Set_Move_Dist")
-
-        self.X_Move_Dist = widget.get_value()
-
-        print("X_Move_Dist = " + str(self.X_Move_Dist))
-
-#######################################################################
-# X_Set_Scale
-# Purpose:              This is used to set the scale distance for the
-#                           X axis.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Tab_Settings
-#   Button:             X_Set_Scale (on setting the value)
-#   Signal:             HAL_SpinButton/value-changed
-# ---------------------------------------------------------------------
-# Data
-#   Read from UI:       (none)
-#   Program Variables
-#       Referenced:     (none)
-#       Set:            (none)
-#   Written to UI:      (none)
-# ---------------------------------------------------------------------
-# Gcodes Called:        (none)
-# ---------------------------------------------------------------------
-# HAL Commands:         halcmd setp hm2_7i92.0.stepgen.04.position-scale
-#                              (value)
-#######################################################################
-    def X_Set_Scale(self,widget):
-
-        print("=================================================")
-        print("FUNCTION X_Set_Scale")
-
-        # Cancel any in-progress move (e.g. X_Idx_Plus/Minus) before this
-        # scale change lands - a large change to position-scale while a
-        # coordinated move is still executing could otherwise leave the
-        # physical axis somewhere unexpected once the new scale takes
-        # effect (same class of risk as the Run Operation spindle case -
-        # see conversation).
-        c.abort()
-        c.wait_complete()
-
-        X_Scale = round(widget.get_value(), 1)
-
-        # X_ENA_Status belongs to the main panel's HAL component
-        # ("gladevcp"); read it cross-component via halcmd. To disable
-        # the axis, drive this component's own X_Ena_Override pin
-        # (ANDed with the panel button in REB_PostGUI.hal) instead of
-        # trying to write another component's pin directly.
-        status_pin = "gladevcp.X_ENA_Status"
-
-        try:
-            result = subprocess.run(
-                ["halcmd", "getp", status_pin],
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            is_enabled = result.stdout.strip().upper() in ("TRUE", "1")
-            print(status_pin + " = " + result.stdout.strip())
-
-            if is_enabled:
-                print("X axis is enabled - disabling")
-                self.halcomp['X_Ena_Override'] = False
-            else:
-                print("X axis is already disabled")
-        except subprocess.CalledProcessError as e:
-            print("Error checking " + status_pin + ": " + e.stderr)
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
-
-        # Send the new scale to the X axis stepgen via halcmd.
-        hal_pin = "hm2_7i92.0.stepgen.04.position-scale"
-        cmd = ["halcmd", "setp", hal_pin, str(X_Scale)]
-
-        try:
-            result = subprocess.run(
-                cmd,
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            print("Set " + hal_pin + " = " + str(X_Scale))
-        except subprocess.CalledProcessError as e:
-            print("Error setting " + hal_pin + ": " + e.stderr)
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
-
-#######################################################################
-# X_Set_Ena
-# Purpose:              See B_Set_Ena - same pattern, for X.
-#######################################################################
-    def X_Set_Ena(self,widget):
-        _clear_ena_override('X')
-
 
 # ********************************************************************
 #    AA    XX    XX IIIIIIII  SSSSSS      ZZZZZZZZ
@@ -3343,6 +3062,172 @@ class HandlerClass:
         self.Z_Idx_Dist     = 0.0       # Z axis index distance
         self.Z_Idx_Qty      = 0         # Z axis index counter
         self.Z_Move_Dist    = 0.0       # Z axis move distance
+
+# ------------------------------------------------------------------
+# Generated per-axis handlers (linear axes: X, Z, U, V, W).
+#
+# Collapses the near-identical Idx_Minus/Idx_Plus/Set_Feed/Set_Idx_Dist/
+# Set_Move_Dist/Set_Scale methods that used to be hand-written once per
+# axis (see docs/hitcounter-review.md, Issue 1) into one factory function
+# per pattern, looped over the axes and bound onto HandlerClass via
+# setattr. This has to produce real, named methods rather than a
+# __getattr__ dispatcher: GladeVCP discovers handlers via dir(instance)
+# fed into builder.connect_signals(), and dir() does not enumerate names
+# that only exist through __getattr__ - such a button would silently
+# stop working with no error anywhere.
+#
+# Rollout in progress: currently X only (see the refactor plan). Z/U/V/W
+# still have their own hand-written methods above and will be migrated
+# the same way, one axis at a time, each live-tested before the next.
+#
+# Set_Ena IS generated here (revised 2026-07-28): initially thought dead
+# (no .ui file wires a <signal> to any <Axis>_Set_Ena), but that's because
+# the ENA buttons were redesigned from HAL_Button (which used a "pressed"
+# signal - see B_Set_Ena's banner comment) to HAL_LightButton, which only
+# emits "clicked" - the signal wiring was never carried over, silently
+# orphaning _clear_ena_override()'s fix for the "press ENA and nothing
+# happens, need a confusing second press" bug (see that function's own
+# comments). The real fix is reconnecting REB_Panel_v2.ui's <Axis>_ENA
+# widgets' "clicked" signal to <Axis>_Set_Ena, not deleting the method.
+
+LINEAR_AXES = ("X",)  # TODO: add "Z", "U", "V", "W" as each is migrated
+
+def _axis_idx_move(axis, sign):
+    label = "Minus" if sign == "-" else "Plus"
+    def handler(self, widget):
+        print("=================================================")
+        print("FUNCTION " + axis + "_Idx_" + label)
+
+        # Depress the button for the duration of the move (see
+        # _set_depressed for why this isn't a HAL_ToggleButton).
+        _set_depressed(widget, True)
+        try:
+            s.poll()
+            if s.task_state != linuxcnc.MODE_MDI:
+                c.mode(linuxcnc.MODE_MDI)
+                c.wait_complete()
+
+            dist = getattr(self, axis + "_Idx_Dist")
+            feed = getattr(self, axis + "_Feed")
+            Gcode = "G1 " + axis + sign + str(dist) + " F" + str(feed)
+
+            print(Gcode)
+            c.mdi(Gcode)
+            c.wait_complete()
+        finally:
+            _set_depressed(widget, False)
+    handler.__name__ = axis + "_Idx_" + label
+    return handler
+
+def _axis_set_feed(axis):
+    def handler(self, widget):
+        print("=================================================")
+        print("FUNCTION " + axis + "_Set_Feed")
+        setattr(self, axis + "_Feed", round(widget.get_value(), 1))
+        print(axis + "_Set_Feed =")
+        print(getattr(self, axis + "_Feed"))
+    handler.__name__ = axis + "_Set_Feed"
+    return handler
+
+def _axis_set_idx_dist(axis):
+    def handler(self, widget):
+        print("=================================================")
+        print("FUNCTION " + axis + "_Set_Idx_Dist")
+        setattr(self, axis + "_Idx_Dist", widget.get_value())
+        print(axis + "_Idx_Dist =")
+        print(getattr(self, axis + "_Idx_Dist"))
+    handler.__name__ = axis + "_Set_Idx_Dist"
+    return handler
+
+def _axis_set_move_dist(axis):
+    def handler(self, widget):
+        print("=================================================")
+        print("FUNCTION " + axis + "_Set_Move_Dist")
+        setattr(self, axis + "_Move_Dist", widget.get_value())
+        print(axis + "_Move_Dist = " + str(getattr(self, axis + "_Move_Dist")))
+    handler.__name__ = axis + "_Set_Move_Dist"
+    return handler
+
+def _axis_set_scale(axis):
+    stepgen_ch = AXIS_STEPGEN[axis]
+    hal_pin = "hm2_7i92.0.stepgen." + stepgen_ch + ".position-scale"
+    status_pin = "gladevcp." + axis + "_ENA_Status"
+    def handler(self, widget):
+        print("=================================================")
+        print("FUNCTION " + axis + "_Set_Scale")
+
+        # Cancel any in-progress move (e.g. <Axis>_Idx_Plus/Minus) before
+        # this scale change lands - a large change to position-scale
+        # while a coordinated move is still executing could otherwise
+        # leave the physical axis somewhere unexpected once the new
+        # scale takes effect (same class of risk as the Run Operation
+        # spindle case - see conversation). This guards an independently
+        # running G-code program or another MDI source, not this same
+        # click handler's own MDI call - that can't be concurrent, since
+        # c.mdi()/c.wait_complete() block the GTK loop this click needs
+        # to be processed by.
+        c.abort()
+        c.wait_complete()
+
+        scale = round(widget.get_value(), 1)
+
+        # <Axis>_ENA_Status belongs to the main panel's HAL component
+        # ("gladevcp"); read it cross-component via halcmd. To disable
+        # the axis, drive this component's own <Axis>_Ena_Override pin
+        # (ANDed with the panel button in REB_PostGUI.hal) instead of
+        # trying to write another component's pin directly.
+        try:
+            result = subprocess.run(
+                ["halcmd", "getp", status_pin],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            is_enabled = result.stdout.strip().upper() in ("TRUE", "1")
+            print(status_pin + " = " + result.stdout.strip())
+
+            if is_enabled:
+                print(axis + " axis is enabled - disabling")
+                self.halcomp[axis + '_Ena_Override'] = False
+            else:
+                print(axis + " axis is already disabled")
+        except subprocess.CalledProcessError as e:
+            print("Error checking " + status_pin + ": " + e.stderr)
+        except FileNotFoundError:
+            print("halcmd not found - is the LinuxCNC environment sourced?")
+
+        # Send the new scale to the axis's stepgen via halcmd.
+        cmd = ["halcmd", "setp", hal_pin, str(scale)]
+        try:
+            result = subprocess.run(
+                cmd,
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            print("Set " + hal_pin + " = " + str(scale))
+        except subprocess.CalledProcessError as e:
+            print("Error setting " + hal_pin + ": " + e.stderr)
+        except FileNotFoundError:
+            print("halcmd not found - is the LinuxCNC environment sourced?")
+    handler.__name__ = axis + "_Set_Scale"
+    return handler
+
+def _axis_set_ena(axis):
+    def handler(self, widget):
+        _clear_ena_override(axis)
+    handler.__name__ = axis + "_Set_Ena"
+    return handler
+
+for _axis in LINEAR_AXES:
+    setattr(HandlerClass, _axis + "_Idx_Minus", _axis_idx_move(_axis, "-"))
+    setattr(HandlerClass, _axis + "_Idx_Plus",  _axis_idx_move(_axis, "+"))
+    setattr(HandlerClass, _axis + "_Set_Feed", _axis_set_feed(_axis))
+    setattr(HandlerClass, _axis + "_Set_Ena", _axis_set_ena(_axis))
+    setattr(HandlerClass, _axis + "_Set_Idx_Dist", _axis_set_idx_dist(_axis))
+    setattr(HandlerClass, _axis + "_Set_Move_Dist", _axis_set_move_dist(_axis))
+    setattr(HandlerClass, _axis + "_Set_Scale", _axis_set_scale(_axis))
+del _axis
 
 def get_handlers(halcomp,builder,useropts):
     '''
