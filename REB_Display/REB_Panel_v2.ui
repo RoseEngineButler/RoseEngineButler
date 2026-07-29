@@ -168,14 +168,14 @@
     <property name="upper">10</property>
     <property name="value">1</property>
     <property name="step-increment">0.01</property>
-    <property name="page-increment">0.10</property>
+    <property name="page-increment">1.00</property>
   </object>
   <object class="GtkAdjustment" id="Sp1_Feed_Rate">
     <property name="lower">-1000</property>
     <property name="upper">1000</property>
     <property name="value">100</property>
     <property name="step-increment">0.01</property>
-    <property name="page-increment">0.10</property>
+    <property name="page-increment">5.00</property>
   </object>
   <object class="GtkAdjustment" id="Sp_Idx_Dis">
     <property name="upper">720</property>
@@ -1106,7 +1106,7 @@
                 <property name="overwrite-mode">True</property>
                 <property name="input-purpose">number</property>
                 <property name="adjustment">Sp0_Feed_Rate</property>
-                <property name="climb-rate">0.009999999776482582</property>
+                <property name="climb-rate">0.05</property>
                 <property name="digits">2</property>
                 <property name="numeric">True</property>
                 <property name="value">1</property>
@@ -1177,6 +1177,7 @@ feed rate</property>
                 <property name="overwrite-mode">True</property>
                 <property name="input-purpose">number</property>
                 <property name="adjustment">Sp1_Feed_Rate</property>
+                <property name="climb-rate">0.05</property>
                 <property name="digits">2</property>
                 <property name="numeric">True</property>
                 <property name="value">100</property>

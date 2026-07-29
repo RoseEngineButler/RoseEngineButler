@@ -1421,6 +1421,22 @@ class HandlerClass:
         self.Sp0_Feed = round(widget.get_value(), 1)
         print("self.Sp0_Feed = " + str(self.Sp0_Feed))
 
+        # The spinbutton's arrows auto-repeat while held, firing
+        # value-changed on every tick. c.mdi()/c.wait_complete() below
+        # block the GTK main loop (same issue noted in _set_busy_cursor
+        # and _axis_set_scale above), so sending them on every tick was
+        # freezing the whole panel - including the spinbutton's own
+        # on-screen digits - for as long as the button stayed held.
+        # Debounce: only actually dispatch once the value has settled for
+        # 150ms, so GTK is free to repaint between ticks.
+        if self.Sp0_Feed_debounce_id is not None:
+            GLib.source_remove(self.Sp0_Feed_debounce_id)
+        self.Sp0_Feed_debounce_id = GLib.timeout_add(150, self._Sp0_Send_Feed)
+
+    def _Sp0_Send_Feed(self):
+
+        self.Sp0_Feed_debounce_id = None
+
         Sp1_Feed = round(self.Sp0_Feed * self.Sp1_Pct / 100, 2)
 
         Gcode0 = "S" + str(self.Sp0_Feed) + " $0"
@@ -1441,6 +1457,8 @@ class HandlerClass:
 
         # Wait for the command to complete
         c.wait_complete()
+
+        return False  # one-shot timeout, not a repeating GLib source
 
 #######################################################################
 # Sp0_Set_Idx_bW_DegDiv
@@ -1754,8 +1772,22 @@ class HandlerClass:
         print("FUNCTION Sp1_Set_Move_Pct")
 
         self.Sp1_Pct = round(widget.get_value(), 2)
-        Sp1_Feed = round(self.Sp0_Feed * self.Sp1_Pct / 100, 2)
+        print("self.Sp1_Pct = " + str(self.Sp1_Pct))
 
+        # Same freeze as Sp0_Set_Feed (see that handler's comment): the
+        # spinbutton arrows auto-repeat while held, and dispatching the
+        # blocking c.mdi()/c.wait_complete() pair on every tick stalls the
+        # GTK main loop long enough that the on-screen value looks stuck.
+        # Debounce the actual dispatch instead.
+        if self.Sp1_Pct_debounce_id is not None:
+            GLib.source_remove(self.Sp1_Pct_debounce_id)
+        self.Sp1_Pct_debounce_id = GLib.timeout_add(150, self._Sp1_Send_Pct)
+
+    def _Sp1_Send_Pct(self):
+
+        self.Sp1_Pct_debounce_id = None
+
+        Sp1_Feed = round(self.Sp0_Feed * self.Sp1_Pct / 100, 2)
         Gcode1 = "S" + str(Sp1_Feed) + " $1"
 
         print("self.Sp0_Feed = " + str(self.Sp0_Feed))
@@ -1774,6 +1806,8 @@ class HandlerClass:
 
         # Wait for the command to complete
         c.wait_complete()
+
+        return False  # one-shot timeout, not a repeating GLib source
 
 #######################################################################
 # Sp1_Set_Scale
@@ -1962,11 +1996,13 @@ class HandlerClass:
         self.Sp0_Idx_Deg    = 90.0      # Sp0 index degrees
         self.Sp0_Idx_Dist   = 90.0      # B axis index distance
         self.Sp0_Idx_Qty    = 0         # Sp0 axis index counter
+        self.Sp0_Feed_debounce_id = None  # pending GLib timeout for Sp0_Set_Feed, see that handler
 
         self.Sp1_Idx_Bool   = False     # Index this spindle? See Sp0_Idx_Bool - the checkbox renders unchecked at launch regardless of the .ui default.
         self.Sp1_Idx_Dist   = 90.0      # Sp1 index degrees
         self.Sp1_Idx_Qty    = 0         # Sp1 axis index counter
         self.Sp1_Pct        = 100.0     # Sp1 speed percentage of Sp0 speed
+        self.Sp1_Pct_debounce_id = None  # pending GLib timeout for Sp1_Set_Move_Pct, see that handler
 
         # Match the on-screen checkboxes to the defaults above (see
         # _set_checkbox_active for why this is deferred rather than done
