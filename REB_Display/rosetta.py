@@ -65,6 +65,9 @@ import hal
 import hal_glib
 import glib
 import time
+import datetime
+import json
+import os
 import linuxcnc
 import webbrowser
 import subprocess
@@ -90,6 +93,48 @@ AXIS_STEPGEN = {
 }
 
 SETTINGS_PATH = "/home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Settings_v1.ini"
+
+# User-facing, explicitly named/located settings snapshots (see
+# docs/settings_file.md) - separate from and in addition to the automatic,
+# fixed-path REB_Settings_v1.ini above. format_version is written into
+# every .rebset file and checked on load; bump it and add a
+# _migrate_v<N>_to_v<N+1>-style function if the schema below ever changes.
+REBSET_FORMAT_VERSION = 1
+REBSET_EXTENSION = ".rebset"
+REBSET_DEFAULT_DIR = os.path.expanduser("~/Documents")
+
+# Shipped starter profile, read from this repo (not RoseEngineButlerLocal
+# or a user's ~/Documents) - see _prompt_initial_settings_load. Its scale
+# values are deliberately 1 (no meaningful motion per commanded unit, on
+# any machine's real step/unit calibration) rather than a plausible-looking
+# number: an uncalibrated axis should fail toward "barely moves", never
+# toward "moves far more than commanded".
+REBSET_GENERIC_EXAMPLE_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "generic_example" + REBSET_EXTENSION
+)
+
+# Per-machine record of the last .rebset actually opened/saved by the
+# operator (not the generic_example fallback - see
+# _prompt_initial_settings_load), so the next session can reload it
+# automatically instead of prompting. Lives in RoseEngineButlerLocal
+# alongside REB_Settings_v1.ini, same reasoning as that file: this is
+# per-machine state, not something to track in the shared repo.
+LAST_SETTINGS_PATH_FILE = "/home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Last_Settings_Path.txt"
+
+# A full, ready-to-save .rebset payload, kept continuously up to date by
+# _mark_settings_dirty (and the two _prompt_initial_settings_load
+# fallbacks) for as long as there are unsaved changes; removed again once
+# they're saved or discarded. This is what lets the exit prompt work at
+# all: a GTK delete-event/destroy hook on this component's own window
+# does NOT fire on real AXIS exit (confirmed live - AXIS tears embedded
+# tabs down by yanking their X window out from under them, not a normal
+# close negotiation), so the actual prompt has to run from a different,
+# proven-reliable point in the shutdown sequence: REB_Scale_Persist.py,
+# run via `loadusr -w` from REB_Shutdown.hal, which already blocks
+# shutdown until it finishes. That script is a separate process with no
+# access to this component's live widgets, hence staging the full
+# payload here rather than just a boolean flag.
+PENDING_SETTINGS_PATH = "/home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Pending_Settings.rebset"
 
 # Axes (not spindles) that have a free-text comment field on the main
 # panel, persisted to REB_Settings_v1.ini as each <axis>'s <usercomment>.
@@ -180,6 +225,17 @@ def _show_no_spindle_enabled_popup(widget):
         message_type=Gtk.MessageType.WARNING,
         buttons=Gtk.ButtonsType.OK,
         text="No spindle is enabled",
+    )
+    dialog.run()
+    dialog.destroy()
+
+def _show_settings_error(widget, message):
+    dialog = Gtk.MessageDialog(
+        transient_for=widget.get_toplevel(),
+        flags=0,
+        message_type=Gtk.MessageType.ERROR,
+        buttons=Gtk.ButtonsType.OK,
+        text=message,
     )
     dialog.run()
     dialog.destroy()
@@ -481,6 +537,586 @@ class HandlerClass:
             print("Saved " + axis_id + " comment")
         except OSError as e:
             print("Could not write " + SETTINGS_PATH + ": " + str(e))
+            return
+
+        self._mark_settings_dirty()
+
+    def _read_axis_comment(self, axis_id):
+        '''
+        Reads a single axis's current comment straight out of
+        REB_Settings_v1.ini. Used by Settings_Save to gather a snapshot
+        for a .rebset file - the Settings tab component doesn't own the
+        Comment Entry widgets (those live on the main panel, a separate
+        gladevcp process/widget tree - see docs/settings_file.md), so the
+        shared settings file, which the main panel keeps current via
+        _save_axis_comment on every focus-out, is the only common ground.
+        '''
+        try:
+            with open(SETTINGS_PATH, "r") as f:
+                xml_text = f.read()
+        except OSError as e:
+            print("Could not read " + SETTINGS_PATH + ": " + str(e))
+            return ""
+
+        match = re.search(
+            r'<axis\s+id="' + re.escape(axis_id) + r'">\s*<scale>-?[\d.]+</scale>\s*'
+            r'<usercomment>(.*?)</usercomment>',
+            xml_text,
+            re.DOTALL
+        )
+        return unescape(match.group(1)) if match else ""
+
+    def _mark_settings_dirty(self):
+        '''
+        Flags that something covered by a .rebset snapshot (axis scales,
+        comments, or notes) has changed since the last Settings_Save/
+        Settings_Load, and stages a full snapshot on disk for the
+        shutdown-time exit prompt to offer (see PENDING_SETTINGS_PATH).
+        Suppressed while Settings_Load is itself the one poking widgets
+        (self._applying_settings) - otherwise re-applying a loaded scale
+        value would immediately re-dirty the settings it just loaded.
+        '''
+        if not self._applying_settings:
+            self._settings_dirty = True
+            self._write_pending_snapshot()
+            self._refresh_settings_name_label()
+
+    def _write_pending_snapshot(self):
+        '''
+        Writes the full current settings (scale/comment/notes/name) to
+        PENDING_SETTINGS_PATH, in the same shape as a saved .rebset, so
+        the shutdown-time prompt (a separate process - see
+        PENDING_SETTINGS_PATH) has something concrete to offer saving.
+        Called by _mark_settings_dirty and by _prompt_initial_settings_load's
+        legacy/generic_example fallbacks, which force-dirty outside that
+        normal path.
+        '''
+        notes_view = self.builder.get_object("Settings_Notes")
+        notes = ""
+        if notes_view is not None:
+            buf = notes_view.get_buffer()
+            notes = buf.get_text(buf.get_start_iter(), buf.get_end_iter(), False)
+
+        data = self._gather_current_settings(self._settings_name or "", notes)
+        try:
+            with open(PENDING_SETTINGS_PATH, "w") as f:
+                json.dump(data, f, indent=2)
+        except OSError as e:
+            print("Could not stage pending settings snapshot: " + str(e))
+
+    def _clear_pending_settings_snapshot(self):
+        try:
+            os.remove(PENDING_SETTINGS_PATH)
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            print("Could not clear pending settings snapshot: " + str(e))
+
+    def _set_settings_name_display(self, name):
+        self._settings_name = name
+        self._refresh_settings_name_label()
+
+    def _refresh_settings_name_label(self):
+        '''
+        Renders the Settings Name label from self._settings_name plus a
+        trailing " *" whenever self._settings_dirty is True - the same
+        "unsaved changes" convention as a text editor's title bar. This
+        is what lets the operator notice and save proactively, while the
+        GUI is still fully up and interactive, instead of relying on the
+        shutdown-time prompt (which can't appear until well after the
+        screen has already visually torn down - see
+        docs/settings_file.md, Decision 4).
+        '''
+        label = self.builder.get_object("Settings_Name")
+        if label is None:
+            return
+        text = "Settings: " + self._settings_name if self._settings_name else "Settings: (unsaved)"
+        if self._settings_dirty:
+            text += " *"
+        label.set_text(text)
+
+    def _read_last_settings_path(self):
+        try:
+            with open(LAST_SETTINGS_PATH_FILE, "r") as f:
+                path = f.read().strip()
+            return path or None
+        except OSError:
+            return None
+
+    def _write_last_settings_path(self, path):
+        '''
+        Records path as the file to silently reload next session
+        (_prompt_initial_settings_load), and as this session's own
+        "current file" (self._settings_path), so plain Settings_Save can
+        re-save straight to it with no dialog (Settings_Save_As always
+        prompts). Only called for a file the operator actually chose via
+        Save/Save As or Load - never for the generic_example fallback,
+        which must keep prompting (and must never be silently
+        overwritten by a plain Save) until the operator saves a real
+        copy of their own.
+        '''
+        self._settings_path = path
+        try:
+            os.makedirs(os.path.dirname(LAST_SETTINGS_PATH_FILE), exist_ok=True)
+            with open(LAST_SETTINGS_PATH_FILE, "w") as f:
+                f.write(path)
+        except OSError as e:
+            print("Could not record last-used settings path: " + str(e))
+
+    def _legacy_settings_available(self):
+        '''
+        True if REB_Settings_v1.ini has at least one real <axis>/<scale>
+        entry - i.e. there's a pre-existing, pre-.rebset machine setup
+        worth treating as the starting point instead of an empty
+        ~/Documents picker or the generic_example placeholder. Its values
+        are already live by the time this is checked: _load_scale_settings/
+        _load_axis_comments already applied them earlier in __init__,
+        unconditionally, regardless of anything to do with .rebset files -
+        this only decides how _prompt_initial_settings_load should react
+        to that, not whether to (re-)apply them.
+        '''
+        try:
+            with open(SETTINGS_PATH, "r") as f:
+                xml_text = f.read()
+        except OSError:
+            return False
+        return re.search(r'<axis\s+id="[^"]+">\s*<scale>-?[\d.]+</scale>', xml_text) is not None
+
+    def _disable_axis(self, axis_id):
+        '''
+        Forces one axis disabled from this component, the same way
+        _axis_set_scale/Sp0_Set_Scale/Sp1_Set_Scale already force their
+        own axis disabled when its scale changes - only touches it if
+        it's actually enabled right now (cross-component read of
+        <axis>_ENA-light, which belongs to the main panel's "gladevcp"
+        component), then clears this component's own <axis>_Ena_Override
+        pin (ANDed with the panel's ENA button in REB_PostGUI.hal).
+        Used by Settings_Load to force every axis off before a loaded
+        scale value can take effect under it (docs/settings_file.md,
+        Decision 3).
+        '''
+        status_pin = "gladevcp." + axis_id + "_ENA-light"
+        try:
+            result = subprocess.run(
+                ["halcmd", "getp", status_pin],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            is_enabled = result.stdout.strip().upper() in ("TRUE", "1")
+        except subprocess.CalledProcessError as e:
+            print("Error checking " + status_pin + ": " + str(e.stderr))
+            return
+        except FileNotFoundError:
+            print("halcmd not found - is the LinuxCNC environment sourced?")
+            return
+
+        if is_enabled:
+            print(axis_id + " axis is enabled - disabling for settings load")
+            self.halcomp[axis_id + '_Ena_Override'] = False
+
+    def _gather_current_settings(self, name, notes):
+        axes = {}
+        for axis_id in AXIS_STEPGEN:
+            widget = self.builder.get_object(axis_id + "_Set_Scale")
+            entry = {"scale": widget.get_value() if widget is not None else None}
+            if axis_id in COMMENT_AXES:
+                entry["comment"] = self._read_axis_comment(axis_id)
+            axes[axis_id] = entry
+
+        return {
+            "format_version": REBSET_FORMAT_VERSION,
+            "name": name,
+            "notes": notes,
+            "saved_at": datetime.datetime.now().isoformat(timespec="seconds"),
+            "axes": axes,
+        }
+
+    def Settings_Notes_Changed(self, buffer):
+        # Wired to the Notes GtkTextView's GtkTextBuffer "changed" signal.
+        # Also fires when Settings_Load sets the buffer's text
+        # programmatically - _mark_settings_dirty's own
+        # self._applying_settings check is what keeps that from re-dirtying
+        # the settings that were just loaded.
+        self._mark_settings_dirty()
+
+#######################################################################
+# Settings_Save
+# Purpose:              Saves the current Settings tab (axis scales +
+#                           comments) plus the Notes field back to
+#                           whichever .rebset file is currently active,
+#                           with no dialog. Falls back to Settings_Save_As
+#                           if nothing is active yet (e.g. still on the
+#                           legacy/generic_example starting point - see
+#                           docs/settings_file.md, Decision 5/6).
+# Updated:              ver 1.0, 29 July 2026, Claude
+# ---------------------------------------------------------------------
+# Called from:
+#   UI:                 REB_Tab_Settings_v1
+#   Button:              Settings_Save  (GtkButton)
+#   Signal:              GtkButton/clicked
+#######################################################################
+    def Settings_Save(self, widget):
+        if self.builder.get_object("X_Set_Scale") is None:
+            return
+
+        if not self._settings_path:
+            self.Settings_Save_As(widget)
+            return
+
+        print("=================================================")
+        print("FUNCTION Settings_Save")
+        self._save_to_path(widget, self._settings_path)
+
+#######################################################################
+# Settings_Save_As
+# Purpose:              Always shows the file chooser, so the operator
+#                           can pick a new location/filename (or
+#                           overwrite an existing one) rather than
+#                           re-saving over whatever's currently active.
+#                           The chosen filename IS the name - shown as
+#                           the Settings Name and stored in the file's
+#                           own "name" field - there's no separate typed
+#                           name to keep in sync (see docs/settings_file.md,
+#                           Decision 2, revised).
+# Updated:              ver 1.0, 29 July 2026, Claude
+# ---------------------------------------------------------------------
+# Called from:
+#   UI:                 REB_Tab_Settings_v1
+#   Button:              Settings_Save_As  (GtkButton)
+#   Signal:              GtkButton/clicked
+#######################################################################
+    def Settings_Save_As(self, widget):
+        if self.builder.get_object("X_Set_Scale") is None:
+            return
+
+        print("=================================================")
+        print("FUNCTION Settings_Save_As")
+
+        os.makedirs(REBSET_DEFAULT_DIR, exist_ok=True)
+
+        dialog = Gtk.FileChooserDialog(
+            title="Save Settings As",
+            transient_for=widget.get_toplevel(),
+            action=Gtk.FileChooserAction.SAVE,
+        )
+        dialog.add_buttons(
+            "_Cancel", Gtk.ResponseType.CANCEL,
+            "_Save", Gtk.ResponseType.OK,
+        )
+        dialog.set_current_folder(REBSET_DEFAULT_DIR)
+        dialog.set_do_overwrite_confirmation(True)
+
+        file_filter = Gtk.FileFilter()
+        file_filter.set_name("Rose Engine Butler Settings (*" + REBSET_EXTENSION + ")")
+        file_filter.add_pattern("*" + REBSET_EXTENSION)
+        dialog.add_filter(file_filter)
+
+        # Suggest the current name as a starting filename, but the
+        # operator can freely change it - whatever they end up with is
+        # the new name, going forward.
+        if self._settings_name:
+            safe_name = re.sub(r'[^A-Za-z0-9 _-]', '_', self._settings_name)
+            dialog.set_current_name(safe_name + REBSET_EXTENSION)
+
+        response = dialog.run()
+        path = dialog.get_filename() if response == Gtk.ResponseType.OK else None
+        dialog.destroy()
+
+        if not path:
+            print("Settings_Save_As cancelled")
+            return
+
+        if not path.endswith(REBSET_EXTENSION):
+            path += REBSET_EXTENSION
+
+        self._save_to_path(widget, path)
+
+    def _save_to_path(self, widget, path):
+        '''
+        Shared by Settings_Save (re-saving the active file with no
+        dialog) and Settings_Save_As (always via the file chooser
+        above). The name is always derived from path's filename - see
+        Settings_Save_As's banner comment for why that replaced a
+        separately-typed name field.
+        '''
+        name = os.path.splitext(os.path.basename(path))[0]
+
+        notes_view = self.builder.get_object("Settings_Notes")
+        notes_buffer = notes_view.get_buffer() if notes_view is not None else None
+        notes = ""
+        if notes_buffer is not None:
+            notes = notes_buffer.get_text(
+                notes_buffer.get_start_iter(), notes_buffer.get_end_iter(), False
+            )
+
+        data = self._gather_current_settings(name, notes)
+
+        try:
+            with open(path, "w") as f:
+                json.dump(data, f, indent=2)
+        except OSError as e:
+            _show_settings_error(widget, "Could not write " + path + ":\n" + str(e))
+            return
+
+        print("Saved settings '" + name + "' to " + path)
+        self._set_settings_name_display(name)
+        self._settings_dirty = False
+        self._write_last_settings_path(path)  # also sets self._settings_path
+        self._clear_pending_settings_snapshot()
+        self._refresh_settings_name_label()
+
+#######################################################################
+# Settings_Load
+# Purpose:              Loads a previously saved .rebset JSON file,
+#                           applying its axis scales/comments/notes.
+#                           Stops all motion and disables every axis
+#                           first (docs/settings_file.md, Decision 3).
+# Updated:              ver 1.0, 29 July 2026, Claude
+# ---------------------------------------------------------------------
+# Called from:
+#   UI:                 REB_Tab_Settings_v1
+#   Button:              Settings_Load  (GtkButton)
+#   Signal:              GtkButton/clicked
+#######################################################################
+    def Settings_Load(self, widget):
+        if self.builder.get_object("X_Set_Scale") is None:
+            return
+
+        print("=================================================")
+        print("FUNCTION Settings_Load")
+
+        os.makedirs(REBSET_DEFAULT_DIR, exist_ok=True)
+
+        dialog = Gtk.FileChooserDialog(
+            title="Load Settings",
+            transient_for=widget.get_toplevel(),
+            action=Gtk.FileChooserAction.OPEN,
+        )
+        dialog.add_buttons(
+            "_Cancel", Gtk.ResponseType.CANCEL,
+            "_Open", Gtk.ResponseType.OK,
+        )
+        dialog.set_current_folder(REBSET_DEFAULT_DIR)
+
+        file_filter = Gtk.FileFilter()
+        file_filter.set_name("Rose Engine Butler Settings (*" + REBSET_EXTENSION + ")")
+        file_filter.add_pattern("*" + REBSET_EXTENSION)
+        dialog.add_filter(file_filter)
+
+        response = dialog.run()
+        path = dialog.get_filename() if response == Gtk.ResponseType.OK else None
+        dialog.destroy()
+
+        if not path:
+            print("Settings_Load cancelled")
+            return
+
+        if self._load_settings_file(widget, path):
+            self._write_last_settings_path(path)
+
+    def _load_settings_file(self, widget, path):
+        '''
+        Parses and applies a single .rebset file: validates it, stops
+        motion and disables every axis (Decision 3), then applies its
+        scale/comment/notes/name. Shared by the Settings_Load button and
+        _prompt_initial_settings_load (the startup prompt) so both go
+        through identical validation. Returns True on success, False if
+        the file was rejected (an error dialog has already been shown in
+        that case) - callers that need to react to failure check this.
+        '''
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
+        except (OSError, ValueError) as e:
+            _show_settings_error(widget, "Could not read " + path + ":\n" + str(e))
+            return False
+
+        version = data.get("format_version")
+        if version != REBSET_FORMAT_VERSION:
+            _show_settings_error(
+                widget,
+                "Unsupported settings file version (" + str(version) + ") in\n" + path +
+                "\nExpected version " + str(REBSET_FORMAT_VERSION) + "."
+            )
+            return False
+
+        axes = data.get("axes")
+        if not isinstance(axes, dict):
+            _show_settings_error(widget, path + " is missing its axes data.")
+            return False
+
+        # Stop any in-progress motion and disable every axis before a
+        # loaded scale value can take effect under it.
+        c.abort()
+        c.wait_complete()
+        for axis_id in AXIS_STEPGEN:
+            self._disable_axis(axis_id)
+
+        self._applying_settings = True
+        try:
+            for axis_id, stepgen_ch in AXIS_STEPGEN.items():
+                entry = axes.get(axis_id)
+                if not isinstance(entry, dict) or "scale" not in entry:
+                    print("No stored scale for axis " + axis_id + " in " + path)
+                    continue
+
+                scale = entry["scale"]
+
+                spin = self.builder.get_object(axis_id + "_Set_Scale")
+                if spin is not None:
+                    spin.set_value(scale)
+
+                hal_pin = "hm2_7i92.0.stepgen." + stepgen_ch + ".position-scale"
+                try:
+                    subprocess.run(
+                        ["halcmd", "setp", hal_pin, str(scale)],
+                        check=True,
+                        capture_output=True,
+                        text=True
+                    )
+                    print("Loaded " + hal_pin + " = " + str(scale))
+                except subprocess.CalledProcessError as e:
+                    print("Error setting " + hal_pin + ": " + str(e.stderr))
+                except FileNotFoundError:
+                    print("halcmd not found - is the LinuxCNC environment sourced?")
+
+                if axis_id in COMMENT_AXES and "comment" in entry:
+                    # Only patches REB_Settings_v1.ini - the main panel's
+                    # own Comment entries are a different component's
+                    # widgets (see _read_axis_comment) and will pick this
+                    # up next time that component starts, the same way
+                    # _load_axis_comments only runs once at startup today.
+                    self._save_axis_comment(axis_id, entry["comment"])
+
+            notes_view = self.builder.get_object("Settings_Notes")
+            if notes_view is not None:
+                notes_view.get_buffer().set_text(data.get("notes", "") or "")
+        finally:
+            self._applying_settings = False
+
+        # The name always tracks the file's own current filename, not
+        # whatever "name" happens to be baked into its JSON content - so
+        # renaming a .rebset outside the app (or hand-editing the file)
+        # can't leave a stale name on screen after reloading it.
+        name = os.path.splitext(os.path.basename(path))[0]
+        print("Loaded settings '" + name + "' from " + path)
+        self._set_settings_name_display(name)
+        self._settings_dirty = False
+        self._clear_pending_settings_snapshot()
+        self._refresh_settings_name_label()
+        return True
+
+    def _prompt_initial_settings_load(self):
+        '''
+        Runs once, shortly after the Settings tab is up (see the
+        idle_add call in __init__). Reloads the last .rebset the operator
+        actually opened/saved (LAST_SETTINGS_PATH_FILE, in
+        RoseEngineButlerLocal - per-machine state, not tracked in this
+        repo) with no prompt at all, if one is on record and still
+        readable.
+
+        Failing that - no record, first-ever run with this feature - a
+        machine that's been in use since before .rebset files existed
+        still has real, good values sitting in REB_Settings_v1.ini,
+        already restored into HAL/the spin buttons unconditionally
+        earlier in __init__ (_load_scale_settings/_load_axis_comments)
+        regardless of anything here. Recognize that instead of
+        overwriting it with an empty ~/Documents picker: leave those
+        values alone, but flag them dirty so the exit prompt offers to
+        save them as a real, named .rebset - migrating them into this
+        feature rather than leaving them stuck as the single anonymous
+        legacy file forever.
+
+        Only when there's neither a usable .rebset on record nor any
+        legacy REB_Settings_v1.ini data does this fall back to showing a
+        picker: pick a saved profile from ~/Documents, or fall back
+        further to the generic_example profile shipped in this repo
+        (REB_Display/, not RoseEngineButlerLocal) if they Cancel that too.
+        Both the legacy and generic_example fallbacks are force-marked
+        dirty (and stage a pending snapshot - see PENDING_SETTINGS_PATH)
+        so the shutdown-time exit prompt (REB_Scale_Persist.py) offers to
+        save a real copy into ~/Documents - never overwriting the shipped
+        repo copy of generic_example, since Settings_Save always defaults to
+        REBSET_DEFAULT_DIR. Picking a real file here, unlike either
+        fallback, also updates LAST_SETTINGS_PATH_FILE, same as the Load
+        button does.
+        '''
+        if self.builder.get_object("X_Set_Scale") is None:
+            return False  # idle_add: run once regardless
+
+        widget = self.builder.get_object("X_Set_Scale")
+
+        last_path = self._read_last_settings_path()
+        if last_path and os.path.isfile(last_path):
+            if self._load_settings_file(widget, last_path):
+                print("Reloaded last-used settings from " + last_path)
+                return False
+            print("Could not reload last-used settings (" + last_path
+                  + ") - falling back to the startup picker")
+
+        if self._legacy_settings_available():
+            print("No .rebset on record - keeping the existing "
+                  + SETTINGS_PATH + " values as the starting point")
+            self._set_settings_name_display("legacy")
+            self._settings_dirty = True
+            self._write_pending_snapshot()
+            self._refresh_settings_name_label()
+            return False
+
+        os.makedirs(REBSET_DEFAULT_DIR, exist_ok=True)
+
+        dialog = Gtk.FileChooserDialog(
+            title="Load Settings",
+            transient_for=widget.get_toplevel(),
+            action=Gtk.FileChooserAction.OPEN,
+        )
+        dialog.add_buttons(
+            "_Cancel", Gtk.ResponseType.CANCEL,
+            "_Open", Gtk.ResponseType.OK,
+        )
+        dialog.set_current_folder(REBSET_DEFAULT_DIR)
+
+        file_filter = Gtk.FileFilter()
+        file_filter.set_name("Rose Engine Butler Settings (*" + REBSET_EXTENSION + ")")
+        file_filter.add_pattern("*" + REBSET_EXTENSION)
+        dialog.add_filter(file_filter)
+
+        instructions = Gtk.Label(
+            label="No previously used settings file found. Select a saved"
+                  " Rose Engine Butler settings file (" + REBSET_EXTENSION +
+                  ") to load.\nCancel to start from the generic_example"
+                  " starter profile instead."
+        )
+        instructions.set_line_wrap(True)
+        instructions.set_max_width_chars(60)
+        instructions.set_xalign(0)
+        instructions.show()
+        dialog.set_extra_widget(instructions)
+
+        response = dialog.run()
+        path = dialog.get_filename() if response == Gtk.ResponseType.OK else None
+        dialog.destroy()
+
+        if path:
+            if self._load_settings_file(widget, path):
+                self._write_last_settings_path(path)
+        else:
+            print("No settings file selected at startup - falling back to "
+                  + REBSET_GENERIC_EXAMPLE_PATH)
+            if self._load_settings_file(widget, REBSET_GENERIC_EXAMPLE_PATH):
+                # Unlike a normal load, this isn't a file the operator
+                # actually has saved anywhere themselves yet - force it
+                # dirty so they're offered a chance to save their own
+                # copy (to ~/Documents) once they exit or make changes.
+                # _load_settings_file just cleared the pending snapshot
+                # on its way to a clean return - re-stage it now that
+                # dirty is being forced back on.
+                self._settings_dirty = True
+                self._write_pending_snapshot()
+                self._refresh_settings_name_label()
+
+        return False  # idle_add: run once
 
     def _on_machine_is_on_changed(self, hal_pin, data=None):
         '''
@@ -765,6 +1401,8 @@ class HandlerClass:
             print("Error setting " + hal_pin + ": " + e.stderr)
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
+
+        self._mark_settings_dirty()
 
 #######################################################################
 # B_Set_Ena
@@ -1671,6 +2309,8 @@ class HandlerClass:
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
 
+        self._mark_settings_dirty()
+
 #######################################################################
 # Sp0_Set_Ena
 # Purpose:              See B_Set_Ena - same pattern, for Sp0.
@@ -1892,6 +2532,8 @@ class HandlerClass:
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
 
+        self._mark_settings_dirty()
+
 #######################################################################
 # Sp1_Set_Ena
 # Purpose:              See B_Set_Ena - same pattern, for Sp1.
@@ -1921,6 +2563,16 @@ class HandlerClass:
         self.halcomp        = halcomp
         self.builder        = builder
         self.nhits          = 0
+
+        # .rebset save/load state (Settings_Save/Settings_Load, see
+        # docs/settings_file.md). _applying_settings suppresses
+        # _mark_settings_dirty while Settings_Load is itself the one
+        # driving widget values, so re-applying a loaded scale doesn't
+        # immediately re-dirty the settings just loaded.
+        self._applying_settings = False
+        self._settings_dirty    = False
+        self._settings_name     = None
+        self._settings_path     = None  # current file for plain Settings_Save; None -> behaves like Save As
 
         _install_depress_css()
 
@@ -1965,6 +2617,16 @@ class HandlerClass:
         # component other than the main panel (gladevcp), which is the
         # only one with these widgets.
         self._load_axis_comments()
+
+        # There's no stored "last loaded .rebset" carried across restarts
+        # (only the auto-persisted REB_Settings_v1.ini values, already
+        # applied above regardless of what happens here) - so every
+        # session starts with nothing named. Prompt once, after the tab
+        # is actually up, to pick a saved profile; deferred via idle_add
+        # since __init__ runs before the toplevel is realized. Only in
+        # the component that owns these widgets.
+        if self.builder.get_object("X_Set_Scale") is not None:
+            GLib.idle_add(self._prompt_initial_settings_load)
 
         # Input pin fed from the existing "machine-is-on" HAL signal
         # (net machine-is-on => gladevcp.machine-is-on in
@@ -2175,6 +2837,8 @@ def _axis_set_scale(axis):
             print("Error setting " + hal_pin + ": " + e.stderr)
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
+
+        self._mark_settings_dirty()
     handler.__name__ = axis + "_Set_Scale"
     return handler
 

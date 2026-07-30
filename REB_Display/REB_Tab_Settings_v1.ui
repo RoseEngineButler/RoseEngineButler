@@ -115,12 +115,161 @@
     <property name="step-increment">1</property>
     <property name="page-increment">10</property>
   </object>
+  <object class="GtkTextBuffer" id="Settings_Notes_Buffer">
+    <signal name="changed" handler="Settings_Notes_Changed" swapped="no"/>
+  </object>
   <object class="GtkWindow" id="window1">
     <property name="can-focus">False</property>
     <property name="halign">start</property>
     <property name="valign">start</property>
     <property name="vexpand">True</property>
     <child>
+      <object class="GtkBox" id="Settings_Outer_Box">
+        <property name="visible">True</property>
+        <property name="can-focus">False</property>
+        <property name="orientation">vertical</property>
+        <property name="vexpand">True</property>
+        <child>
+          <!-- Save/Load/Name row lives outside the scrolled region below
+               so it stays reachable regardless of scroll position. -->
+          <object class="GtkBox" id="Settings_Toolbar_Box">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="orientation">horizontal</property>
+            <property name="spacing">8</property>
+            <property name="margin-start">4</property>
+            <property name="margin-end">4</property>
+            <property name="margin-top">4</property>
+            <property name="margin-bottom">4</property>
+            <child>
+              <object class="GtkButton" id="Settings_Save">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="receives-default">True</property>
+                <property name="label" translatable="yes">Save Settings</property>
+                <property name="tooltip-text" translatable="yes">Save to the current settings file. If none is active yet, this asks for a location the same as Save As.</property>
+                <signal name="clicked" handler="Settings_Save" swapped="no"/>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">0</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkButton" id="Settings_Save_As">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="receives-default">True</property>
+                <property name="label" translatable="yes">Save Settings As...</property>
+                <property name="tooltip-text" translatable="yes">Save to a new file/name, or overwrite an existing one.</property>
+                <signal name="clicked" handler="Settings_Save_As" swapped="no"/>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkButton" id="Settings_Load">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="receives-default">True</property>
+                <property name="label" translatable="yes">Load Settings...</property>
+                <signal name="clicked" handler="Settings_Load" swapped="no"/>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">2</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel" id="Settings_Name">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="valign">center</property>
+                <property name="margin-start">12</property>
+                <property name="label" translatable="yes">Settings: (unsaved)</property>
+                <attributes>
+                  <attribute name="weight" value="bold"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">3</property>
+              </packing>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+            <property name="position">0</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkBox" id="Settings_Notes_Box">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="orientation">horizontal</property>
+            <property name="spacing">8</property>
+            <property name="margin-start">4</property>
+            <property name="margin-end">4</property>
+            <property name="margin-bottom">4</property>
+            <child>
+              <object class="GtkLabel" id="Settings_Notes_Label">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="valign">start</property>
+                <property name="label" translatable="yes">Notes:</property>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">0</property>
+              </packing>
+            </child>
+            <child>
+              <!-- min/max-content-height pin this to roughly 3 lines tall;
+                   its own scrollbar keeps longer notes from growing the tab. -->
+              <object class="GtkScrolledWindow" id="Settings_Notes_Scroll">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="hscrollbar-policy">never</property>
+                <property name="vscrollbar-policy">automatic</property>
+                <property name="shadow-type">in</property>
+                <property name="min-content-height">54</property>
+                <property name="max-content-height">54</property>
+                <property name="propagate-natural-height">False</property>
+                <child>
+                  <object class="GtkTextView" id="Settings_Notes">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="wrap-mode">word</property>
+                    <property name="top-margin">2</property>
+                    <property name="bottom-margin">2</property>
+                    <property name="left-margin">4</property>
+                    <property name="right-margin">4</property>
+                    <property name="buffer">Settings_Notes_Buffer</property>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+                <property name="position">1</property>
+              </packing>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+            <property name="position">1</property>
+          </packing>
+        </child>
+        <child>
       <object class="GtkScrolledWindow" id="scrolledwindow1">
         <property name="visible">True</property>
         <property name="can-focus">True</property>
@@ -983,6 +1132,13 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
         </object>
       </child>
     </object>
+        <packing>
+          <property name="expand">True</property>
+          <property name="fill">True</property>
+          <property name="position">2</property>
+        </packing>
+        </child>
+      </object>
     </child>
   </object>
 </interface>

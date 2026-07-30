@@ -1,0 +1,16 @@
+{
+  "format_version": 1,
+  "name": "generic_example",
+  "notes": "Generic starting values shipped with Rose Engine Butler.\nThese are placeholders (scale = 1 on every axis), NOT calibrated for any real machine - verify/recalibrate every axis scale on the Settings tab before relying on this profile.",
+  "saved_at": "2026-07-29T00:00:00",
+  "axes": {
+    "X":   { "scale": 1, "comment": "" },
+    "Z":   { "scale": 1, "comment": "" },
+    "B":   { "scale": 1, "comment": "" },
+    "U":   { "scale": 1, "comment": "" },
+    "V":   { "scale": 1, "comment": "" },
+    "W":   { "scale": 1, "comment": "" },
+    "Sp0": { "scale": 1 },
+    "Sp1": { "scale": 1 }
+  }
+}
