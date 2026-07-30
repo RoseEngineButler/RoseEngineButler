@@ -9,7 +9,7 @@ overall shape.
 **Status (2026-07-28):** Issue 1 has a concrete implementation plan.
 Scope is X/Z/U/V/W only — B and Sp0/Sp1 are intentionally excluded (see
 Issue 1 below for why). While designing it, two live bugs also surfaced
-and are being fixed as part of the same work: `REB_Panel_v2.ui` has
+and are being fixed as part of the same work: `REB_Panel_v1.ui` has
 `V_Idx_Minus` wired to the `W_Idx_Minus` handler (wrong axis) and
 `W_Idx_Minus`/`W_Idx_Plus` swapped with each other; and only X currently
 has the `c.abort()` safety-stop-before-rescale and button-depress UI
@@ -62,7 +62,7 @@ carried over - silently disconnecting `_clear_ena_override()`'s existing
 fix for a "press ENA and nothing happens, need a confusing second press"
 bug that resurfaced live during this refactor. Fixed by wiring all 8 ENA
 buttons' `clicked` signal to their `<Axis>_Set_Ena` handler in
-`REB_Panel_v2.ui`, and generating `Set_Ena` for every migrated axis
+`REB_Panel_v1.ui`, and generating `Set_Ena` for every migrated axis
 instead of skipping it.
 
 **Fix (planned):** generate real bound methods via `setattr` on

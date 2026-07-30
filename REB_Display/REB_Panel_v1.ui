@@ -16,7 +16,7 @@
 # LinuxCNC configuration for use with a Rose Engine                   #
 #                                                                     #
 # File:                                                               #
-#   REB_Panel_v2.ui                                                   #
+#   REB_Panel_v1.ui                                                   #
 #                                                                     #
 # Purpose:                                                            #
 #   This is the main Glade VCP panel used to provide the user         #

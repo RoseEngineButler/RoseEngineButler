@@ -93,6 +93,48 @@ AXIS_STEPGEN = {
     "Sp1": "07",
 }
 
+# Axis id -> HAL `pid` component instance driving that axis's PID loop
+# (see the `loadrt pid names=...` line and each axis's `setp pid.<x>.*`
+# block in REB.hal). Sp0/Sp1 each have two loops instead of one - a
+# position/orient loop (pid.p0/pid.p1) and a velocity loop
+# (pid.s0/pid.s1) - handled separately by PID_SPINDLE_LOOPS below.
+PID_AXES = {
+    "X": "pid.x",
+    "Z": "pid.z",
+    "B": "pid.b",
+    "U": "pid.u",
+    "V": "pid.v",
+    "W": "pid.w",
+}
+
+# Spindle id -> {"Pos": position-loop component, "Vel": velocity-loop
+# component}. The suffix ("Pos"/"Vel") matches the Settings tab widget
+# id suffix (e.g. Sp0_Set_P_Pos, Sp0_Set_P_Vel) and the REB_Settings_v1.ini
+# block tag ("pid_pos"/"pid_vel").
+PID_SPINDLE_LOOPS = {
+    "Sp0": {"Pos": "pid.p0", "Vel": "pid.s0"},
+    "Sp1": {"Pos": "pid.p1", "Vel": "pid.s1"},
+}
+
+# Settings tab field name -> HAL pid component pin name. Order matches
+# the P/I/D/FF0/FF1/FF2 column order in REB_Tab_Settings_v1.ui's
+# "Stepper Motor Settings" grid.
+PID_PARAM_PIN = {
+    "P":   "Pgain",
+    "I":   "Igain",
+    "D":   "Dgain",
+    "FF0": "FF0",
+    "FF1": "FF1",
+    "FF2": "FF2",
+}
+PID_PARAMS = ("P", "I", "D", "FF0", "FF1", "FF2")
+
+# Max time (seconds) to wait for both Sp0 and Sp1 to report oriented in
+# Sp0_Move_Idx_Fwd/Rev's simultaneous-index path (see
+# _index_both_spindles_simultaneously) - matches the "Q20" timeout
+# already used for the single-spindle M19 path elsewhere in this file.
+SIMULTANEOUS_INDEX_TIMEOUT = 20.0
+
 SETTINGS_PATH = "/home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Settings_v1.ini"
 
 # REB.ini lives in this repo (one directory up from REB_Display/), not in
@@ -217,7 +259,7 @@ def idx_log(msg):
 def _clear_ena_override(axis_id):
     # The *_Set_Ena handlers fire from whichever component owns that
     # axis's ENA button (the main panel, "gladevcp") - but the real,
-    # netted *_Ena_Override pin (see REB_PostGUI.hal) lives on the
+    # netted *_Ena_Override pin (see REB_PostGUI_v1.hal) lives on the
     # Settings tab's component ("REBCnfg"), a different process. Writing
     # to self.halcomp there would only touch this component's own,
     # unconnected pin of the same name - a no-op. Cross the process
@@ -227,7 +269,7 @@ def _clear_ena_override(axis_id):
     # Once a pin is netted to a signal, halcmd can't "setp" the pin
     # directly ("pin is connected to a signal") - the signal itself has
     # to be set instead, via "halcmd sets". The signal name follows the
-    # <axis>-ena-settings-allow convention in REB_PostGUI.hal.
+    # <axis>-ena-settings-allow convention in REB_PostGUI_v1.hal.
     hal_signal = axis_id.lower() + "-ena-settings-allow"
     idx_log("_clear_ena_override(" + axis_id + ") -> " + hal_signal)
 
@@ -255,7 +297,7 @@ def _clear_ena_override(axis_id):
 
     if was_blocked:
         # The same ENA press that got us here also clocks the flipflop's
-        # own toggle bit (REB_PostGUI.hal) via the ordinary clk input -
+        # own toggle bit (REB_PostGUI_v1.hal) via the ordinary clk input -
         # since that bit never moved while the override was blocking
         # things, this click would otherwise flip a previously-on panel
         # state OFF, undoing the very re-enable just requested (this is
@@ -622,6 +664,99 @@ class HandlerClass:
             except FileNotFoundError:
                 print("halcmd not found - is the LinuxCNC environment sourced?")
 
+    def _load_pid_settings(self):
+        '''
+        Reads persisted P/I/D/FF0/FF1/FF2 gains from REB_Settings_v1.ini
+        (each axis's <pid> block, or <pid_pos>/<pid_vel> for the two
+        spindle loops) and applies them to the Settings tab's PID spin
+        buttons and the live pid.* HAL gain pins - mirrors
+        _load_scale_settings above for the axis stepgen scales.
+        REB_Scale_Persist.py is what writes these back into
+        REB_Settings_v1.ini at shutdown, the same as it already does
+        for scale.
+
+        Only runs in the component that actually owns the Settings
+        tab's PID spin buttons (X_Set_P etc.) - every other tab/panel
+        also using rosetta.py will find that widget missing and
+        return immediately.
+        '''
+        if self.builder.get_object("X_Set_P") is None:
+            return
+
+        try:
+            with open(SETTINGS_PATH, "r") as f:
+                xml_text = f.read()
+        except OSError as e:
+            print("Could not read " + SETTINGS_PATH + ": " + str(e))
+            return
+
+        def apply(axis_id, block_tag, hal_component, widget_id_for_param):
+            '''
+            widget_id_for_param(param) builds the Settings tab widget id
+            for a given P/I/D/FF0/FF1/FF2 param - axes and spindle loops
+            put their disambiguating suffix in different places
+            (X_Set_P vs Sp0_Set_P_Pos), so the caller supplies this
+            rather than apply() assuming one fixed naming shape.
+            '''
+            axis_match = re.search(
+                r'<axis\s+id="' + re.escape(axis_id) + r'">(.*?)</axis>',
+                xml_text, re.DOTALL
+            )
+            if not axis_match:
+                print("No <axis id=\"" + axis_id + "\"> entry found in " + SETTINGS_PATH)
+                return
+
+            block_match = re.search(
+                r'<' + block_tag + r'>(.*?)</' + block_tag + r'>',
+                axis_match.group(1), re.DOTALL
+            )
+            if not block_match:
+                print("No <" + block_tag + "> entry found for axis " + axis_id
+                      + " in " + SETTINGS_PATH)
+                return
+
+            for param in PID_PARAMS:
+                widget_id = widget_id_for_param(param)
+
+                param_match = re.search(
+                    r'<' + param + r'>(-?[\d.]+)</' + param + r'>',
+                    block_match.group(1)
+                )
+                if not param_match:
+                    print("No stored " + param + " found for " + widget_id
+                          + " in " + SETTINGS_PATH)
+                    continue
+
+                value = param_match.group(1)
+                widget = self.builder.get_object(widget_id)
+                if widget is not None:
+                    widget.set_value(float(value))
+
+                hal_pin = hal_component + "." + PID_PARAM_PIN[param]
+                try:
+                    subprocess.run(
+                        ["halcmd", "setp", hal_pin, value],
+                        check=True,
+                        capture_output=True,
+                        text=True
+                    )
+                    print("Restored " + hal_pin + " = " + value)
+                except subprocess.CalledProcessError as e:
+                    print("Error restoring " + hal_pin + ": " + e.stderr)
+                except FileNotFoundError:
+                    print("halcmd not found - is the LinuxCNC environment sourced?")
+
+        for axis_id, component in PID_AXES.items():
+            apply(axis_id, "pid", component,
+                  lambda param, axis_id=axis_id: axis_id + "_Set_" + param)
+
+        for spindle_id, loops in PID_SPINDLE_LOOPS.items():
+            for suffix, component in loops.items():
+                block_tag = "pid_pos" if suffix == "Pos" else "pid_vel"
+                apply(spindle_id, block_tag, component,
+                      lambda param, spindle_id=spindle_id, suffix=suffix:
+                          spindle_id + "_Set_" + param + "_" + suffix)
+
     def _load_axis_comments(self):
         '''
         Reads each axis's persisted user comment from REB_Settings_v1.ini
@@ -922,7 +1057,7 @@ class HandlerClass:
         it's actually enabled right now (cross-component read of
         <axis>_ENA-light, which belongs to the main panel's "gladevcp"
         component), then clears this component's own <axis>_Ena_Override
-        pin (ANDed with the panel's ENA button in REB_PostGUI.hal).
+        pin (ANDed with the panel's ENA button in REB_PostGUI_v1.hal).
         Used by Settings_Load to force every axis off before a loaded
         scale value can take effect under it (docs/settings_file.md,
         Decision 3).
@@ -1884,7 +2019,7 @@ class HandlerClass:
         # B_ENA-light belongs to the main panel's HAL component
         # ("gladevcp"); read it cross-component via halcmd. To disable
         # the axis, drive this component's own B_Ena_Override pin
-        # (ANDed with the panel button in REB_PostGUI.hal) instead of
+        # (ANDed with the panel button in REB_PostGUI_v1.hal) instead of
         # trying to write another component's pin directly.
         status_pin = "gladevcp.B_ENA-light"
 
@@ -1935,7 +2070,7 @@ class HandlerClass:
 #                           (B_Set_Scale) can be re-enabled by the
 #                           operator afterward. Does not touch the
 #                           panel's own toggle state - see
-#                           REB_PostGUI.hal for the flip-flop that
+#                           REB_PostGUI_v1.hal for the flip-flop that
 #                           tracks that.
 # ---------------------------------------------------------------------
 # Called from:
@@ -2279,6 +2414,80 @@ class HandlerClass:
         # Wait for the command to complete
         c.wait_complete()
 
+    def _index_both_spindles_simultaneously(self, sign):
+        '''
+        Indexes Sp0 and Sp1 together, in the same servo-thread cycle,
+        by driving orient.0/orient.1's target angle and trigger bit
+        directly through the Sp0-idx-angle/Sp1-idx-angle and
+        Sp0-idx-active/Sp1-idx-active HAL pins (see REB.hal's Sp0/Sp1
+        blocks: mux2.2/mux2.3 select this angle over the M19-driven
+        one, or2.0/or2.1 OR this active bit into the same enable chain
+        M19 already used) - entirely bypassing M19/MDI, unlike the
+        single-spindle path in Sp0_Move_Idx_Fwd/Rev.
+
+        This exists because that M19 path is fundamentally sequential -
+        LinuxCNC's M19 blocks the (single-threaded) interpreter until
+        that spindle reports oriented, so a second M19 for the other
+        spindle cannot even begin until the first returns. Queuing both
+        back-to-back with only one final wait_complete() was tried and
+        dropped Sp1's move entirely (see Sp0_Move_Idx_Fwd's git history).
+        orient.0 and orient.1 are fully independent realtime components
+        with their own PID loop each (pid.p0/pid.p1), so once both
+        Active bits are set - each individual halcmd-style pin write
+        only microseconds apart - both land well within the same or
+        adjacent servo-thread cycle and both spindles move at once.
+
+        sign is +1 for forward, -1 for reverse. Only called when both
+        Sp0_Idx_Bool and Sp1_Idx_Bool are true (see callers).
+        '''
+        current_angle_0 = (hal.get_value('spindle.0-position-fb') % 1.0) * 360.0
+        target_angle_0 = (current_angle_0 + sign * self.Sp0_Idx_Deg) % 360.0
+
+        current_angle_1 = (hal.get_value('spindle.1-position-fb') % 1.0) * 360.0
+        target_angle_1 = (current_angle_1 + sign * self.Sp0_Idx_Deg) % 360.0
+
+        idx_log("Simultaneous index: Sp0 target=" + str(target_angle_0)
+                + "  Sp1 target=" + str(target_angle_1))
+
+        # Set both target angles first - orient.N samples position/angle
+        # on Active's rising edge (see REB.hal comments) - then trigger
+        # both together.
+        self.halcomp['Sp0-idx-angle'] = target_angle_0
+        self.halcomp['Sp1-idx-angle'] = target_angle_1
+        self.halcomp['Sp0-idx-active'] = True
+        self.halcomp['Sp1-idx-active'] = True
+
+        try:
+            deadline = time.time() + SIMULTANEOUS_INDEX_TIMEOUT
+            sp0_done = False
+            sp1_done = False
+            while time.time() < deadline:
+                if not sp0_done and hal.get_value('orient.0.is-oriented'):
+                    sp0_done = True
+                    idx_log("Sp0 oriented")
+                if not sp1_done and hal.get_value('orient.1.is-oriented'):
+                    sp1_done = True
+                    idx_log("Sp1 oriented")
+                if sp0_done and sp1_done:
+                    break
+                # Keep the GUI responsive while polling - same reason
+                # _set_busy_cursor/_set_depressed force a repaint before
+                # a blocking call takes over the main loop.
+                while Gtk.events_pending():
+                    Gtk.main_iteration()
+                time.sleep(0.02)
+            else:
+                idx_log("Simultaneous index TIMED OUT - Sp0 oriented=" + str(sp0_done)
+                        + " Sp1 oriented=" + str(sp1_done))
+        finally:
+            # Clear the trigger bits regardless of outcome - orient.N
+            # only reacts to the next rising edge, so leaving Active
+            # stuck True would just be a no-op until cleared and
+            # re-raised anyway, but clearing it now keeps HAL state
+            # consistent with "idle" for the next press.
+            self.halcomp['Sp0-idx-active'] = False
+            self.halcomp['Sp1-idx-active'] = False
+
 #######################################################################
 # Sp0_Move_Idx_Fwd
 # Purpose:              This is used to index the Sp0 spindle in a
@@ -2331,14 +2540,22 @@ class HandlerClass:
             c.mdi(GcodeStr1)
             c.mdi(GcodeStr2)
 
+            if self.Sp0_Idx_Bool and self.Sp1_Idx_Bool:
+                # Both selected - drive both spindles' orient chains
+                # directly and simultaneously (see
+                # _index_both_spindles_simultaneously) instead of two
+                # sequential M19s.
+                self._index_both_spindles_simultaneously(+1)
+                return
+
             # M19 orients to an absolute angle, not a relative step, so compute
             # the next target from each spindle's own actual current angle
             # rather than sending Sp0_Idx_Deg itself as R each time (which
-            # would just re-target the same fixed angle on every press). The
-            # Sp0/Sp1 checkboxes on the Indexing panel gate which spindle(s)
-            # actually get an M19 - a spindle with no orient HAL chain (or one
-            # the operator hasn't enabled) is simply skipped rather than
-            # sent a command that can only time out.
+            # would just re-target the same fixed angle on every press). Only
+            # one of Sp0_Idx_Bool/Sp1_Idx_Bool can be true here (the both-true
+            # case already returned above), so exactly one of the two blocks
+            # below runs - a spindle the operator hasn't enabled is simply
+            # skipped rather than sent a command that can only time out.
             if self.Sp0_Idx_Bool:
                 current_angle = (hal.get_value('spindle.0-position-fb') % 1.0) * 360.0
                 target_angle = (current_angle + self.Sp0_Idx_Deg) % 360.0
@@ -2351,10 +2568,6 @@ class HandlerClass:
                 GcodeStr3 = "M19 R" + str(target_angle) + " Q20 P0 $0"
                 idx_log(GcodeStr3)
                 c.mdi(GcodeStr3)
-                # Let Sp0's orient fully resolve before Sp1's M19 is even sent -
-                # queuing both back-to-back with a single wait_complete() at the
-                # end let Sp0's move interfere with Sp1's (see conversation: with
-                # both checkboxes on, only Sp0 actually moved).
                 c.wait_complete()
             else:
                 idx_log("Sp0 M19 skipped (Sp0_Idx_Bool is False)")
@@ -2424,8 +2637,14 @@ class HandlerClass:
             c.mdi(GcodeStr1)
             c.mdi(GcodeStr2)
 
+            if self.Sp0_Idx_Bool and self.Sp1_Idx_Bool:
+                # Both selected - see matching branch in Sp0_Move_Idx_Fwd.
+                self._index_both_spindles_simultaneously(-1)
+                return
+
             # See Sp0_Move_Idx_Fwd for why the target is computed per-spindle
-            # from live position, and why the checkboxes gate each M19.
+            # from live position, and why the checkboxes gate each M19 (only
+            # one of Sp0_Idx_Bool/Sp1_Idx_Bool can be true past this point).
             if self.Sp0_Idx_Bool:
                 current_angle = (hal.get_value('spindle.0-position-fb') % 1.0) * 360.0
                 target_angle = (current_angle - self.Sp0_Idx_Deg) % 360.0
@@ -2434,8 +2653,6 @@ class HandlerClass:
                 GcodeStr3 = "M19 R" + str(target_angle) + " Q20 P0 $0"
                 idx_log(GcodeStr3)
                 c.mdi(GcodeStr3)
-                # See matching note in Sp0_Move_Idx_Fwd - let Sp0 fully resolve
-                # before Sp1's M19 is sent.
                 c.wait_complete()
             else:
                 idx_log("Sp0 M19 skipped (Sp0_Idx_Bool is False)")
@@ -2779,12 +2996,25 @@ class HandlerClass:
         # the spindle is actively spinning under S-word/M3/M4 control
         # could otherwise cause a runaway once the new scale takes
         # effect (see conversation).
+        #
+        # Only if the machine is actually ON: this handler also fires
+        # from _load_settings_file's programmatic spin.set_value() (the
+        # startup auto-reload of the last-used .rebset, via
+        # _prompt_initial_settings_load) - which runs before the
+        # operator has powered on/reset E-stop, when there's no
+        # spinning spindle to stop anyway. Sending M5 unconditionally
+        # there popped an "EMC_TASK_PLAN_EXECUTE cannot be executed
+        # until the machine is out of E-stop and turned on" error dialog
+        # at every startup.
         s.poll()
-        if s.task_state != linuxcnc.MODE_MDI:
-                c.mode(linuxcnc.MODE_MDI)
-                c.wait_complete()
-        c.mdi("M5")
-        c.wait_complete()
+        if s.task_state == linuxcnc.STATE_ON:
+            if s.task_state != linuxcnc.MODE_MDI:
+                    c.mode(linuxcnc.MODE_MDI)
+                    c.wait_complete()
+            c.mdi("M5")
+            c.wait_complete()
+        else:
+            print("Sp0_Set_Scale: machine not ON - skipping M5 (nothing to stop)")
 
         Sp0_Scale = round(widget.get_value(), 1)
 
@@ -3001,13 +3231,17 @@ class HandlerClass:
         print("FUNCTION Sp1_Set_Scale")
 
         # See Sp0_Set_Scale for why this stops Run Operation rotation
-        # before the scale change lands.
+        # before the scale change lands, and why it's skipped when the
+        # machine isn't ON (the startup auto-reload path).
         s.poll()
-        if s.task_state != linuxcnc.MODE_MDI:
-                c.mode(linuxcnc.MODE_MDI)
-                c.wait_complete()
-        c.mdi("M5")
-        c.wait_complete()
+        if s.task_state == linuxcnc.STATE_ON:
+            if s.task_state != linuxcnc.MODE_MDI:
+                    c.mode(linuxcnc.MODE_MDI)
+                    c.wait_complete()
+            c.mdi("M5")
+            c.wait_complete()
+        else:
+            print("Sp1_Set_Scale: machine not ON - skipping M5 (nothing to stop)")
 
         Sp1_Scale = round(widget.get_value(), 1)
 
@@ -3111,7 +3345,7 @@ class HandlerClass:
         # axis disabled from this tab regardless of what the main
         # panel's own enable button is doing. Each defaults to "allow
         # enabled". ANDed with the panel button per-axis in
-        # REB_PostGUI.hal (REBCnfg.<Axis>_Ena_Override).
+        # REB_PostGUI_v1.hal (REBCnfg.<Axis>_Ena_Override).
         #
         # HAL_IO, not HAL_OUT: this component's own Set_Scale handlers
         # clear an axis to False, but re-arming it happens from the main
@@ -3136,12 +3370,44 @@ class HandlerClass:
             )
             self.halcomp[pin_name] = True
 
+        # Sp0-idx-angle/Sp1-idx-angle (float) and Sp0-idx-active/
+        # Sp1-idx-active (bit) - drive orient.0/orient.1 directly,
+        # bypassing M19/MDI, so Sp0_Move_Idx_Fwd/Rev can trigger both
+        # spindles in the same servo cycle when both are selected for
+        # indexing (see REB.hal's Sp0/Sp1 blocks: mux2.2/mux2.3 pick
+        # this angle over the M19-driven one, or2.0/or2.1 OR this
+        # active bit into the same enable chain M19 already used).
+        # HAL_OUT (not IO): only this component (the main panel,
+        # "gladevcp" - the only one with the Idx Fwd/Rev buttons) ever
+        # drives these, so plain GPin output pins are enough - see
+        # _ena_override_pins above for why GPin specifically (required
+        # for halcomp[name] = value writes to take effect).
+        self._sp_idx_pins = {}
+        if self.builder.get_object("Sp0_Idx_Fwd") is not None:
+            for spindle_id in ("Sp0", "Sp1"):
+                angle_pin = spindle_id + "-idx-angle"
+                active_pin = spindle_id + "-idx-active"
+                self._sp_idx_pins[spindle_id + "_Angle"] = hal_glib.GPin(
+                    self.halcomp.newpin(angle_pin, hal.HAL_FLOAT, hal.HAL_OUT)
+                )
+                self._sp_idx_pins[spindle_id + "_Active"] = hal_glib.GPin(
+                    self.halcomp.newpin(active_pin, hal.HAL_BIT, hal.HAL_OUT)
+                )
+                self.halcomp[active_pin] = False
+
         # Restore persisted axis scale values (REB_Settings_v1.ini)
         # into the Settings tab's spin buttons and the real stepgen
         # scale pins. No-ops in every component other than the
         # Settings tab (REBHlp), which is the only one with these
         # widgets.
         self._load_scale_settings()
+
+        # Restore persisted P/I/D/FF0/FF1/FF2 gains (REB_Settings_v1.ini)
+        # into the Settings tab's PID spin buttons and the live pid.*
+        # HAL gain pins. No-ops in every component other than the
+        # Settings tab (REBCnfg), which is the only one with these
+        # widgets.
+        self._load_pid_settings()
 
         # Restore persisted per-axis user comments (REB_Settings_v1.ini)
         # into the main panel's comment fields. No-ops in every
@@ -3167,7 +3433,7 @@ class HandlerClass:
 
         # Input pin fed from the existing "machine-is-on" HAL signal
         # (net machine-is-on => gladevcp.machine-is-on in
-        # REB_PostGUI.hal). Grays out the whole main panel grid
+        # REB_PostGUI_v1.hal). Grays out the whole main panel grid
         # whenever the machine is not powered on. GPin.update() treats
         # any pin's first read after creation as a change (self._prev
         # starts as None), so this fires once automatically shortly
@@ -3251,7 +3517,7 @@ class HandlerClass:
 # emits "clicked" - the signal wiring was never carried over, silently
 # orphaning _clear_ena_override()'s fix for the "press ENA and nothing
 # happens, need a confusing second press" bug (see that function's own
-# comments). The real fix is reconnecting REB_Panel_v2.ui's <Axis>_ENA
+# comments). The real fix is reconnecting REB_Panel_v1.ui's <Axis>_ENA
 # widgets' "clicked" signal to <Axis>_Set_Ena, not deleting the method.
 
 LINEAR_AXES = ("X", "Z", "U", "V", "W")  # all five linear axes migrated
@@ -3338,7 +3604,7 @@ def _axis_set_scale(axis):
         # <Axis>_ENA-light belongs to the main panel's HAL component
         # ("gladevcp"); read it cross-component via halcmd. To disable
         # the axis, drive this component's own <Axis>_Ena_Override pin
-        # (ANDed with the panel button in REB_PostGUI.hal) instead of
+        # (ANDed with the panel button in REB_PostGUI_v1.hal) instead of
         # trying to write another component's pin directly.
         try:
             result = subprocess.run(
@@ -3394,6 +3660,51 @@ for _axis in LINEAR_AXES:
     setattr(HandlerClass, _axis + "_Set_Move_Dist", _axis_set_move_dist(_axis))
     setattr(HandlerClass, _axis + "_Set_Scale", _axis_set_scale(_axis))
 del _axis
+
+def _pid_set(hal_pin):
+    '''
+    Generic value-changed handler for a single P/I/D/FF0/FF1/FF2 spin
+    button: pushes the new value straight to the live pid.* HAL gain
+    pin. Unlike _axis_set_scale, there's no need to disable the axis
+    first - a PID gain is safe to retune on the fly, it doesn't
+    invalidate an in-progress move the way a scale change can.
+
+    REB_Settings_v1.ini itself is not written here - same as scale,
+    that only happens at shutdown (REB_Scale_Persist.py reading the
+    live HAL pins), not on every keystroke/spin-click.
+    '''
+    def handler(self, widget):
+        value = widget.get_value()
+        try:
+            subprocess.run(
+                ["halcmd", "setp", hal_pin, str(value)],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            print("Set " + hal_pin + " = " + str(value))
+        except subprocess.CalledProcessError as e:
+            print("Error setting " + hal_pin + ": " + e.stderr)
+        except FileNotFoundError:
+            print("halcmd not found - is the LinuxCNC environment sourced?")
+    return handler
+
+for _axis_id, _component in PID_AXES.items():
+    for _param in PID_PARAMS:
+        _widget_id = _axis_id + "_Set_" + _param
+        _handler = _pid_set(_component + "." + PID_PARAM_PIN[_param])
+        _handler.__name__ = _widget_id
+        setattr(HandlerClass, _widget_id, _handler)
+del _axis_id, _component, _param, _widget_id, _handler
+
+for _spindle_id, _loops in PID_SPINDLE_LOOPS.items():
+    for _suffix, _component in _loops.items():
+        for _param in PID_PARAMS:
+            _widget_id = _spindle_id + "_Set_" + _param + "_" + _suffix
+            _handler = _pid_set(_component + "." + PID_PARAM_PIN[_param])
+            _handler.__name__ = _widget_id
+            setattr(HandlerClass, _widget_id, _handler)
+del _spindle_id, _loops, _suffix, _component, _param, _widget_id, _handler
 
 def get_handlers(halcomp,builder,useropts):
     '''

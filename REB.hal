@@ -101,7 +101,14 @@ loadrt hostmot2
 loadrt hm2_eth board_ip="192.168.1.121" config="num_encoders=0 num_pwmgens=0 num_stepgens=8"
 loadrt orient count=2
 loadrt sum2
-loadrt mux2 count=2
+# mux2.0/mux2.1 select spindle velocity source; mux2.2/mux2.3 select the
+# Sp0/Sp1 orient target angle source (M19 vs the simultaneous-index path -
+# see the Sp0/Sp1 sections below).
+loadrt mux2 count=4
+# or2.0/or2.1 merge the M19-driven orient-enable with the simultaneous-index
+# path's own trigger bit for Sp0/Sp1 respectively - see the Sp0/Sp1 sections
+# below.
+loadrt or2 count=2
 loadrt pid names=pid.x,pid.z,pid.b,pid.u,pid.v,pid.w,pid.s0,pid.s1,pid.p0,pid.p1,orient.0-pid
 
 addf hm2_7i92.0.read                        servo-thread
@@ -187,13 +194,19 @@ setp hm2_7i92.0.stepgen.04.maxvel           [JOINT_0]STEPGEN_MAXVEL
 
 setp pid.x.error-previous-target            true
 
-setp pid.x.Pgain                            [JOINT_0]P
-setp pid.x.Igain                            [JOINT_0]I
-setp pid.x.Dgain                            [JOINT_0]D
+# P/I/D/FF0/FF1/FF2 below are now set live from REB_Settings_v1.ini by
+# rosetta.py (Settings tab "Stepper Motor Settings" section), not from
+# this ini value, so the operator can retune them without restarting
+# LinuxCNC. REB_Scale_Persist.py writes the live values back into
+# REB_Settings_v1.ini at shutdown, the same as it already does for
+# axis scale.
+# setp pid.x.Pgain                            [JOINT_0]P
+# setp pid.x.Igain                            [JOINT_0]I
+# setp pid.x.Dgain                            [JOINT_0]D
 setp pid.x.bias                             [JOINT_0]BIAS
-setp pid.x.FF0                              [JOINT_0]FF0
-setp pid.x.FF1                              [JOINT_0]FF1
-setp pid.x.FF2                              [JOINT_0]FF2
+# setp pid.x.FF0                              [JOINT_0]FF0
+# setp pid.x.FF1                              [JOINT_0]FF1
+# setp pid.x.FF2                              [JOINT_0]FF2
 setp pid.x.deadband                         [JOINT_0]DEADBAND
 setp pid.x.maxoutput                        [JOINT_0]MAX_OUTPUT
 
@@ -293,13 +306,19 @@ setp hm2_7i92.0.stepgen.01.maxvel           [JOINT_1]STEPGEN_MAXVEL
 
 setp pid.z.error-previous-target            true
 
-setp pid.z.Pgain                            [JOINT_1]P
-setp pid.z.Igain                            [JOINT_1]I
-setp pid.z.Dgain                            [JOINT_1]D
+# P/I/D/FF0/FF1/FF2 below are now set live from REB_Settings_v1.ini by
+# rosetta.py (Settings tab "Stepper Motor Settings" section), not from
+# this ini value, so the operator can retune them without restarting
+# LinuxCNC. REB_Scale_Persist.py writes the live values back into
+# REB_Settings_v1.ini at shutdown, the same as it already does for
+# axis scale.
+# setp pid.z.Pgain                            [JOINT_1]P
+# setp pid.z.Igain                            [JOINT_1]I
+# setp pid.z.Dgain                            [JOINT_1]D
 setp pid.z.bias                             [JOINT_1]BIAS
-setp pid.z.FF0                              [JOINT_1]FF0
-setp pid.z.FF1                              [JOINT_1]FF1
-setp pid.z.FF2                              [JOINT_1]FF2
+# setp pid.z.FF0                              [JOINT_1]FF0
+# setp pid.z.FF1                              [JOINT_1]FF1
+# setp pid.z.FF2                              [JOINT_1]FF2
 setp pid.z.deadband                         [JOINT_1]DEADBAND
 setp pid.z.maxoutput                        [JOINT_1]MAX_OUTPUT
 
@@ -381,13 +400,19 @@ setp hm2_7i92.0.stepgen.05.maxvel           [JOINT_2]STEPGEN_MAXVEL
 
 setp pid.b.error-previous-target            true
 
-setp pid.b.Pgain                            [JOINT_2]P
-setp pid.b.Igain                            [JOINT_2]I
-setp pid.b.Dgain                            [JOINT_2]D
+# P/I/D/FF0/FF1/FF2 below are now set live from REB_Settings_v1.ini by
+# rosetta.py (Settings tab "Stepper Motor Settings" section), not from
+# this ini value, so the operator can retune them without restarting
+# LinuxCNC. REB_Scale_Persist.py writes the live values back into
+# REB_Settings_v1.ini at shutdown, the same as it already does for
+# axis scale.
+# setp pid.b.Pgain                            [JOINT_2]P
+# setp pid.b.Igain                            [JOINT_2]I
+# setp pid.b.Dgain                            [JOINT_2]D
 setp pid.b.bias                             [JOINT_2]BIAS
-setp pid.b.FF0                              [JOINT_2]FF0
-setp pid.b.FF1                              [JOINT_2]FF1
-setp pid.b.FF2                              [JOINT_2]FF2
+# setp pid.b.FF0                              [JOINT_2]FF0
+# setp pid.b.FF1                              [JOINT_2]FF1
+# setp pid.b.FF2                              [JOINT_2]FF2
 setp pid.b.deadband                         [JOINT_2]DEADBAND
 setp pid.b.maxoutput                        [JOINT_2]MAX_OUTPUT
 
@@ -468,13 +493,19 @@ setp hm2_7i92.0.stepgen.02.maxvel           [JOINT_3]STEPGEN_MAXVEL
 
 setp pid.u.error-previous-target            true
 
-setp pid.u.Pgain                            [JOINT_3]P
-setp pid.u.Igain                            [JOINT_3]I
-setp pid.u.Dgain                            [JOINT_3]D
+# P/I/D/FF0/FF1/FF2 below are now set live from REB_Settings_v1.ini by
+# rosetta.py (Settings tab "Stepper Motor Settings" section), not from
+# this ini value, so the operator can retune them without restarting
+# LinuxCNC. REB_Scale_Persist.py writes the live values back into
+# REB_Settings_v1.ini at shutdown, the same as it already does for
+# axis scale.
+# setp pid.u.Pgain                            [JOINT_3]P
+# setp pid.u.Igain                            [JOINT_3]I
+# setp pid.u.Dgain                            [JOINT_3]D
 setp pid.u.bias                             [JOINT_3]BIAS
-setp pid.u.FF0                              [JOINT_3]FF0
-setp pid.u.FF1                              [JOINT_3]FF1
-setp pid.u.FF2                              [JOINT_3]FF2
+# setp pid.u.FF0                              [JOINT_3]FF0
+# setp pid.u.FF1                              [JOINT_3]FF1
+# setp pid.u.FF2                              [JOINT_3]FF2
 setp pid.u.deadband                         [JOINT_3]DEADBAND
 setp pid.u.maxoutput                        [JOINT_3]MAX_OUTPUT
 
@@ -555,13 +586,19 @@ setp hm2_7i92.0.stepgen.03.maxvel           [JOINT_4]STEPGEN_MAXVEL
 
 setp pid.v.error-previous-target            true
 
-setp pid.v.Pgain                            [JOINT_4]P
-setp pid.v.Igain                            [JOINT_4]I
-setp pid.v.Dgain                            [JOINT_4]D
+# P/I/D/FF0/FF1/FF2 below are now set live from REB_Settings_v1.ini by
+# rosetta.py (Settings tab "Stepper Motor Settings" section), not from
+# this ini value, so the operator can retune them without restarting
+# LinuxCNC. REB_Scale_Persist.py writes the live values back into
+# REB_Settings_v1.ini at shutdown, the same as it already does for
+# axis scale.
+# setp pid.v.Pgain                            [JOINT_4]P
+# setp pid.v.Igain                            [JOINT_4]I
+# setp pid.v.Dgain                            [JOINT_4]D
 setp pid.v.bias                             [JOINT_4]BIAS
-setp pid.v.FF0                              [JOINT_4]FF0
-setp pid.v.FF1                              [JOINT_4]FF1
-setp pid.v.FF2                              [JOINT_4]FF2
+# setp pid.v.FF0                              [JOINT_4]FF0
+# setp pid.v.FF1                              [JOINT_4]FF1
+# setp pid.v.FF2                              [JOINT_4]FF2
 setp pid.v.deadband                         [JOINT_4]DEADBAND
 setp pid.v.maxoutput                        [JOINT_4]MAX_OUTPUT
 
@@ -649,13 +686,19 @@ setp hm2_7i92.0.stepgen.00.maxvel           [JOINT_5]STEPGEN_MAXVEL
 
 setp pid.w.error-previous-target            true
 
-setp pid.w.Pgain                            [JOINT_5]P
-setp pid.w.Igain                            [JOINT_5]I
-setp pid.w.Dgain                            [JOINT_5]D
+# P/I/D/FF0/FF1/FF2 below are now set live from REB_Settings_v1.ini by
+# rosetta.py (Settings tab "Stepper Motor Settings" section), not from
+# this ini value, so the operator can retune them without restarting
+# LinuxCNC. REB_Scale_Persist.py writes the live values back into
+# REB_Settings_v1.ini at shutdown, the same as it already does for
+# axis scale.
+# setp pid.w.Pgain                            [JOINT_5]P
+# setp pid.w.Igain                            [JOINT_5]I
+# setp pid.w.Dgain                            [JOINT_5]D
 setp pid.w.bias                             [JOINT_5]BIAS
-setp pid.w.FF0                              [JOINT_5]FF0
-setp pid.w.FF1                              [JOINT_5]FF1
-setp pid.w.FF2                              [JOINT_5]FF2
+# setp pid.w.FF0                              [JOINT_5]FF0
+# setp pid.w.FF1                              [JOINT_5]FF1
+# setp pid.w.FF2                              [JOINT_5]FF2
 setp pid.w.deadband                         [JOINT_5]DEADBAND
 setp pid.w.maxoutput                        [JOINT_5]MAX_OUTPUT
 
@@ -685,13 +728,37 @@ setp pid.w.maxoutput                        [JOINT_5]MAX_OUTPUT
 addf orient.0                               servo-thread
 addf pid.p0.do-pid-calcs                    servo-thread
 addf mux2.0                                 servo-thread
+addf mux2.2                                 servo-thread
+addf or2.0                                  servo-thread
 
 # ********************************************************************
 #  Connect signals to pins
 
 net machine-is-on                        => hm2_7i92.0.stepgen.06.enable
 
-net orient.0-angle                      <=  spindle.0.orient-angle
+# orient.0.angle now comes through mux2.2 instead of straight from
+# spindle.0.orient-angle, so it can be driven either by M19 (the normal
+# single-spindle path, mux2.2.in0, sel=FALSE) or by rosetta.py's
+# simultaneous Sp0+Sp1 index path (mux2.2.in1, sel=TRUE) - see
+# Sp0_Idx_Active/Sp1_Idx_Active in rosetta.py and the matching Sp1 block
+# below. orient.0.mode is hardwired below instead of following
+# spindle.0.orient-mode - both paths only ever use shortest-path (mode 0,
+# same as M19's existing "P0").
+net spindle.0-orient-angle-m19          <=  spindle.0.orient-angle
+net spindle.0-orient-angle-m19           => mux2.2.in0
+
+# Sp0-idx-angle/Sp0-idx-active are only created here (readers only) -
+# their driver (gladevcp.Sp0-idx-angle/-active) doesn't exist until the
+# GladeVCP panel process starts, well after REB.hal loads, so that net
+# is added later from REB_PostGUI_v1.hal instead (same reason the ENA
+# override pins are wired there, not here). Until then these signals
+# just sit at their default (0.0 / FALSE), which is harmless - FALSE
+# selects the normal M19 path in both mux2.2 and or2.0 below.
+net Sp0-idx-angle                        => mux2.2.in1
+
+net Sp0-idx-active                       => mux2.2.sel
+
+net orient.0-angle                      <=  mux2.2.out
 net orient.0-angle                       => orient.0.angle
 
 net orient.0-command                     => orient.0-pid.command
@@ -700,9 +767,6 @@ net orient-done                         <=  orient.0.is-oriented
 net orient-done                          => spindle.0.is-oriented
 
 net orient.0-enable                      => orient.0-pid.enable
-
-net orient.0-mode                        => spindle.0.orient-mode
-net orient.0-mode                        => orient.0.mode
 
 net spindle.0-at-speed                   => spindle.0.at-speed
 
@@ -740,7 +804,17 @@ net spindle.0-pos                        => orient.0-pid.feedback
 net spindle.0-pos-cmd                   <=  orient.0.command
 net spindle.0-pos-cmd                    => pid.p0.command
 
-net spindle.0-pos-mode-enable           <=  spindle.0.orient
+# spindle.0-pos-mode-enable is now the OR of the M19-driven enable
+# (spindle.0.orient, or2.0.in0) and rosetta.py's simultaneous
+# Sp0+Sp1 index path (Sp0-idx-active, or2.0.in1 - same bit used to
+# select mux2.2 above) - either path enables the same orient/PID/mux
+# chain identically, only the trigger source differs.
+net spindle.0-orient-m19                <=  spindle.0.orient
+net spindle.0-orient-m19                 => or2.0.in0
+
+net Sp0-idx-active                       => or2.0.in1
+
+net spindle.0-pos-mode-enable           <=  or2.0.out
 net spindle.0-pos-mode-enable            => orient.0.enable
 net spindle.0-pos-mode-enable            => pid.p0.enable
 net spindle.0-pos-mode-enable            => mux2.0.sel
@@ -783,24 +857,41 @@ setp hm2_7i92.0.stepgen.06.maxvel           [SPINDLE_0]STEPGEN_MAXVEL
 
 setp pid.s0.error-previous-target           true
 
-setp pid.p0.Pgain                           [SPINDLE_0]P_POS
-setp pid.p0.Igain                           [SPINDLE_0]I_POS
-setp pid.p0.Dgain                           [SPINDLE_0]D_POS
+# P/I/D/FF0/FF1/FF2 below are now set live from REB_Settings_v1.ini by
+# rosetta.py (Settings tab "Stepper Motor Settings" section), not from
+# this ini value, so the operator can retune them without restarting
+# LinuxCNC. REB_Scale_Persist.py writes the live values back into
+# REB_Settings_v1.ini at shutdown, the same as it already does for
+# axis scale.
+# setp pid.p0.Pgain                           [SPINDLE_0]P_POS
+# setp pid.p0.Igain                           [SPINDLE_0]I_POS
+# setp pid.p0.Dgain                           [SPINDLE_0]D_POS
 setp pid.p0.bias                            [SPINDLE_0]BIAS_POS
-setp pid.p0.FF0                             [SPINDLE_0]FF0_POS
-setp pid.p0.FF1                             [SPINDLE_0]FF1_POS
-setp pid.p0.FF2                             [SPINDLE_0]FF2_POS
+# setp pid.p0.FF0                             [SPINDLE_0]FF0_POS
+# setp pid.p0.FF1                             [SPINDLE_0]FF1_POS
+# setp pid.p0.FF2                             [SPINDLE_0]FF2_POS
 setp orient.0.tolerance                     [SPINDLE_0]ORIENT_TOLERANCE
+# Hardwired shortest-path (see man orient) - both the M19 path (which has
+# always sent P0/shortest-path) and rosetta.py's simultaneous index path
+# only ever want this, so orient.0.mode no longer follows
+# spindle.0.orient-mode - it's simply always 0.
+setp orient.0.mode                          0
 setp pid.p0.maxoutput                       [SPINDLE_0]MAX_OUTPUT_POS
 setp pid.p0.maxerrorI                       [SPINDLE_0]MAX_ERROR_I_POS
 
-setp pid.s0.Pgain                           [SPINDLE_0]P_VEL
-setp pid.s0.Igain                           [SPINDLE_0]I_VEL
-setp pid.s0.Dgain                           [SPINDLE_0]D_VEL
+# P/I/D/FF0/FF1/FF2 below are now set live from REB_Settings_v1.ini by
+# rosetta.py (Settings tab "Stepper Motor Settings" section), not from
+# this ini value, so the operator can retune them without restarting
+# LinuxCNC. REB_Scale_Persist.py writes the live values back into
+# REB_Settings_v1.ini at shutdown, the same as it already does for
+# axis scale.
+# setp pid.s0.Pgain                           [SPINDLE_0]P_VEL
+# setp pid.s0.Igain                           [SPINDLE_0]I_VEL
+# setp pid.s0.Dgain                           [SPINDLE_0]D_VEL
 setp pid.s0.bias                            [SPINDLE_0]BIAS_VEL
-setp pid.s0.FF0                             [SPINDLE_0]FF0_VEL
-setp pid.s0.FF1                             [SPINDLE_0]FF1_VEL
-setp pid.s0.FF2                             [SPINDLE_0]FF2_VEL
+# setp pid.s0.FF0                             [SPINDLE_0]FF0_VEL
+# setp pid.s0.FF1                             [SPINDLE_0]FF1_VEL
+# setp pid.s0.FF2                             [SPINDLE_0]FF2_VEL
 setp pid.s0.deadband                        [SPINDLE_0]DEADBAND
 setp pid.s0.maxoutput                       [SPINDLE_0]MAX_OUTPUT_VEL
 
@@ -832,19 +923,31 @@ addf pid.s1.do-pid-calcs                    servo-thread
 addf orient.1                               servo-thread
 addf pid.p1.do-pid-calcs                    servo-thread
 addf mux2.1                                 servo-thread
+addf mux2.3                                 servo-thread
+addf or2.1                                  servo-thread
 
 # ********************************************************************
 #  Connect signals to pins
 net machine-is-on                        => hm2_7i92.0.stepgen.07.enable
 
-net orient.1-angle                      <=  spindle.1.orient-angle
+# See the matching Sp0 block above for why orient.1.angle now comes
+# through mux2.3 (M19 vs rosetta.py's simultaneous Sp0+Sp1 index path)
+# and orient.1.mode is hardwired below instead of following
+# spindle.1.orient-mode.
+net spindle.1-orient-angle-m19          <=  spindle.1.orient-angle
+net spindle.1-orient-angle-m19           => mux2.3.in0
+
+# See the matching Sp0-idx-angle/Sp0-idx-active comment above - these
+# are also wired to their gladevcp.* driver later, from REB_PostGUI_v1.hal.
+net Sp1-idx-angle                        => mux2.3.in1
+
+net Sp1-idx-active                       => mux2.3.sel
+
+net orient.1-angle                      <=  mux2.3.out
 net orient.1-angle                       => orient.1.angle
 
 net orient.1-done                       <=  orient.1.is-oriented
 net orient.1-done                        => spindle.1.is-oriented
-
-net orient.1-mode                        => spindle.1.orient-mode
-net orient.1-mode                        => orient.1.mode
 
 net spindle.1-at-speed                   => spindle.1.at-speed
 
@@ -874,7 +977,14 @@ net spindle.1-output-pos                 => mux2.1.in1
 net spindle.1-pos-cmd                   <=  orient.1.command
 net spindle.1-pos-cmd                    => pid.p1.command
 
-net spindle.1-pos-mode-enable           <=  spindle.1.orient
+# See the matching Sp0 block above - spindle.1-pos-mode-enable is now the
+# OR of the M19-driven enable and rosetta.py's simultaneous index path.
+net spindle.1-orient-m19                <=  spindle.1.orient
+net spindle.1-orient-m19                 => or2.1.in0
+
+net Sp1-idx-active                       => or2.1.in1
+
+net spindle.1-pos-mode-enable           <=  or2.1.out
 net spindle.1-pos-mode-enable            => orient.1.enable
 net spindle.1-pos-mode-enable            => pid.p1.enable
 net spindle.1-pos-mode-enable            => mux2.1.sel
@@ -922,24 +1032,38 @@ setp hm2_7i92.0.stepgen.07.maxvel           [SPINDLE_1]STEPGEN_MAXVEL
 
 setp pid.s1.error-previous-target           true
 
-setp pid.p1.Pgain                           [SPINDLE_1]P_POS
-setp pid.p1.Igain                           [SPINDLE_1]I_POS
-setp pid.p1.Dgain                           [SPINDLE_1]D_POS
+# P/I/D/FF0/FF1/FF2 below are now set live from REB_Settings_v1.ini by
+# rosetta.py (Settings tab "Stepper Motor Settings" section), not from
+# this ini value, so the operator can retune them without restarting
+# LinuxCNC. REB_Scale_Persist.py writes the live values back into
+# REB_Settings_v1.ini at shutdown, the same as it already does for
+# axis scale.
+# setp pid.p1.Pgain                           [SPINDLE_1]P_POS
+# setp pid.p1.Igain                           [SPINDLE_1]I_POS
+# setp pid.p1.Dgain                           [SPINDLE_1]D_POS
 setp pid.p1.bias                            [SPINDLE_1]BIAS_POS
-setp pid.p1.FF0                             [SPINDLE_1]FF0_POS
-setp pid.p1.FF1                             [SPINDLE_1]FF1_POS
-setp pid.p1.FF2                             [SPINDLE_1]FF2_POS
+# setp pid.p1.FF0                             [SPINDLE_1]FF0_POS
+# setp pid.p1.FF1                             [SPINDLE_1]FF1_POS
+# setp pid.p1.FF2                             [SPINDLE_1]FF2_POS
 setp orient.1.tolerance                     [SPINDLE_1]ORIENT_TOLERANCE
+# See the matching Sp0 setp above - hardwired shortest-path.
+setp orient.1.mode                          0
 setp pid.p1.maxoutput                       [SPINDLE_1]MAX_OUTPUT_POS
 setp pid.p1.maxerrorI                       [SPINDLE_1]MAX_ERROR_I_POS
 
-setp pid.s1.Pgain                           [SPINDLE_1]P_VEL
-setp pid.s1.Igain                           [SPINDLE_1]I_VEL
-setp pid.s1.Dgain                           [SPINDLE_1]D_VEL
+# P/I/D/FF0/FF1/FF2 below are now set live from REB_Settings_v1.ini by
+# rosetta.py (Settings tab "Stepper Motor Settings" section), not from
+# this ini value, so the operator can retune them without restarting
+# LinuxCNC. REB_Scale_Persist.py writes the live values back into
+# REB_Settings_v1.ini at shutdown, the same as it already does for
+# axis scale.
+# setp pid.s1.Pgain                           [SPINDLE_1]P_VEL
+# setp pid.s1.Igain                           [SPINDLE_1]I_VEL
+# setp pid.s1.Dgain                           [SPINDLE_1]D_VEL
 setp pid.s1.bias                            [SPINDLE_1]BIAS_VEL
-setp pid.s1.FF0                             [SPINDLE_1]FF0_VEL
-setp pid.s1.FF1                             [SPINDLE_1]FF1_VEL
-setp pid.s1.FF2                             [SPINDLE_1]FF2_VEL
+# setp pid.s1.FF0                             [SPINDLE_1]FF0_VEL
+# setp pid.s1.FF1                             [SPINDLE_1]FF1_VEL
+# setp pid.s1.FF2                             [SPINDLE_1]FF2_VEL
 
 setp pid.s1.deadband                        [SPINDLE_1]DEADBAND
 setp pid.s1.maxoutput                       [SPINDLE_1]MAX_OUTPUT
