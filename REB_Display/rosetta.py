@@ -1581,18 +1581,41 @@ class HandlerClass:
             path += EXPORT_EXTENSION
 
         root = ET.Element("settings")
+        axis_els = {}
+
+        def get_axis_el(axis_id):
+            if axis_id not in axis_els:
+                axis_els[axis_id] = ET.SubElement(root, "axis", {"id": axis_id})
+            return axis_els[axis_id]
+
+        exported = []
         for axis_id in selected.get("axes", ()):
             spin = self.builder.get_object(axis_id + "_Set_Scale")
             if spin is None:
                 continue
-            axis_el = ET.SubElement(root, "axis", {"id": axis_id})
-            ET.SubElement(axis_el, "scale").text = str(spin.get_value())
+            ET.SubElement(get_axis_el(axis_id), "scale").text = str(spin.get_value())
+            exported.append(axis_id + " Scale")
+
+        for axis_id in selected.get("pid_axes", ()):
+            if axis_id in PID_AXES:
+                self._export_pid_block(get_axis_el(axis_id), axis_id, "pid",
+                                        lambda param, axis_id=axis_id: axis_id + "_Set_" + param)
+                exported.append(axis_id + " PID")
+            elif axis_id in PID_SPINDLE_LOOPS:
+                for suffix in ("Pos", "Vel"):
+                    block_tag = "pid_pos" if suffix == "Pos" else "pid_vel"
+                    self._export_pid_block(
+                        get_axis_el(axis_id), axis_id, block_tag,
+                        lambda param, axis_id=axis_id, suffix=suffix: axis_id + "_Set_" + param + "_" + suffix
+                    )
+                exported.append(axis_id + " PID")
 
         if selected.get("measurement_system"):
             combo = self.builder.get_object("Measurement_System")
             system = combo.get_active_text() if combo is not None else None
             if system:
                 ET.SubElement(root, "measurement_system").text = system
+                exported.append("Measurement System")
 
         ET.indent(root, space="    ")
 
@@ -1602,14 +1625,39 @@ class HandlerClass:
             _show_settings_error(widget, "Could not write " + path + ":\n" + str(e))
             return
 
-        print("Exported " + str(list(selected.get("axes", ()))) + " to " + path)
+        print("Exported " + ", ".join(exported) + " to " + path)
+
+    def _export_pid_block(self, axis_el, axis_id, block_tag, widget_id_for_param):
+        '''
+        Reads P/I/D/FF0/FF1/FF2 from this axis's/spindle loop's own
+        Settings tab widgets and writes them into a <pid>/<pid_pos>/
+        <pid_vel> sub-element of axis_el - the same block shape
+        REB_Settings_v1.ini already uses, so a value round-trips through
+        Import_Settings/_load_pid_settings identically either way. Missing
+        widgets are skipped rather than erroring - matches the tolerant,
+        "just skip what isn't there" pattern the rest of Export/Import
+        already uses.
+        '''
+        block_el = None
+        for param in PID_PARAMS:
+            widget = self.builder.get_object(widget_id_for_param(param))
+            if widget is None:
+                continue
+            if block_el is None:
+                block_el = ET.SubElement(axis_el, block_tag)
+            ET.SubElement(block_el, param).text = str(widget.get_value())
 
     def _run_export_selection_dialog(self, widget):
         '''
-        Modal checklist: one row per axis's Scale plus Measurement
-        System, all pre-checked, with Select All/None convenience
-        buttons. Returns {"axes": [...ids...], "measurement_system":
-        bool} on Export, or None if cancelled/nothing was selected.
+        Modal checklist: one row per axis's Scale, one row per axis's/
+        spindle loop's PID gains (P/I/D/FF0/FF1/FF2 as a single unit -
+        Sp0/Sp1 each cover both their position and velocity loops
+        together, matching the coarse per-axis granularity already used
+        for Scale rather than exposing every individual gain), plus
+        Measurement System - all pre-checked, with Select All/None
+        convenience buttons. Returns {"axes": [...ids...], "pid_axes":
+        [...ids...], "measurement_system": bool} on Export, or None if
+        cancelled/nothing was selected.
         '''
         dialog = Gtk.Dialog(
             title="Export Settings - Choose What to Include",
@@ -1634,23 +1682,47 @@ class HandlerClass:
 
         content.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0)
 
+        # Two columns side by side (Scale, PID) so ~19 checkboxes stay a
+        # manageable dialog height instead of one long list.
+        columns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+        content.pack_start(columns, False, False, 0)
+
+        scale_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        pid_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        columns.pack_start(scale_col, False, False, 0)
+        columns.pack_start(pid_col, False, False, 0)
+
+        def section_label(text):
+            label = Gtk.Label()
+            label.set_markup("<b>" + text + "</b>")
+            label.set_xalign(0)
+            return label
+
+        scale_col.pack_start(section_label("Axis Scales"), False, False, 0)
         checks = {}
         for axis_id in AXIS_STEPGEN:
             check = Gtk.CheckButton(label=axis_id + " Scale")
             check.set_active(True)
-            content.pack_start(check, False, False, 0)
+            scale_col.pack_start(check, False, False, 0)
             checks[axis_id] = check
+
+        pid_col.pack_start(section_label("PID Gains"), False, False, 0)
+        pid_checks = {}
+        for axis_id in list(PID_AXES) + list(PID_SPINDLE_LOOPS):
+            check = Gtk.CheckButton(label=axis_id + " PID")
+            check.set_active(True)
+            pid_col.pack_start(check, False, False, 0)
+            pid_checks[axis_id] = check
+
+        content.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0)
 
         measurement_check = Gtk.CheckButton(label="Measurement System")
         measurement_check.set_active(True)
         content.pack_start(measurement_check, False, False, 0)
 
-        select_all_btn.connect(
-            "clicked", lambda b: [c.set_active(True) for c in list(checks.values()) + [measurement_check]]
-        )
-        select_none_btn.connect(
-            "clicked", lambda b: [c.set_active(False) for c in list(checks.values()) + [measurement_check]]
-        )
+        all_checks = list(checks.values()) + list(pid_checks.values()) + [measurement_check]
+        select_all_btn.connect("clicked", lambda b: [c.set_active(True) for c in all_checks])
+        select_none_btn.connect("clicked", lambda b: [c.set_active(False) for c in all_checks])
 
         content.show_all()
 
@@ -1661,12 +1733,13 @@ class HandlerClass:
                 break
 
             axes = [axis_id for axis_id, c in checks.items() if c.get_active()]
+            pid_axes = [axis_id for axis_id, c in pid_checks.items() if c.get_active()]
             measurement_system = measurement_check.get_active()
-            if not axes and not measurement_system:
+            if not axes and not pid_axes and not measurement_system:
                 _show_settings_error(widget, "Select at least one item to export.")
                 continue
 
-            result = {"axes": axes, "measurement_system": measurement_system}
+            result = {"axes": axes, "pid_axes": pid_axes, "measurement_system": measurement_system}
             break
 
         dialog.destroy()
@@ -1738,22 +1811,41 @@ class HandlerClass:
         imported = []
         for axis_el in root.findall("axis"):
             axis_id = axis_el.get("id")
+            if axis_id not in AXIS_STEPGEN:
+                continue
+
+            # Scale and PID are independent - an export may carry either,
+            # both, or neither for a given axis, so check each on its own
+            # rather than skipping the whole <axis> element when one is
+            # absent.
             scale_el = axis_el.find("scale")
-            if axis_id not in AXIS_STEPGEN or scale_el is None or scale_el.text is None:
-                continue
+            if scale_el is not None and scale_el.text is not None:
+                spin = self.builder.get_object(axis_id + "_Set_Scale")
+                if spin is not None:
+                    try:
+                        scale = float(scale_el.text.strip())
+                    except ValueError:
+                        print("Skipping " + axis_id + " scale - not a number: " + scale_el.text)
+                        scale = None
+                    if scale is not None:
+                        spin.set_value(scale)  # fires <Axis>_Set_Scale: abort/disable-if-enabled/halcmd setp/mark dirty
+                        imported.append(axis_id + " Scale")
 
-            spin = self.builder.get_object(axis_id + "_Set_Scale")
-            if spin is None:
-                continue
-
-            try:
-                scale = float(scale_el.text.strip())
-            except ValueError:
-                print("Skipping " + axis_id + " - not a number: " + scale_el.text)
-                continue
-
-            spin.set_value(scale)  # fires <Axis>_Set_Scale: abort/disable-if-enabled/halcmd setp/mark dirty
-            imported.append(axis_id + " Scale")
+            pid_applied = False
+            if axis_id in PID_AXES:
+                pid_applied = self._import_pid_block(
+                    axis_el, "pid", lambda param, axis_id=axis_id: axis_id + "_Set_" + param
+                )
+            elif axis_id in PID_SPINDLE_LOOPS:
+                for suffix in ("Pos", "Vel"):
+                    block_tag = "pid_pos" if suffix == "Pos" else "pid_vel"
+                    if self._import_pid_block(
+                        axis_el, block_tag,
+                        lambda param, axis_id=axis_id, suffix=suffix: axis_id + "_Set_" + param + "_" + suffix
+                    ):
+                        pid_applied = True
+            if pid_applied:
+                imported.append(axis_id + " PID")
 
         measurement_el = root.find("measurement_system")
         if measurement_el is not None and measurement_el.text in ("Metric", "Imperial"):
@@ -1775,6 +1867,43 @@ class HandlerClass:
             dialog.destroy()
         else:
             _show_settings_error(widget, "Nothing recognizable to import in " + path)
+
+    def _import_pid_block(self, axis_el, block_tag, widget_id_for_param):
+        '''
+        Mirror of _export_pid_block: reads a <pid>/<pid_pos>/<pid_vel>
+        sub-element (if present) and applies each P/I/D/FF0/FF1/FF2 value
+        it contains to that param's own Settings tab widget via
+        set_value() - fires the same _pid_set handler a live edit would
+        (pushes straight to the live pid.* HAL gain pin; see that
+        function's docstring for why it doesn't need the abort/disable
+        dance scale changes do, and doesn't mark .settings.ini dirty -
+        PID gains aren't part of that format's schema). Returns True if
+        anything was actually applied.
+        '''
+        block_el = axis_el.find(block_tag)
+        if block_el is None:
+            return False
+
+        applied = False
+        for param in PID_PARAMS:
+            param_el = block_el.find(param)
+            if param_el is None or param_el.text is None:
+                continue
+
+            widget = self.builder.get_object(widget_id_for_param(param))
+            if widget is None:
+                continue
+
+            try:
+                value = float(param_el.text.strip())
+            except ValueError:
+                print("Skipping " + widget_id_for_param(param) + " - not a number: " + param_el.text)
+                continue
+
+            widget.set_value(value)
+            applied = True
+
+        return applied
 
     def _on_machine_is_on_changed(self, hal_pin, data=None):
         '''

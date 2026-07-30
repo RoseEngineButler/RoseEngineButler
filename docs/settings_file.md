@@ -542,40 +542,118 @@ a full named setup." Differences from `.settings.ini`, by design:
   point-in-time subset dump.
 - **Selectable scope is deliberately narrow: only what's literally on the
   Settings tab itself** - each axis's Scale (`X, Z, B, U, V, W, Sp0,
-  Sp1`) and Measurement System. Comments and Notes are excluded on
-  purpose: comments live on the *main panel*, a different component
-  (see `_read_axis_comment`'s docstring for why that's a cross-component
-  problem `.settings.ini`'s Save/Load already had to solve), and Notes isn't
-  part of `REB_Settings_v1.ini`'s schema at all - both are `.settings.ini`-only
-  concepts, not "things stored on the settings page."
+  Sp1`), each axis's/spindle loop's PID gains (added when Rich's PID
+  branch merged - see below), and Measurement System. Comments and Notes
+  are excluded on purpose: comments live on the *main panel*, a different
+  component (see `_read_axis_comment`'s docstring for why that's a
+  cross-component problem `.settings.ini`'s Save/Load already had to
+  solve), and Notes isn't part of `REB_Settings_v1.ini`'s schema at all -
+  both are `.settings.ini`-only concepts, not "things stored on the
+  settings page."
 - **Export** (`Export_Settings`): a modal checklist dialog
-  (`_run_export_selection_dialog`) - one checkbox per axis's Scale plus
-  Measurement System, all pre-checked, with Select All/Select None
-  buttons - blocks proceeding until at least one item is checked. Then a
-  normal Save file chooser (`~/Documents` default, like Save As), and
-  only the checked items get written.
+  (`_run_export_selection_dialog`), two columns - Axis Scales and PID
+  Gains, plus Measurement System below - all pre-checked, with Select
+  All/Select None buttons - blocks proceeding until at least one item is
+  checked. Then a normal Save file chooser (`~/Documents` default, like
+  Save As), and only the checked items get written. PID gains are
+  selected **per axis/spindle as one unit** (all six of P/I/D/FF0/FF1/FF2
+  together; Sp0/Sp1 each cover both their position *and* velocity loop
+  together) - matching Scale's existing coarse, per-axis granularity
+  rather than exposing 6-12 individual gain checkboxes per axis.
 - **Import** (`Import_Settings`): an Open file chooser, then
   `xml.etree.ElementTree`-parses the file (a real parser is fine here,
   unlike `REB_Settings_v1.ini`'s hand-maintained-comments regex-patching
   - this format has no comments to preserve and is fully owned by this
-  code on both ends of the round trip). For each `<axis>` present, calls
-  `set_value()` on that axis's own `Set_Scale` spin button; if
-  `<measurement_system>` is present, calls `set_active()` on the
-  `Measurement_System` combo. Both of those are the **exact same widgets
-  a live edit would touch**, so importing goes through the *existing*
-  `<Axis>_Set_Scale`/`Measurement_System_Changed` handlers exactly as if
-  the operator had typed/selected each value by hand - motion-abort,
-  disable-if-currently-enabled, the HAL `position-scale` write, dirty-
-  flagging (`_mark_settings_dirty`), and the Measurement System's
-  persist/patch-REB.ini/restart-required popup all come for free, with
-  no need to duplicate any of that per-field safety logic a third time.
-  A value not present in the file is left completely untouched. A short
-  summary popup lists what was actually imported.
-- Imported axis values feed into the same unsaved-changes tracking as any
-  other edit (Decision 4) - the operator still needs to Save/Save As
-  afterward (to the *active* `.settings.ini`, if any) to persist an import
-  into a named profile; Import only changes the live values, the same as
-  typing directly into a Scale spin button would.
+  code on both ends of the round trip). For each `<axis>` present, applies
+  whichever of `<scale>` and `<pid>`/`<pid_pos>`/`<pid_vel>` it actually
+  contains (independently - an export may carry either, both, or neither
+  for a given axis); if `<measurement_system>` is present, calls
+  `set_active()` on the `Measurement_System` combo. All of these are
+  applied via `set_value()`/`set_active()` on the **exact same widgets a
+  live edit would touch**, so importing goes through the *existing*
+  `<Axis>_Set_Scale`/`<Axis>_Set_<Param>`/`Measurement_System_Changed`
+  handlers exactly as if the operator had typed/selected each value by
+  hand - motion-abort and disable-if-currently-enabled for Scale, a
+  straight-to-HAL gain write for PID (no disable dance needed - see
+  `_pid_set`'s docstring, a live gain retune doesn't invalidate an
+  in-progress move the way a scale change can), persist/patch-REB.ini/
+  restart-required popup for Measurement System - all for free, with no
+  per-field safety logic duplicated a third time. A value not present in
+  the file is left completely untouched. A short summary popup lists what
+  was actually imported.
+- **PID gains are intentionally outside `.settings.ini`'s dirty-tracking**,
+  matching how a live PID edit already behaves (`_pid_set` never calls
+  `_mark_settings_dirty` - PID gains are only captured by the automatic,
+  unnamed `REB_Settings_v1.ini` persistence at shutdown, the same as
+  Scale was before `.settings.ini` existed). Importing a PID subset
+  inherits that same behavior for free by going through the real
+  widgets - it does *not* mark the Settings Name label dirty, since
+  Save/Save As wouldn't capture the change either way.
+- Imported Scale/Measurement System values do feed into the same
+  unsaved-changes tracking as any other edit (Decision 4) - the operator
+  still needs to Save/Save As afterward (to the *active* `.settings.ini`,
+  if any) to persist those into a named profile; Import only changes the
+  live values, the same as typing directly into a spin button would.
+
+### Merged with Rich's PID gain / simultaneous-indexing branch (30 July 2026)
+
+`dev-rich` added P/I/D/FF0/FF1/FF2 persistence for every axis and Sp0/
+Sp1's position/velocity loops (read from `REB_Settings_v1.ini` at
+startup, live-editable, written back at shutdown - mirroring how Scale
+already worked), simultaneous Sp0+Sp1 indexing, a fix for `Sp0_Set_Scale`/
+`Sp1_Set_Scale` sending an unconditional M5 that errored during the
+startup auto-reload (now guarded on `s.task_state == linuxcnc.STATE_ON`),
+and three file renames (`REB_Panel_v2.ui`→`REB_Panel_v1.ui`,
+`REB_Tab_Help_v2.ui`→`REB_Tab_Help_v1.ui`, `REB_PostGUI.hal`→
+`REB_PostGUI_v1.hal`).
+
+**Conflicts** (both branched from `53296d9`, the Measurement System
+commit - the last point they shared):
+
+- `REB_Display/REB_Scale_Persist.py` - both sides edited the module
+  docstring (his PID-persistence paragraph vs. my `.settings.ini`
+  rewording). Trivial: combined both paragraphs, updated the stray
+  `.rebset` mention in his half to `.settings.ini`. The rest of the file
+  (his new PID-persistence loops in `main()`, my
+  `prompt_save_pending_settings()`) merged automatically with no
+  conflict - they landed in different, non-overlapping parts of the
+  function.
+- `REB_Display/REB_Tab_Settings_v1.ui` - the real conflict. Rich's branch
+  re-saved this file in Glade starting from `53296d9`, *before* my
+  `Settings_Save_As`/Export/Import/`Settings_File_Path` work landed on
+  top of it - so his version had the older Save/Load toolbar but was
+  missing those four widgets, **and** Glade's re-save had accidentally
+  nested `Settings_Outer_Box` (toolbar + notes + everything) *inside*
+  `scrolledwindow1`/`viewport1`, rather than the other way around -
+  meaning the Save/Load toolbar would have scrolled out of view along
+  with the (now much longer, with PID gains added) grid, undoing the
+  original reason that wrapping exists. A raw textual merge of a
+  ~4000-line Glade file wasn't going to resolve either issue safely, so
+  this was resolved by hand: took Rich's file as the base (to keep his
+  large new PID grid intact rather than hand-reconstructing it), used a
+  small Python/`ElementTree` script (comment-preserving parser) to
+  reparent `vbox1` (the "Axis Scaling" grid) so it - along with
+  everything Rich had added after it (Stepper Motor Settings label, PID
+  grid, footer help section) - is the *only* thing inside
+  `scrolledwindow1`/`viewport1`, restoring `Settings_Outer_Box` to
+  `window1`'s direct child with the toolbar/notes/scrolled-grid as its
+  three always-reachable top-level rows, then re-added the four missing
+  widgets (`Settings_File_Path`, `Settings_Toolbar_Separator`,
+  `Export_Settings`, `Import_Settings`) into that corrected structure.
+  Verified after the fact: every original widget ID present exactly
+  once, no duplicates, `<signal>`/`<object>` counts increased by exactly
+  the 4 new widgets' worth.
+- `REB_Display/rosetta.py` merged automatically with **no conflicts**
+  (git's 3-way merge), spot-checked afterward rather than trusted blind:
+  `Sp0_Set_Scale`/`Sp1_Set_Scale` carry both his `STATE_ON` guard and my
+  `_mark_settings_dirty()` call; `__init__` has both his Measurement
+  System state and my `.settings.ini` state; the `_load_scale_settings`
+  → `_load_pid_settings` → `_load_axis_comments` → `_load_measurement_system`
+  → `_prompt_initial_settings_load` startup sequence is intact and
+  correctly ordered.
+- `REB.hal`, `REB.ini`, `CLAUDE.md`, `REB_Setup/REB_Settings_v1.ini`,
+  the three file renames, and the two `docs/` files auto-merged cleanly
+  with no changes from my side to reconcile against.
 
 ## Testing plan
 
@@ -679,3 +757,16 @@ exercise:
   `generic_example.settings.ini`'s full repo path (not `(unsaved)`) on
   the legacy/generic_example fallbacks respectively. Confirm it stays
   readable (front-truncated, not wrapped/cut off) with a long path.
+- Confirm the Settings tab's Save/Save As/Load/Export/Import toolbar and
+  Notes box stay visible while scrolling through the (now much longer,
+  with PID gains) grid - the whole point of the post-merge structural fix.
+- Export with only `Sp0 PID` checked (no `Sp0 Scale`) and confirm the
+  resulting file's `<axis id="Sp0">` has `<pid_pos>`/`<pid_vel>` but no
+  `<scale>`; Import it after changing Sp0's gains and confirm only the
+  gains change back, Sp0's scale untouched.
+- Export with both `X Scale` and `X PID` checked and confirm both land
+  under the same single `<axis id="X">` element (not two separate ones).
+- Change a PID gain, confirm the Settings Name label does **not** pick up
+  a `*` (PID gains aren't part of `.settings.ini`'s tracked scope) - then
+  change a Scale value and confirm it *does*, to confirm the two are
+  correctly distinguished.
