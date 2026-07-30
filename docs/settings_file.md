@@ -1,4 +1,4 @@
-# Named Settings Files (.rebset) — Design Plan
+# Named Settings Files (.settings.ini) — Design Plan
 
 ## Purpose of this document
 
@@ -35,7 +35,7 @@ free-text `<usercomment>`. It is:
 
 This plan adds a **second, user-driven mechanism** alongside that one, not a
 replacement for it: named, explicitly-saved/loaded profile files that the
-operator controls the location and name of. Loading a `.rebset` file pushes
+operator controls the location and name of. Loading a `.settings.ini` file pushes
 its values into the same live widgets/HAL pins that `_load_scale_settings`
 already knows how to write to — so on the next shutdown,
 `REB_Scale_Persist.py` naturally carries whatever was just loaded forward
@@ -46,7 +46,7 @@ feature doesn't touch that path (see Decision 4 below for why).
 
 ## File format
 
-- **Extension:** `.rebset`
+- **Extension:** `.settings.ini`
 - **Encoding:** JSON (replacing the ad hoc regex-patched XML used for the
   automatic file — much less fragile to parse/write correctly, and Python's
   `json` module needs no new dependency)
@@ -81,7 +81,7 @@ feature doesn't touch that path (see Decision 4 below for why).
 ## Versioning
 
 - `format_version` is a plain integer, starting at `1`, present at the top
-  level of every `.rebset` file.
+  level of every `.settings.ini` file.
 - The loader reads `format_version` first and dispatches on it. Unknown or
   newer-than-supported versions must produce a clear error dialog and abort
   the load — never guess at a schema we don't recognize.
@@ -98,12 +98,23 @@ region — anything inside it can be scrolled out of view, which is fine for
 the long list of per-axis rows but wrong for controls that should always be
 reachable.
 
+- **Settings File Path** (`Settings_File_Path`) — a read-only, selectable
+  label on its own line at the very top of the tab (above the toolbar),
+  showing the **full path** of wherever the current settings actually
+  came from (e.g. `Settings File: /home/reuben/Documents/
+  RoseEngineButler_Settings.settings.ini`), or `(unsaved)` if nothing's
+  been saved/loaded yet this session. Added after Rich noted that the
+  abbreviated Settings Name label alone lost track of the actual file -
+  see `_set_settings_source_path_display`. `ellipsize="start"` so a long
+  path truncates from the front, keeping the filename itself (the most
+  identifying part) visible at the end.
 - **Save Settings** / **Save Settings As...** / **Load Settings...**
-  buttons, in a small `GtkBox` above the scrolled window.
-- **Settings Name** — a read-only label above the scrolled window showing
-  the currently active file's name (e.g. `Settings: Chucks_LRE`). **The
-  name is always the current file's filename (minus `.rebset`), not a
-  separately-typed field** — see Decision 2 (revised) below.
+  buttons, in a small `GtkBox` below that.
+- **Settings Name** — a read-only label in that toolbar showing just the
+  currently active file's bare name (e.g. `Settings: Chucks_LRE`). **The
+  name is always the current file's filename (minus `.settings.ini`), not a
+  separately-typed field** — see Decision 2 (revised) below. (The new
+  Settings File Path label above shows the full path this is short for.)
 - **Notes** — a `GtkTextView` (multi-line free text, ~3 rows tall) inside
   its own small fixed-height `GtkScrolledWindow`, so long notes scroll
   within their own box rather than growing the tab. Placed above or below
@@ -114,7 +125,7 @@ reachable.
 
 **Decision 2, revised.** The original design had the operator type a
 separate "Name" field in the Save dialog, independent of the chosen
-filename. Live testing showed this was confusing: renaming a `.rebset`
+filename. Live testing showed this was confusing: renaming a `.settings.ini`
 file (even from inside a later Save As) didn't change what was displayed,
 because the display was reading the *file's embedded* `name` field, not
 its actual current filename. Fixed by dropping the separate name field
@@ -130,11 +141,11 @@ desktop-app conventions:
 - **Save Settings** (`Settings_Save`): if a file is already active this
   session (`self._settings_path` is set - i.e. something was already
   loaded or saved this session), write straight back to it with **no
-  dialog**. If nothing is active yet (still on the `legacy`/
+  dialog**. If nothing is active yet (still on the `RoseEngineButler_Settings`/
   `generic_example` starting point - Decisions 5/6), this just delegates
   to Save As, since there's nowhere to "save back to".
 - **Save Settings As...** (`Settings_Save_As`): always shows a
-  `GtkFileChooserDialog` (`action=SAVE`), `*.rebset` filter, `~/Documents`
+  `GtkFileChooserDialog` (`action=SAVE`), `*.settings.ini` filter, `~/Documents`
   default starting folder (Decision 1), current name pre-filled as a
   filename suggestion. Whatever filename the operator confirms with
   becomes the new name (and the new `self._settings_path`) going forward.
@@ -151,7 +162,7 @@ unsaved-changes flag, and record `path` as both the last-used file
 ## Load flow
 
 1. Operator clicks **Load Settings...**.
-2. Show a `GtkFileChooserDialog` (`action=OPEN`), same `*.rebset` filter and
+2. Show a `GtkFileChooserDialog` (`action=OPEN`), same `*.settings.ini` filter and
    default folder as Save.
 3. On confirm: `json.load()` the file.
    - Malformed JSON, missing `format_version`, or an unsupported version →
@@ -189,7 +200,7 @@ unsaved-changes flag, and record `path` as both the last-used file
 
 ## Startup behavior: reload the last-used file, or fall back (Decision 5)
 
-By default, the Settings tab should silently reopen whatever `.rebset` the
+By default, the Settings tab should silently reopen whatever `.settings.ini` the
 operator last opened or saved — not the automatic, unnamed
 `REB_Settings_v1.ini` snapshot, which persists on its own regardless, but
 the *named* profile. The startup picker (below) should only ever appear
@@ -197,7 +208,7 @@ when there's genuinely nothing to reopen.
 
 - **Where "last used" is recorded:** `RoseEngineButlerLocal/
   REB_Last_Settings_Path.txt` (`LAST_SETTINGS_PATH_FILE`) — a one-line
-  plain-text file holding the absolute path of the last `.rebset` the
+  plain-text file holding the absolute path of the last `.settings.ini` the
   operator actually chose via Save or the Load button (or picked from the
   startup dialog itself). It lives in `RoseEngineButlerLocal`, not this
   repo, on the same reasoning as `REB_Settings_v1.ini`: this is
@@ -212,31 +223,34 @@ when there's genuinely nothing to reopen.
   `LAST_SETTINGS_PATH_FILE`. If it names a file that still exists, that
   file is loaded straight through the same `_load_settings_file` helper
   `Settings_Load` uses — no dialog, no prompt, nothing on screen.
-- **No `.rebset` on record → check for legacy values first.** A machine
+- **No `.settings.ini` on record → check for legacy values first.** A machine
   that's been in use since before this feature existed still has real,
   good values sitting in `REB_Settings_v1.ini` — and those are already
   live by this point regardless (`_load_scale_settings`/
   `_load_axis_comments` apply them unconditionally, earlier in
-  `__init__`, with no dependency on `.rebset` files at all). Rather than
+  `__init__`, with no dependency on `.settings.ini` files at all). Rather than
   bury that under an empty `~/Documents` picker, `_legacy_settings_available()`
   checks whether `REB_Settings_v1.ini` has at least one real
   `<axis>`/`<scale>` entry; if so, those already-applied values are left
   exactly as they are (nothing is re-loaded/re-applied), the Settings Name
-  display is set to `legacy`, and the settings are force-marked dirty —
+  display is set to `RoseEngineButler_Settings`
+  (`DEFAULT_LEGACY_SETTINGS_NAME` - literally `legacy` originally, changed
+  after Rich pointed out that's meaningless once it's an actual filename
+  in the operator's Documents folder), and the settings are force-marked dirty —
   same reasoning as the `generic_example` case below — so the exit prompt
-  (Decision 4) offers to save them as a real, named `.rebset`, migrating
+  (Decision 4) offers to save them as a real, named `.settings.ini`, migrating
   them into this feature instead of leaving them stuck as the single
   anonymous legacy file forever.
-- **The picker** (shown only once neither a last-used `.rebset` nor any
+- **The picker** (shown only once neither a last-used `.settings.ini` nor any
   legacy `REB_Settings_v1.ini` data is available): the same
   Load dialog as the **Load Settings** button, with an extra instructional
-  label explaining the choice — pick a saved `.rebset` from `~/Documents`,
+  label explaining the choice — pick a saved `.settings.ini` from `~/Documents`,
   or Cancel to fall back to a starter profile.
   - **Picks a file:** loaded exactly like a normal `Settings_Load`
     (Decision-3's motion-stop/disable-all safety applies here too), and
     that path is now recorded as the new "last used" one.
-  - **Cancels:** load `REB_Display/generic_example.rebset` — a small
-    starter `.rebset` **shipped in this repo** (not `RoseEngineButlerLocal`,
+  - **Cancels:** load `REB_Display/generic_example.settings.ini` — a small
+    starter `.settings.ini` **shipped in this repo** (not `RoseEngineButlerLocal`,
     not `~/Documents`) whose `name` field is literally `"generic_example"`,
     so the Settings Name display picks it up with no special-casing in the
     code. Every axis's `scale` in that shipped file is `1` — deliberately
@@ -261,7 +275,7 @@ when there's genuinely nothing to reopen.
 
 If the operator has changed any scale, comment, or note since the last
 save/load, exiting should ask whether to save those changes to a
-`.rebset` file first — the same "unsaved changes" pattern as a text
+`.settings.ini` file first — the same "unsaved changes" pattern as a text
 editor, layered on top of (not replacing) the existing silent
 `REB_Settings_v1.ini` auto-persist, which keeps happening regardless.
 
@@ -311,17 +325,17 @@ to pop a blocking dialog.
 - **Pending snapshot:** since `REB_Scale_Persist.py` runs in a completely
   separate process with no access to the Settings tab's live widgets,
   `_mark_settings_dirty()` (and the two fallbacks) also write a complete,
-  ready-to-save `.rebset`-shaped payload to
-  `RoseEngineButlerLocal/REB_Pending_Settings.rebset`
+  ready-to-save `.settings.ini`-shaped payload to
+  `RoseEngineButlerLocal/REB_Pending_Settings.settings.ini`
   (`PENDING_SETTINGS_PATH`) every time something changes. Removed again
   by `_clear_pending_settings_snapshot()` whenever Save or Load succeeds.
 - **The shutdown prompt** (`prompt_save_pending_settings()` in
   `REB_Scale_Persist.py`, called at the end of `main()`, after the
-  existing scale-persist step): if `REB_Pending_Settings.rebset` exists,
+  existing scale-persist step): if `REB_Pending_Settings.settings.ini` exists,
   show a Tkinter (not GTK - no gladevcp/GtkBuilder machinery needed for
   one yes/no box, and Tk is already a guaranteed dependency since AXIS
   itself is Tk-based) `askyesno` "Save changes to '<name>' before
-  exiting?". Yes: writes it to `~/Documents/<name>.rebset` (name
+  exiting?". Yes: writes it to `~/Documents/<name>.settings.ini` (name
   sanitized for use as a filename) and updates
   `LAST_SETTINGS_PATH_FILE`, so it's what silently reloads next session.
   Either way, the pending-snapshot file is removed once answered, so the
@@ -341,7 +355,7 @@ to pop a blocking dialog.
   display, Notes `GtkTextView` + its own `GtkScrolledWindow`, with
   `Settings_Save` / `Settings_Save_As` / `Settings_Load` signal handlers
   (naming matches the existing `<Widget>_<Action>` convention).
-- `REB_Display/generic_example.rebset` — the shipped starter profile
+- `REB_Display/generic_example.settings.ini` — the shipped starter profile
   (Decision 5), tracked in this repo like any other config asset.
 - `REB_Display/rosetta.py`:
   - `Settings_Save(self, widget)` (no dialog if a file's already active,
@@ -372,7 +386,7 @@ to pop a blocking dialog.
     return`), since `rosetta.py` is loaded once per gladevcp instance
     across several tabs/panels.
   - Worth factoring a shared `_gather_axis_settings()` /
-    `_apply_axis_settings(data)` pair that both the new `.rebset` path and
+    `_apply_axis_settings(data)` pair that both the new `.settings.ini` path and
     the existing `_load_scale_settings`/`_load_axis_comments`/
     `_save_axis_comment` trio can call, instead of a third independent
     walk over `AXIS_STEPGEN`/`COMMENT_AXES`. Nice-to-have cleanup, not
@@ -399,17 +413,17 @@ to pop a blocking dialog.
    file's actual filename instead, both at save time and at load time -
    see "Save flow" for why (a typed name that could drift from the
    filename left the display showing a stale name after a rename).
-3. **Load safety:** loading a `.rebset` must stop all motion in progress
+3. **Load safety:** loading a `.settings.ini` must stop all motion in progress
    and disable all axes before applying the loaded values.
 4. **Exit behavior:** if settings have changed since the last save/load,
    ask the operator whether to save before exiting.
 5. **Default to reloading the last-used file:** the startup picker should
-   only appear if there's no last-used `.rebset` on record. Record that
+   only appear if there's no last-used `.settings.ini` on record. Record that
    path in `RoseEngineButlerLocal` (`REB_Last_Settings_Path.txt`). When the
    picker does appear, it carries enough instructions to be useful on its
    own; if the operator cancels it instead of picking a file, load a
    `generic_example` starter profile — read from this repo
-   (`REB_Display/generic_example.rebset`), not `RoseEngineButlerLocal` —
+   (`REB_Display/generic_example.settings.ini`), not `RoseEngineButlerLocal` —
    which then gets offered for saving into `~/Documents` on exit (via the
    existing Decision-4 prompt), and is not itself recorded as "last used"
    until the operator actually saves their own copy.
@@ -418,7 +432,7 @@ to pop a blocking dialog.
    existed, don't bury that under an empty `~/Documents` picker on first
    run — recognize it (`_legacy_settings_available()`), leave it as the
    already-applied starting point, and flag it dirty so the operator is
-   offered a chance to save it as a real, named `.rebset`.
+   offered a chance to save it as a real, named `.settings.ini`.
 7. **Save vs. Save As, and the shutdown prompt shows a file selector:**
    plain Save silently re-saves the active file with no dialog; Save As
    always prompts for a location/filename. The shutdown-time "save before
@@ -426,6 +440,142 @@ to pop a blocking dialog.
    a real file selector (coaching the operator where it's about to be
    stored) rather than silently writing to a computed default path, and
    they can rename it right there.
+8. **Export/Import is a separate, smaller mechanism from .settings.ini:**
+   selective, ad hoc sharing of just a few values (e.g. one axis's
+   Scale), not a full named profile. See the dedicated section below.
+9. **Extension renamed `.rebset` → `.settings.ini`, default legacy name
+   renamed `legacy` → `RoseEngineButler_Settings` (Rich, 30 July 2026):**
+   `.rebset` was a made-up extension that meant nothing to an operator
+   browsing their Documents folder; `.ini` reads as an ordinary settings
+   file at a glance. Went with `.settings.ini` rather than bare `.ini` -
+   Rich's literal suggestion - to avoid colliding with both
+   `REB_Settings_v1.ini` and the separate `.export.ini` format, which
+   would otherwise blend all three together under a naive `*.ini` filter
+   (e.g. Load Settings showing export files mixed in with full profiles).
+   Likewise `legacy` as a *displayed name* only meant something inside
+   this codebase's own vocabulary - renamed to `RoseEngineButler_Settings`
+   (`DEFAULT_LEGACY_SETTINGS_NAME`) so it reads as something the operator
+   recognizes as theirs once it's an actual filename. The internal
+   `_legacy_settings_available()` name/concept is unchanged - only the
+   string shown to and saved by the operator changed.
+10. **Show the full file path, not just the name (Rich, 30 July 2026):**
+    the abbreviated Settings Name label (bare filename, no extension) lost
+    track of exactly which file/folder was actually in play. Added a new
+    `Settings_File_Path` label, its own line at the top of the tab, above
+    the toolbar - showing the full path, including for the legacy/
+    generic_example fallback states (where it points at
+    `REB_Settings_v1.ini` or the repo's shipped template respectively,
+    even though neither of those establishes `self._settings_path` /
+    enables a no-dialog plain Save).
+
+### Bug found live: compound extension broke name derivation (30 July 2026)
+
+Symptom: after the `.rebset` → `.settings.ini` rename (Decision 9), a
+restart appeared not to reload the previously-saved file - in reality it
+did reload, but the *name* it displayed was wrong enough to look like a
+different/broken file. Root cause: every place that derived a `name` from
+a path used `os.path.splitext(os.path.basename(path))[0]`, which only
+strips the single final suffix. For a plain extension like the old
+`.rebset` that's correct, but `.settings.ini` has **two** dots -
+`splitext` only strips `.ini`, leaving the name as `"Chucks_LRE.settings"`
+instead of `"Chucks_LRE"`. Confirmed live: reloading
+`Chucks_LRE.settings.ini` produced exactly that mangled name, which then
+got baked into a bogus `Chucks_LRE_settings.settings.ini` the next time
+Save As pre-filled its suggested filename from the (already wrong)
+displayed name - a self-compounding bug on every subsequent save.
+
+Fixed by replacing every `os.path.splitext(...)` name-derivation with a
+shared `_name_from_settings_path(path)` (duplicated between `rosetta.py`
+and `REB_Scale_Persist.py`, same reasoning as `AXIS_STEPGEN`) that strips
+the *whole* `REBSET_EXTENSION` suffix as a literal string match, falling
+back to a plain `splitext` only for files that don't end in it (e.g. an
+old `.rebset` file) - `Chucks_LRE.settings.ini` → `Chucks_LRE`,
+`legacy.rebset` → `legacy`.
+
+**Not cleaned up automatically:** any `.settings.ini` file already saved
+before this fix may have a stale `"name"` field baked into its JSON (e.g.
+`Chucks_LRE.settings.ini`'s own `name` field still literally says
+`"Chucks_LRE.settings"`) - harmless, since display/re-derivation always
+uses the current filename, not this field, but worth knowing if you go
+looking at one of these files directly. The bogus
+`Chucks_LRE_settings.settings.ini` this bug produced on disk was left in
+place rather than deleted automatically - it's the operator's file in
+their own Documents folder.
+
+### Bug found live: silent startup reload never updated the new path label (30 July 2026)
+
+Symptom: load a `.settings.ini` file, quit, restart - the silent
+last-used reload (Decision 5) actually worked (scale/comment values were
+correctly reapplied), but the new `Settings_File_Path` label (Decision
+10) still read `Settings File: (unsaved)`, looking like nothing had been
+restored at all. Root cause: `_set_settings_source_path_display()` was
+only being called from `_write_last_settings_path()` and the two
+`_prompt_initial_settings_load` fallback branches - never from
+`_load_settings_file()` itself. Every *other* caller of
+`_load_settings_file` (`Settings_Load`, the startup picker's "picked a
+file" branch) happens to call `_write_last_settings_path()` right
+afterward too, which papered over the gap - but the silent last-used
+reload path calls `_load_settings_file` **only**, by design (deliberately
+not rewriting `LAST_SETTINGS_PATH_FILE` on every single startup), so it
+never went through the code that actually updates the label.
+
+Fixed by moving the `_set_settings_source_path_display(path)` call into
+`_load_settings_file` itself, right next to where it already sets the
+name - one call site now covers every caller, including the silent
+reload. The now-redundant explicit call in the `generic_example`
+fallback branch was removed since `_load_settings_file` covers it too;
+`_write_last_settings_path`'s own call stays, since `_save_to_path`
+(Save/Save As) doesn't go through `_load_settings_file` at all.
+
+## Export/Import (`.export.ini`) — a separate, smaller mechanism
+
+Added after Rich's Measurement System change landed. Deliberately **not**
+built as a variant of `.settings.ini` - it answers a different question ("let
+me hand someone just my B-axis calibration, or grab just their spindle
+scale without touching anything else of mine") rather than "save/reload
+a full named setup." Differences from `.settings.ini`, by design:
+
+- **Extension `.export.ini`, plain XML** (matching `REB_Settings_v1.ini`'s
+  own shape - `<settings><axis id="..."><scale>...</scale></axis>...
+  <measurement_system>...</measurement_system></settings>`), not JSON.
+  No `format_version` - this isn't a versioned profile format, just a
+  point-in-time subset dump.
+- **Selectable scope is deliberately narrow: only what's literally on the
+  Settings tab itself** - each axis's Scale (`X, Z, B, U, V, W, Sp0,
+  Sp1`) and Measurement System. Comments and Notes are excluded on
+  purpose: comments live on the *main panel*, a different component
+  (see `_read_axis_comment`'s docstring for why that's a cross-component
+  problem `.settings.ini`'s Save/Load already had to solve), and Notes isn't
+  part of `REB_Settings_v1.ini`'s schema at all - both are `.settings.ini`-only
+  concepts, not "things stored on the settings page."
+- **Export** (`Export_Settings`): a modal checklist dialog
+  (`_run_export_selection_dialog`) - one checkbox per axis's Scale plus
+  Measurement System, all pre-checked, with Select All/Select None
+  buttons - blocks proceeding until at least one item is checked. Then a
+  normal Save file chooser (`~/Documents` default, like Save As), and
+  only the checked items get written.
+- **Import** (`Import_Settings`): an Open file chooser, then
+  `xml.etree.ElementTree`-parses the file (a real parser is fine here,
+  unlike `REB_Settings_v1.ini`'s hand-maintained-comments regex-patching
+  - this format has no comments to preserve and is fully owned by this
+  code on both ends of the round trip). For each `<axis>` present, calls
+  `set_value()` on that axis's own `Set_Scale` spin button; if
+  `<measurement_system>` is present, calls `set_active()` on the
+  `Measurement_System` combo. Both of those are the **exact same widgets
+  a live edit would touch**, so importing goes through the *existing*
+  `<Axis>_Set_Scale`/`Measurement_System_Changed` handlers exactly as if
+  the operator had typed/selected each value by hand - motion-abort,
+  disable-if-currently-enabled, the HAL `position-scale` write, dirty-
+  flagging (`_mark_settings_dirty`), and the Measurement System's
+  persist/patch-REB.ini/restart-required popup all come for free, with
+  no need to duplicate any of that per-field safety logic a third time.
+  A value not present in the file is left completely untouched. A short
+  summary popup lists what was actually imported.
+- Imported axis values feed into the same unsaved-changes tracking as any
+  other edit (Decision 4) - the operator still needs to Save/Save As
+  afterward (to the *active* `.settings.ini`, if any) to persist an import
+  into a named profile; Import only changes the live values, the same as
+  typing directly into a Scale spin button would.
 
 ## Testing plan
 
@@ -442,16 +592,16 @@ exercise:
   `generic_example`, nothing active), click plain **Save Settings** and
   confirm it behaves like Save As (shows the dialog) instead of trying to
   save nowhere.
-- Save As with a filename that has no `.rebset` extension, or contains
+- Save As with a filename that has no `.settings.ini` extension, or contains
   spaces, and confirm it still produces a valid, reloadable file.
 - Save As, then rename the resulting file on disk (outside the app, e.g.
   via a file manager) and reload it via **Load Settings...**: confirm the
   Settings Name display shows the *new* filename, not whatever name was
   originally baked into the file's JSON.
 - Load a file with a missing/garbled `format_version`, and a plain
-  non-JSON text file renamed to `.rebset`, and confirm both produce an
+  non-JSON text file renamed to `.settings.ini`, and confirm both produce an
   error dialog instead of a crash or silently-wrong values.
-- With an axis enabled and/or a move in progress, Load a `.rebset` and
+- With an axis enabled and/or a move in progress, Load a `.settings.ini` and
   confirm motion actually stops and every axis actually disables before
   any scale value changes.
 - Change a scale value, then exit LinuxCNC without saving, and confirm
@@ -464,7 +614,7 @@ exercise:
   treated as "don't save" rather than erroring; confirm no prompt appears
   on a plain exit when nothing has changed since the last save/load.
 - After answering that prompt either way, confirm
-  `REB_Pending_Settings.rebset` is gone (so the next session isn't asked
+  `REB_Pending_Settings.settings.ini` is gone (so the next session isn't asked
   about the same already-resolved change again).
 - Change a scale value and confirm the Settings Name label immediately
   picks up a trailing `*` (no exit needed); Save (or Save As) and confirm
@@ -474,13 +624,14 @@ exercise:
 - With no `REB_Last_Settings_Path.txt` **but** a real `REB_Settings_v1.ini`
   already populated (the actual first-time-test scenario on a live
   machine): confirm no dialog appears, the already-good scale/comment
-  values stay exactly as restored, the Name display reads `legacy`, and
-  the settings are already flagged dirty (exiting immediately offers to
-  save). Save it, restart again, and confirm that saved copy — not
-  `legacy` — is what silently reloads next time.
+  values stay exactly as restored, the Name display reads
+  `RoseEngineButler_Settings`, and the settings are already flagged dirty
+  (exiting immediately offers to save). Save it, restart again, and
+  confirm that saved copy — not `RoseEngineButler_Settings` — is what
+  silently reloads next time.
 - With no `RoseEngineButlerLocal/REB_Last_Settings_Path.txt` present
   **and** an empty/missing `REB_Settings_v1.ini` (true first-ever run),
-  confirm the startup picker appears: pick a real `.rebset` and confirm it
+  confirm the startup picker appears: pick a real `.settings.ini` and confirm it
   loads exactly like the Load button would, and confirm that path is now
   recorded.
 - Restart with a valid recorded last-used path: confirm the Settings tab
@@ -500,7 +651,31 @@ exercise:
   again rather than silently reloading `generic_example` a second time.
 - From that `generic_example` state, exit and choose Save: confirm the
   Save dialog's Name field is pre-filled with `generic_example` and the
-  suggested filename is `generic_example.rebset`, and confirm the file
+  suggested filename is `generic_example.settings.ini`, and confirm the file
   lands in `~/Documents`, not overwriting
-  `REB_Display/generic_example.rebset` in the repo. Confirm a subsequent
+  `REB_Display/generic_example.settings.ini` in the repo. Confirm a subsequent
   restart now silently reloads that saved copy.
+- Export with only one axis (e.g. `Sp0`) checked and confirm the resulting
+  `.export.ini` contains only that `<axis>` block - no other axes, no
+  `<measurement_system>`, no comments/notes.
+- Try Export with nothing checked and confirm it's blocked rather than
+  writing an empty file.
+- Export with only Measurement System checked, change a scale value, then
+  Import that same file: confirm the scale is untouched and only the
+  Measurement System changes (including the persist/patch/restart-required
+  popup, same as changing the combo box directly).
+- Export a couple of axes, change all axes' scales to something else,
+  then Import that file: confirm only the exported axes change back and
+  the rest are left at whatever they were, and confirm the Settings Name
+  label picks up a trailing `*` from the import same as any other edit.
+- With an axis currently enabled, Import a file containing that axis:
+  confirm the same abort/disable-if-enabled safety as a live edit of that
+  axis's Scale spin button actually fires (not skipped).
+- Import a non-XML file renamed to `.export.ini`, and a well-formed XML
+  file whose root isn't `<settings>`, and confirm both produce an error
+  dialog rather than a crash.
+- Confirm the Settings File Path label at the top shows the full path
+  after Save/Save As/Load, and shows `REB_Settings_v1.ini`'s full path or
+  `generic_example.settings.ini`'s full repo path (not `(unsaved)`) on
+  the legacy/generic_example fallbacks respectively. Confirm it stays
+  readable (front-truncated, not wrapped/cut off) with a long path.

@@ -8,7 +8,7 @@ into REB_Settings_v1.ini, updating only the <scale> value inside each
 <axis id="..."> block. The rest of the file - including its header
 comment - is left untouched.
 
-Also offers to save any pending named .rebset changes (see
+Also offers to save any pending named .settings.ini changes (see
 docs/settings_file.md) - see prompt_save_pending_settings() below for
 why that lives here rather than in rosetta.py/the Settings tab itself.
 
@@ -43,10 +43,22 @@ SETTINGS_PATH = "/home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Setting
 # for why duplicating small constants across these two independent
 # scripts, rather than importing between them, is this codebase's
 # existing pattern for this exact split).
-PENDING_SETTINGS_PATH = "/home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Pending_Settings.rebset"
+PENDING_SETTINGS_PATH = "/home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Pending_Settings.settings.ini"
 LAST_SETTINGS_PATH_FILE = "/home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Last_Settings_Path.txt"
 REBSET_DEFAULT_DIR = os.path.expanduser("~/Documents")
-REBSET_EXTENSION = ".rebset"
+REBSET_EXTENSION = ".settings.ini"
+
+def _name_from_settings_path(path):
+    '''
+    Mirrors rosetta.py's function of the same name - see its docstring.
+    Not os.path.splitext(basename)[0]: that only strips the single final
+    suffix (".ini"), leaving ".settings" stuck to the name for this
+    extension specifically, since it has two dots.
+    '''
+    basename = os.path.basename(path)
+    if basename.endswith(REBSET_EXTENSION):
+        return basename[:-len(REBSET_EXTENSION)]
+    return os.path.splitext(basename)[0]
 
 def get_scale(stepgen_ch):
     hal_pin = "hm2_7i92.0.stepgen." + stepgen_ch + ".position-scale"
@@ -104,7 +116,7 @@ def main():
 
 def prompt_save_pending_settings():
     '''
-    If the Settings tab staged a pending .rebset snapshot (unsaved
+    If the Settings tab staged a pending .settings.ini snapshot (unsaved
     changes at the time of exit - see PENDING_SETTINGS_PATH in
     rosetta.py), ask whether to save it, then let the operator pick
     exactly where/under what name via a real Save-As file dialog -
@@ -175,7 +187,7 @@ def prompt_save_pending_settings():
         # The chosen filename is the name from here on - same rule
         # Settings_Save_As uses - so a rename via this dialog (or later,
         # outside the app) is reflected next time this file is loaded.
-        data["name"] = os.path.splitext(os.path.basename(path))[0]
+        data["name"] = _name_from_settings_path(path)
         try:
             with open(path, "w") as f:
                 json.dump(data, f, indent=2)

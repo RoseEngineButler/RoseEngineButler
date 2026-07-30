@@ -130,6 +130,23 @@
         <property name="vexpand">True</property>
         <property name="orientation">vertical</property>
         <child>
+          <object class="GtkLabel" id="Settings_File_Path">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="halign">start</property>
+            <property name="margin-start">4</property>
+            <property name="margin-top">4</property>
+            <property name="label" translatable="yes">Settings File: (unsaved)</property>
+            <property name="selectable">True</property>
+            <property name="ellipsize">start</property>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+            <property name="position">0</property>
+          </packing>
+        </child>
+        <child>
           <object class="GtkBox" id="Settings_Toolbar_Box">
             <property name="visible">True</property>
             <property name="can-focus">False</property>
@@ -183,6 +200,48 @@
               </packing>
             </child>
             <child>
+              <object class="GtkSeparator" id="Settings_Toolbar_Separator">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="orientation">vertical</property>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">3</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkButton" id="Export_Settings">
+                <property name="label" translatable="yes">Export Settings...</property>
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="receives-default">True</property>
+                <property name="tooltip-text" translatable="yes">Export a chosen subset (e.g. just one axis's Scale) to a small .export.ini file for sharing.</property>
+                <signal name="clicked" handler="Export_Settings" swapped="no"/>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">4</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkButton" id="Import_Settings">
+                <property name="label" translatable="yes">Import Settings...</property>
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="receives-default">True</property>
+                <property name="tooltip-text" translatable="yes">Import a .export.ini file, applying only the values it contains - everything else is left as-is.</property>
+                <signal name="clicked" handler="Import_Settings" swapped="no"/>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">5</property>
+              </packing>
+            </child>
+            <child>
               <object class="GtkLabel" id="Settings_Name">
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
@@ -196,14 +255,14 @@
               <packing>
                 <property name="expand">False</property>
                 <property name="fill">True</property>
-                <property name="position">3</property>
+                <property name="position">6</property>
               </packing>
             </child>
           </object>
           <packing>
             <property name="expand">False</property>
             <property name="fill">False</property>
-            <property name="position">0</property>
+            <property name="position">1</property>
           </packing>
         </child>
         <child>
@@ -258,7 +317,7 @@
           <packing>
             <property name="expand">False</property>
             <property name="fill">False</property>
-            <property name="position">1</property>
+            <property name="position">2</property>
           </packing>
         </child>
         <child>
@@ -1227,7 +1286,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
           <packing>
             <property name="expand">True</property>
             <property name="fill">True</property>
-            <property name="position">2</property>
+            <property name="position">3</property>
           </packing>
         </child>
       </object>
