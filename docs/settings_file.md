@@ -8,7 +8,7 @@ of their choosing (via a save dialog) and reload it later (via an open
 dialog), so it can be shared, backed up, or restored between sessions. It's
 written up front, with decisions from Chuck (CJP) recorded inline, so Rich
 and any future contributor can see why it's shaped this way before any
-`.ui`/`rosetta.py` changes land.
+`.ui`/`REB_main.py` changes land.
 
 ## How settings are persisted today
 
@@ -23,10 +23,10 @@ free-text `<usercomment>`. It is:
   `hm2_7i92.0.stepgen.NN.position-scale` HAL pins and patches just the
   `<scale>` values into the file with a regex, leaving everything else
   untouched. Axis comments are instead saved immediately, one axis at a
-  time, from `rosetta.py`'s `_save_axis_comment()` on each comment field's
+  time, from `REB_main.py`'s `_save_axis_comment()` on each comment field's
   focus-out.
 - **Read** automatically at Settings-tab / main-panel load, by
-  `rosetta.py`'s `_load_scale_settings()` (applies `<scale>` to both the
+  `REB_main.py`'s `_load_scale_settings()` (applies `<scale>` to both the
   Settings tab's spin buttons and the live HAL pins) and
   `_load_axis_comments()` (applies `<usercomment>` to the main panel's
   comment entries).
@@ -72,7 +72,7 @@ feature doesn't touch that path (see Decision 4 below for why).
 ```
 
 - `axes` keys match `AXIS_STEPGEN`'s keys (already the source of truth for
-  axis id ↔ stepgen channel in both `rosetta.py` and
+  axis id ↔ stepgen channel in both `REB_main.py` and
   `REB_Scale_Persist.py`). `comment` is only meaningful for
   `COMMENT_AXES = ("X","Z","U","V","W","B")`; omit it for `Sp0`/`Sp1`.
 - `name` and `notes` are the two new fields this feature adds beyond what
@@ -167,7 +167,7 @@ unsaved-changes flag, and record `path` as both the last-used file
 3. On confirm: `json.load()` the file.
    - Malformed JSON, missing `format_version`, or an unsupported version →
      `Gtk.MessageDialog` error (same pattern already used for the "No
-     spindle is enabled" warning near the top of `rosetta.py`), abort,
+     spindle is enabled" warning near the top of `REB_main.py`), abort,
      leave everything currently on screen/in HAL untouched.
 4. **Stop motion and disable every axis before applying anything**
    (Decision 3):
@@ -357,7 +357,7 @@ to pop a blocking dialog.
   (naming matches the existing `<Widget>_<Action>` convention).
 - `REB_Display/generic_example.settings.ini` — the shipped starter profile
   (Decision 5), tracked in this repo like any other config asset.
-- `REB_Display/rosetta.py`:
+- `REB_Display/REB_main.py`:
   - `Settings_Save(self, widget)` (no dialog if a file's already active,
     otherwise delegates to Save As) / `Settings_Save_As(self, widget)`
     (always shows the file chooser) / `Settings_Load(self, widget)`
@@ -366,7 +366,7 @@ to pop a blocking dialog.
     also shared with `_prompt_initial_settings_load` (Decision 5).
   - `REBSET_FORMAT_VERSION = 1`, `REBSET_DEFAULT_DIR =
     os.path.expanduser("~/Documents")`, `REBSET_GENERIC_EXAMPLE_PATH`
-    (resolved relative to `rosetta.py`'s own location, so it always finds
+    (resolved relative to `REB_main.py`'s own location, so it always finds
     the copy shipped alongside it regardless of where the repo is
     checked out), and `LAST_SETTINGS_PATH_FILE` (fixed
     `RoseEngineButlerLocal` path, same convention as `SETTINGS_PATH`).
@@ -383,7 +383,7 @@ to pop a blocking dialog.
   - Both new handlers need the same "only run in the component that owns
     these widgets" guard already used by `_load_scale_settings` /
     `_load_axis_comments` (`if self.builder.get_object(...) is None:
-    return`), since `rosetta.py` is loaded once per gladevcp instance
+    return`), since `REB_main.py` is loaded once per gladevcp instance
     across several tabs/panels.
   - Worth factoring a shared `_gather_axis_settings()` /
     `_apply_axis_settings(data)` pair that both the new `.settings.ini` path and
@@ -395,7 +395,7 @@ to pop a blocking dialog.
   `prompt_save_pending_settings()`, called at the end of `main()` after
   the existing scale-persist loop. Duplicates `PENDING_SETTINGS_PATH`,
   `LAST_SETTINGS_PATH_FILE`, `REBSET_DEFAULT_DIR`, `REBSET_EXTENSION`
-  from `rosetta.py` rather than importing between them - same reasoning
+  from `REB_main.py` rather than importing between them - same reasoning
   as `AXIS_STEPGEN` already being duplicated across both files. Its
   prompt is two Tkinter dialogs in sequence: `askyesno` ("Save changes to
   '<name>' settings file before exiting?"), then, if yes,
@@ -485,7 +485,7 @@ Save As pre-filled its suggested filename from the (already wrong)
 displayed name - a self-compounding bug on every subsequent save.
 
 Fixed by replacing every `os.path.splitext(...)` name-derivation with a
-shared `_name_from_settings_path(path)` (duplicated between `rosetta.py`
+shared `_name_from_settings_path(path)` (duplicated between `REB_main.py`
 and `REB_Scale_Persist.py`, same reasoning as `AXIS_STEPGEN`) that strips
 the *whole* `REBSET_EXTENSION` suffix as a literal string match, falling
 back to a plain `splitext` only for files that don't end in it (e.g. an
@@ -643,7 +643,7 @@ commit - the last point they shared):
   Verified after the fact: every original widget ID present exactly
   once, no duplicates, `<signal>`/`<object>` counts increased by exactly
   the 4 new widgets' worth.
-- `REB_Display/rosetta.py` merged automatically with **no conflicts**
+- `REB_Display/REB_main.py` merged automatically with **no conflicts**
   (git's 3-way merge), spot-checked afterward rather than trusted blind:
   `Sp0_Set_Scale`/`Sp1_Set_Scale` carry both his `STATE_ON` guard and my
   `_mark_settings_dirty()` call; `__init__` has both his Measurement

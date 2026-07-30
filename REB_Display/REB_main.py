@@ -13,7 +13,7 @@
 # LinuxCNC configuration for use with a Rose Engine
 #
 # File:
-#   rosetta.py
+#   REB_main.py
 #
 # Purpose:  This is used to handle buttons used in panels developed
 #   for Rose Engine Butler's use on LinuxCNC.
@@ -667,7 +667,7 @@ class HandlerClass:
 
         Only runs in the component that actually owns the Settings
         tab's spin buttons (X_Set_Scale etc.) - every other tab/panel
-        also using rosetta.py will find that widget missing and
+        also using REB_main.py will find that widget missing and
         return immediately.
         '''
         if self.builder.get_object("X_Set_Scale") is None:
@@ -723,7 +723,7 @@ class HandlerClass:
 
         Only runs in the component that actually owns the Settings
         tab's PID spin buttons (X_Set_P etc.) - every other tab/panel
-        also using rosetta.py will find that widget missing and
+        also using REB_main.py will find that widget missing and
         return immediately.
         '''
         if self.builder.get_object("X_Set_P") is None:
@@ -810,7 +810,7 @@ class HandlerClass:
 
         Only runs in the component that actually owns these Entry
         widgets (X_Comment etc., on the main REB_Panel) - every other
-        tab/panel also using rosetta.py will find that widget
+        tab/panel also using REB_main.py will find that widget
         missing and return immediately.
         '''
         if self.builder.get_object("X_Comment") is None:

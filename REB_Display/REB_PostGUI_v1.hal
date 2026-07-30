@@ -274,7 +274,7 @@ net w-enable                             => gladevcp.W_ENA-light
 # (with readers only - mux2.2/mux2.3/or2.0/or2.1) in REB.hal, since
 # their driver, the GladeVCP main panel's own pins, doesn't exist until
 # the panel process starts - same reason the ENA override pins above
-# are wired here rather than in REB.hal. See rosetta.py's
+# are wired here rather than in REB.hal. See REB_main.py's
 # _index_both_spindles_simultaneously and REB.hal's Sp0/Sp1 blocks.
 net Sp0-idx-angle                        <= gladevcp.Sp0-idx-angle
 net Sp0-idx-active                       <= gladevcp.Sp0-idx-active

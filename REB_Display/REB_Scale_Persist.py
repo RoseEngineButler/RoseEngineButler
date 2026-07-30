@@ -11,7 +11,7 @@ comment - is left untouched.
 Also persists each axis's/spindle loop's live P/I/D/FF0/FF1/FF2 pid.*
 gains the same way, into that axis's <pid> block (or <pid_pos>/<pid_vel>
 for the two spindle loops) - see PID_AXES/PID_SPINDLE_LOOPS below. These
-gains are set live from REB_Settings_v1.ini by rosetta.py's
+gains are set live from REB_Settings_v1.ini by REB_main.py's
 _load_pid_settings() at Settings-tab load and by each PID spin button's
 value-changed handler while running (see REB.hal for why they're no
 longer set from REB.ini directly), so this is the only place that
@@ -20,7 +20,7 @@ how scale already worked before PID gains were added to this file.
 
 Also offers to save any pending named .settings.ini changes (see
 docs/settings_file.md) - see prompt_save_pending_settings() below for
-why that lives here rather than in rosetta.py/the Settings tab itself.
+why that lives here rather than in REB_main.py/the Settings tab itself.
 
 Invoked from REB_Shutdown.hal:
     loadusr -w python3 REB_Display/REB_Scale_Persist.py
@@ -50,7 +50,7 @@ AXIS_STEPGEN = {
 SETTINGS_PATH = "/home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Settings_v1.ini"
 
 # Mirrors PID_AXES/PID_SPINDLE_LOOPS/PID_PARAM_PIN/PID_PARAMS in
-# rosetta.py (see AXIS_STEPGEN above for why these small constants are
+# REB_main.py (see AXIS_STEPGEN above for why these small constants are
 # duplicated across the two scripts rather than imported).
 PID_AXES = {
     "X": "pid.x",
@@ -74,7 +74,7 @@ PID_PARAM_PIN = {
 }
 PID_PARAMS = ("P", "I", "D", "FF0", "FF1", "FF2")
 
-# Mirrors the same-named constants in rosetta.py (see AXIS_STEPGEN above
+# Mirrors the same-named constants in REB_main.py (see AXIS_STEPGEN above
 # for why duplicating small constants across these two independent
 # scripts, rather than importing between them, is this codebase's
 # existing pattern for this exact split).
@@ -85,7 +85,7 @@ REBSET_EXTENSION = ".settings.ini"
 
 def _name_from_settings_path(path):
     '''
-    Mirrors rosetta.py's function of the same name - see its docstring.
+    Mirrors REB_main.py's function of the same name - see its docstring.
     Not os.path.splitext(basename)[0]: that only strips the single final
     suffix (".ini"), leaving ".settings" stuck to the name for this
     extension specifically, since it has two dots.
@@ -240,13 +240,13 @@ def prompt_save_pending_settings():
     '''
     If the Settings tab staged a pending .settings.ini snapshot (unsaved
     changes at the time of exit - see PENDING_SETTINGS_PATH in
-    rosetta.py), ask whether to save it, then let the operator pick
+    REB_main.py), ask whether to save it, then let the operator pick
     exactly where/under what name via a real Save-As file dialog -
     both so they can see where it's going to land, and so they can
     rename it right there instead of only being able to accept the
     system-picked default.
 
-    This has to live here, not in rosetta.py/the Settings tab's own GTK
+    This has to live here, not in REB_main.py/the Settings tab's own GTK
     process: a delete-event/destroy hook on that component's own window
     does not fire on a real AXIS exit (confirmed live) - AXIS tears
     embedded tabs down by yanking their X window out from under them,
