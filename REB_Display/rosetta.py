@@ -562,6 +562,52 @@ class HandlerClass:
 
         return False
 
+    def _redirect_scroll_to_viewport(self, widget, event):
+        '''
+        scroll_entries above only fires for "windowless" widgets (Labels,
+        empty grid cells) - anything with its own GdkWindow, like a
+        GtkSpinButton or GtkComboBox, receives a scroll-event directly
+        and never lets it reach the viewport at all, since GTK delivers
+        the event straight to the most specific window under the
+        pointer rather than bubbling it up through the container
+        hierarchy. That widget's own built-in class handler then runs
+        its default scroll behavior (increment/decrement a spin button,
+        change a combo box's selection) instead.
+
+        With the Settings tab's grid now almost entirely full of spin
+        buttons (Scale + PID gains), that left almost no surface left to
+        actually scroll the page from - hence wiring this onto every
+        spin button/combo box individually (see
+        _install_viewport_scroll_redirect) rather than relying on
+        scroll_entries alone. A broader attempt at wiring *every* widget
+        in the subtree (labels, grids, boxes) was tried and made things
+        worse - it broke scrolling over spin buttons too, for reasons
+        not fully understood - so this deliberately stays scoped to just
+        the input widgets. Settled behavior: scrolling works over spin
+        buttons/combo boxes; it does not work over the surrounding
+        labels/empty grid space.
+        '''
+        viewport = widget.get_ancestor(Gtk.Viewport)
+        if viewport is None:
+            return False
+        return self.scroll_entries(viewport, event)
+
+    def _install_viewport_scroll_redirect(self, container):
+        '''
+        Recursively wires _redirect_scroll_to_viewport onto every spin
+        button/combo box under container (see that method's docstring
+        for why). Called once from __init__ on the Settings tab's own
+        scrollable viewport - harmless/no-op everywhere else, since
+        every other tab/panel's viewport (if it has one at all) has far
+        fewer, more sparsely-packed input widgets and get_children()
+        simply returns less to walk.
+        '''
+        for child in container.get_children():
+            if isinstance(child, (Gtk.SpinButton, Gtk.ComboBox)):
+                child.connect("scroll-event", self._redirect_scroll_to_viewport)
+            if isinstance(child, Gtk.Container):
+                self._install_viewport_scroll_redirect(child)
+
     def _set_checkbox_active(self, widget_id, active):
         '''
         Forces a checkbox to the given state. Only the main panel
@@ -3559,6 +3605,16 @@ class HandlerClass:
         # the component that owns these widgets.
         if self.builder.get_object("X_Set_Scale") is not None:
             GLib.idle_add(self._prompt_initial_settings_load)
+
+        # Let the mouse wheel scroll the page even when the cursor is
+        # over one of its many spin buttons/combo boxes, rather than only
+        # working over the shrinking gaps between them - see
+        # _redirect_scroll_to_viewport. No-op wherever there's no
+        # "viewport1" (every tab/panel other than the ones that embed a
+        # GtkScrolledWindow).
+        viewport = self.builder.get_object("viewport1")
+        if viewport is not None:
+            self._install_viewport_scroll_redirect(viewport)
 
         # Input pin fed from the existing "machine-is-on" HAL signal
         # (net machine-is-on => gladevcp.machine-is-on in
