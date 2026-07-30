@@ -94,6 +94,14 @@ AXIS_STEPGEN = {
 
 SETTINGS_PATH = "/home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Settings_v1.ini"
 
+# REB.ini lives in this repo (one directory up from REB_Display/), not in
+# RoseEngineButlerLocal - computed from this file's own location rather than
+# hardcoded like SETTINGS_PATH above, since this repo (unlike the Local
+# sibling) is expected to be relocatable/clonable.
+REB_INI_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "REB.ini"
+)
+
 # User-facing, explicitly named/located settings snapshots (see
 # docs/settings_file.md) - separate from and in addition to the automatic,
 # fixed-path REB_Settings_v1.ini above. format_version is written into
@@ -239,6 +247,110 @@ def _show_settings_error(widget, message):
     )
     dialog.run()
     dialog.destroy()
+
+def _show_restart_required_popup(widget):
+    dialog = Gtk.MessageDialog(
+        transient_for=widget.get_toplevel(),
+        flags=0,
+        message_type=Gtk.MessageType.INFO,
+        buttons=Gtk.ButtonsType.OK,
+        text="Restart required",
+    )
+    dialog.format_secondary_text(
+        "The Measurement System change will not take effect until you exit "
+        "and restart LinuxCNC."
+    )
+    dialog.run()
+    dialog.destroy()
+
+def _save_measurement_system(system):
+    '''
+    Persists the Measurement System choice ("Metric"/"Imperial") into
+    REB_Settings_v1.ini, the same silent, automatic settings file that
+    _load_scale_settings/_load_axis_comments already read/write - see
+    docs/settings_file.md for why this file (rather than a .rebset) is
+    the right home for machine-level state like this.
+    '''
+    try:
+        with open(SETTINGS_PATH, "r") as f:
+            xml_text = f.read()
+    except OSError as e:
+        print("Could not read " + SETTINGS_PATH + ": " + str(e))
+        return
+
+    if re.search(r'<measurement_system>(Metric|Imperial)</measurement_system>', xml_text):
+        new_text, count = re.subn(
+            r'<measurement_system>(Metric|Imperial)</measurement_system>',
+            "<measurement_system>" + system + "</measurement_system>",
+            xml_text,
+            count=1
+        )
+    else:
+        new_text, count = re.subn(
+            r'(<settings>)',
+            r'\1\n    <measurement_system>' + system + '</measurement_system>',
+            xml_text,
+            count=1
+        )
+
+    if count == 0:
+        print("Could not find a place to store <measurement_system> in " + SETTINGS_PATH)
+        return
+
+    try:
+        with open(SETTINGS_PATH, "w") as f:
+            f.write(new_text)
+        print("Saved measurement_system = " + system)
+    except OSError as e:
+        print("Could not write " + SETTINGS_PATH + ": " + str(e))
+
+def _apply_measurement_system_to_ini(system):
+    '''
+    Patches REB.ini's [TRAJ] LINEAR_UNITS and each linear [JOINT_n]'s UNITS
+    to match the chosen Measurement System. Only takes effect on the next
+    LinuxCNC start (REB.ini is read once at launch) - see
+    _show_restart_required_popup, shown right after this runs.
+
+    Matches the file's existing casing convention: LINEAR_UNITS lowercase
+    ("inch"/"mm"), per-joint UNITS uppercase ("INCH"/"MM") - both accepted
+    case-insensitively by LinuxCNC, kept this way only for consistency with
+    what was already there. JOINT_2 (B, angular) uses UNITS = DEGREE and is
+    never matched by the INCH/MM pattern below, so it's left untouched.
+    '''
+    try:
+        with open(REB_INI_PATH, "r") as f:
+            text = f.read()
+    except OSError as e:
+        print("Could not read " + REB_INI_PATH + ": " + str(e))
+        return
+
+    if system == "Metric":
+        linear_units, joint_units = "mm", "MM"
+    else:
+        linear_units, joint_units = "inch", "INCH"
+
+    new_text, n1 = re.subn(
+        r'(?m)^(LINEAR_UNITS\s*= )\S+',
+        lambda m: m.group(1) + linear_units,
+        text,
+        count=1
+    )
+    if n1 == 0:
+        print("LINEAR_UNITS line not found in " + REB_INI_PATH)
+
+    new_text, n2 = re.subn(
+        r'(?m)^(UNITS\s*= )(INCH|MM)$',
+        lambda m: m.group(1) + joint_units,
+        new_text
+    )
+
+    try:
+        with open(REB_INI_PATH, "w") as f:
+            f.write(new_text)
+        print("Updated " + str(n1) + " LINEAR_UNITS line(s) and " + str(n2)
+              + " UNITS line(s) in " + REB_INI_PATH)
+    except OSError as e:
+        print("Could not write " + REB_INI_PATH + ": " + str(e))
 
 # The indexing Fwd/Rev handlers block on c.wait_complete() for as long as
 # each M19 takes to converge (or time out), which otherwise leaves the UI
@@ -501,6 +613,60 @@ class HandlerClass:
 
             widget.set_text(unescape(match.group(1)))
 
+    def _apply_measurement_system_labels(self, system):
+        '''
+        Sets the feed-rate/indexing-distance unit labels on the main panel
+        (X/Z/U/V/W's "in / min" and "in" labels) and the scale unit labels
+        on the Settings tab (X/Z/U/V/W's "pulses / in" labels) to match
+        the given system ("Metric" or "Imperial"). Whichever labels this
+        component doesn't own (builder.get_object returns None) are
+        silently skipped - same no-op-in-the-wrong-component pattern as
+        _load_scale_settings/_load_axis_comments.
+        '''
+        if system == "Metric":
+            feed_uom, dist_uom, scale_uom = "mm / min", "mm", "pulses / mm"
+        else:
+            feed_uom, dist_uom, scale_uom = "in / min", "in", "pulses / in"
+
+        for axis_id in LINEAR_AXES:
+            feed_label = self.builder.get_object(axis_id + "_Feed_UOM")
+            if feed_label is not None:
+                feed_label.set_text(feed_uom)
+
+            dist_label = self.builder.get_object(axis_id + "_IdxDist_UOM")
+            if dist_label is not None:
+                dist_label.set_text(dist_uom)
+
+            scale_label = self.builder.get_object(axis_id + "_Scale_UOM")
+            if scale_label is not None:
+                scale_label.set_text(scale_uom)
+
+    def _load_measurement_system(self):
+        '''
+        Reads the persisted Measurement System ("Metric"/"Imperial", default
+        "Imperial" if absent - matching REB.ini's shipped inch/INCH default)
+        from REB_Settings_v1.ini, applies it to the Settings tab's combo box
+        (if this component owns it) and to whichever unit-of-measure labels
+        this component owns (see _apply_measurement_system_labels).
+        '''
+        system = "Imperial"
+        try:
+            with open(SETTINGS_PATH, "r") as f:
+                xml_text = f.read()
+            match = re.search(r'<measurement_system>(Metric|Imperial)</measurement_system>', xml_text)
+            if match:
+                system = match.group(1)
+        except OSError as e:
+            print("Could not read " + SETTINGS_PATH + ": " + str(e))
+
+        combo = self.builder.get_object("Measurement_System")
+        if combo is not None:
+            self._applying_measurement_system = True
+            combo.set_active(0 if system == "Metric" else 1)
+            self._applying_measurement_system = False
+
+        self._apply_measurement_system_labels(system)
+
     def _save_axis_comment(self, axis_id, text):
         '''
         Writes a single axis's comment back into REB_Settings_v1.ini,
@@ -739,6 +905,37 @@ class HandlerClass:
         # self._applying_settings check is what keeps that from re-dirtying
         # the settings that were just loaded.
         self._mark_settings_dirty()
+
+#######################################################################
+# Measurement_System_Changed
+# Purpose:              User picked Metric or Imperial in the Settings
+#                           tab's "Other" section. Updates this
+#                           component's own unit-of-measure labels for
+#                           immediate feedback, persists the choice to
+#                           REB_Settings_v1.ini, patches REB.ini's
+#                           LINEAR_UNITS/UNITS, and warns that a restart
+#                           is needed for the new units to actually take
+#                           effect (REB.ini is only read at LinuxCNC
+#                           startup).
+# Updated:              ver 1.0, 30 July 2026, Claude
+# ---------------------------------------------------------------------
+# Called from:
+#   UI:                 REB_Tab_Settings_v1
+#   Widget:              Measurement_System  (GtkComboBoxText)
+#   Signal:              GtkComboBoxText/changed
+#######################################################################
+    def Measurement_System_Changed(self, widget):
+        if self._applying_measurement_system:
+            return
+
+        system = widget.get_active_text()
+        if system not in ("Metric", "Imperial"):
+            return
+
+        self._apply_measurement_system_labels(system)
+        _save_measurement_system(system)
+        _apply_measurement_system_to_ini(system)
+        _show_restart_required_popup(widget)
 
 #######################################################################
 # Settings_Save
@@ -2574,6 +2771,13 @@ class HandlerClass:
         self._settings_name     = None
         self._settings_path     = None  # current file for plain Settings_Save; None -> behaves like Save As
 
+        # Suppresses Measurement_System_Changed's save/patch/popup while
+        # _load_measurement_system is itself the one driving the combo box
+        # at startup (see combo.set_active there) - a startup load should
+        # not re-save REB_Settings_v1.ini, re-patch REB.ini, or pop up the
+        # restart notice.
+        self._applying_measurement_system = False
+
         _install_depress_css()
 
         # Independent pins this component owns, used to force each
@@ -2617,6 +2821,12 @@ class HandlerClass:
         # component other than the main panel (gladevcp), which is the
         # only one with these widgets.
         self._load_axis_comments()
+
+        # Restore the persisted Measurement System (REB_Settings_v1.ini)
+        # into the Settings tab's combo box (if owned by this component)
+        # and the unit-of-measure labels this component owns on either
+        # the main panel or the Settings tab.
+        self._load_measurement_system()
 
         # There's no stored "last loaded .rebset" carried across restarts
         # (only the auto-persisted REB_Settings_v1.ini values, already
