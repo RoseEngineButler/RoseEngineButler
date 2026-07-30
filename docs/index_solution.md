@@ -286,7 +286,7 @@ on the Indexing panel visibly existed but did nothing; both spindles
 (before Problem 8) or just Sp0 (after Problem 8) always moved regardless
 of which boxes were checked. Compounding this, the Python defaults for
 those two variables were `False`, while the corresponding GTK checkboxes
-(`Sp0_Set_Idx_OnOff`/`Sp1_Set_Idx_OnOff` in `REB_Panel_v2.ui`) default to
+(`Sp0_Set_Idx_OnOff`/`Sp1_Set_Idx_OnOff` in `REB_Panel_v1.ui`) default to
 **checked** (`active=True`) — so even if the checkboxes had been wired up
 naively, a freshly-started GUI would show both boxes checked while the
 underlying state said "don't index," until each box was toggled once.

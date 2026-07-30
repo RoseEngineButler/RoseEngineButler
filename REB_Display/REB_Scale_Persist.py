@@ -8,6 +8,16 @@ into REB_Settings_v1.ini, updating only the <scale> value inside each
 <axis id="..."> block. The rest of the file - including its header
 comment - is left untouched.
 
+Also persists each axis's/spindle loop's live P/I/D/FF0/FF1/FF2 pid.*
+gains the same way, into that axis's <pid> block (or <pid_pos>/<pid_vel>
+for the two spindle loops) - see PID_AXES/PID_SPINDLE_LOOPS below. These
+gains are set live from REB_Settings_v1.ini by rosetta.py's
+_load_pid_settings() at Settings-tab load and by each PID spin button's
+value-changed handler while running (see REB.hal for why they're no
+longer set from REB.ini directly), so this is the only place that
+carries a retuned gain forward into the next session - exactly mirroring
+how scale already worked before PID gains were added to this file.
+
 Also offers to save any pending named .rebset changes (see
 docs/settings_file.md) - see prompt_save_pending_settings() below for
 why that lives here rather than in rosetta.py/the Settings tab itself.
@@ -39,6 +49,31 @@ AXIS_STEPGEN = {
 
 SETTINGS_PATH = "/home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Settings_v1.ini"
 
+# Mirrors PID_AXES/PID_SPINDLE_LOOPS/PID_PARAM_PIN/PID_PARAMS in
+# rosetta.py (see AXIS_STEPGEN above for why these small constants are
+# duplicated across the two scripts rather than imported).
+PID_AXES = {
+    "X": "pid.x",
+    "Z": "pid.z",
+    "B": "pid.b",
+    "U": "pid.u",
+    "V": "pid.v",
+    "W": "pid.w",
+}
+PID_SPINDLE_LOOPS = {
+    "Sp0": {"Pos": "pid.p0", "Vel": "pid.s0"},
+    "Sp1": {"Pos": "pid.p1", "Vel": "pid.s1"},
+}
+PID_PARAM_PIN = {
+    "P":   "Pgain",
+    "I":   "Igain",
+    "D":   "Dgain",
+    "FF0": "FF0",
+    "FF1": "FF1",
+    "FF2": "FF2",
+}
+PID_PARAMS = ("P", "I", "D", "FF0", "FF1", "FF2")
+
 # Mirrors the same-named constants in rosetta.py (see AXIS_STEPGEN above
 # for why duplicating small constants across these two independent
 # scripts, rather than importing between them, is this codebase's
@@ -57,6 +92,58 @@ def get_scale(stepgen_ch):
         text=True
     )
     return result.stdout.strip()
+
+def get_pid_gain(hal_component, param):
+    hal_pin = hal_component + "." + PID_PARAM_PIN[param]
+    result = subprocess.run(
+        ["halcmd", "getp", hal_pin],
+        check=True,
+        capture_output=True,
+        text=True
+    )
+    return result.stdout.strip()
+
+def set_pid_block(xml_text, axis_id, block_tag, values):
+    '''
+    Patches P/I/D/FF0/FF1/FF2 values into a specific axis's <pid> (or
+    <pid_pos>/<pid_vel>) block, leaving everything else in the file -
+    including any other block on that same axis - untouched. Returns
+    (new_xml_text, ok).
+    '''
+    axis_match = re.search(
+        r'<axis\s+id="' + re.escape(axis_id) + r'">.*?</axis>',
+        xml_text, re.DOTALL
+    )
+    if not axis_match:
+        print("No <axis id=\"" + axis_id + "\"> entry found in "
+              + SETTINGS_PATH + " - leaving it unchanged")
+        return xml_text, False
+
+    axis_block = axis_match.group(0)
+    block_match = re.search(
+        r'<' + block_tag + r'>.*?</' + block_tag + r'>',
+        axis_block, re.DOTALL
+    )
+    if not block_match:
+        print("No <" + block_tag + "> entry found for axis " + axis_id
+              + " in " + SETTINGS_PATH + " - leaving it unchanged")
+        return xml_text, False
+
+    pid_block = block_match.group(0)
+    for param, value in values.items():
+        pid_block, count = re.subn(
+            r'(<' + param + r'>)-?[\d.]+(</' + param + r'>)',
+            r'\g<1>' + value + r'\g<2>',
+            pid_block, count=1
+        )
+        if count == 0:
+            print("No <" + param + "> entry found in axis " + axis_id + "'s <"
+                  + block_tag + "> block in " + SETTINGS_PATH + " - leaving it unchanged")
+            return xml_text, False
+
+    new_axis_block = axis_block[:block_match.start()] + pid_block + axis_block[block_match.end():]
+    new_xml_text = xml_text[:axis_match.start()] + new_axis_block + xml_text[axis_match.end():]
+    return new_xml_text, True
 
 def main():
     try:
@@ -91,6 +178,41 @@ def main():
 
         xml_text = new_text
         print("Saved " + axis_id + " scale = " + value)
+
+    for axis_id, hal_component in PID_AXES.items():
+        values = {}
+        try:
+            for param in PID_PARAMS:
+                values[param] = get_pid_gain(hal_component, param)
+        except subprocess.CalledProcessError as e:
+            print("Error reading PID gains for axis " + axis_id + ": " + e.stderr)
+            continue
+        except FileNotFoundError:
+            print("halcmd not found - is the LinuxCNC environment sourced?")
+            sys.exit(1)
+
+        xml_text, ok = set_pid_block(xml_text, axis_id, "pid", values)
+        if ok:
+            print("Saved " + axis_id + " PID gains = " + str(values))
+
+    for spindle_id, loops in PID_SPINDLE_LOOPS.items():
+        for suffix, hal_component in loops.items():
+            block_tag = "pid_pos" if suffix == "Pos" else "pid_vel"
+            values = {}
+            try:
+                for param in PID_PARAMS:
+                    values[param] = get_pid_gain(hal_component, param)
+            except subprocess.CalledProcessError as e:
+                print("Error reading " + suffix + " PID gains for " + spindle_id
+                      + ": " + e.stderr)
+                continue
+            except FileNotFoundError:
+                print("halcmd not found - is the LinuxCNC environment sourced?")
+                sys.exit(1)
+
+            xml_text, ok = set_pid_block(xml_text, spindle_id, block_tag, values)
+            if ok:
+                print("Saved " + spindle_id + " " + suffix + " PID gains = " + str(values))
 
     try:
         with open(SETTINGS_PATH, "w") as f:

@@ -13,7 +13,7 @@
 # LinuxCNC configuration for use with a Rose Engine					  #
 #																	  #
 # File:																  #
-#   REB_PostGUI.hal									  #
+#   REB_PostGUI_v1.hal									  #
 #																	  #
 # Purpose:															  #
 #   This is used to setup hardware abstraction layer for LinuxCNC.	  #
@@ -268,9 +268,23 @@ net w-enable                             <= w-ena-and.out
 net w-enable                             => gladevcp.W_ENA-light
 
 # ******************************************
+# Sp0/Sp1 simultaneous indexing
+
+# Sp0-idx-angle/Sp0-idx-active/Sp1-idx-angle/Sp1-idx-active are created
+# (with readers only - mux2.2/mux2.3/or2.0/or2.1) in REB.hal, since
+# their driver, the GladeVCP main panel's own pins, doesn't exist until
+# the panel process starts - same reason the ENA override pins above
+# are wired here rather than in REB.hal. See rosetta.py's
+# _index_both_spindles_simultaneously and REB.hal's Sp0/Sp1 blocks.
+net Sp0-idx-angle                        <= gladevcp.Sp0-idx-angle
+net Sp0-idx-active                       <= gladevcp.Sp0-idx-active
+net Sp1-idx-angle                        <= gladevcp.Sp1-idx-angle
+net Sp1-idx-active                       <= gladevcp.Sp1-idx-active
+
+# ******************************************
 # Main panel enable/disable
 
-# Grays out the whole main panel (REB_Panel_v2.ui) until the machine
+# Grays out the whole main panel (REB_Panel_v1.ui) until the machine
 # is powered on. machine-is-on is defined in REB.hal, driven by
 # halui.machine.is-on.
 net machine-is-on                        => gladevcp.machine-is-on
