@@ -425,6 +425,10 @@
     <property name="vexpand">True</property>
     <child>
       <object class="GtkBox" id="Settings_Outer_Box">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="vexpand">True</property>
+                <property name="orientation">vertical</property>
                 <child>
   <object class="GtkLabel" id="Settings_File_Path">
     <property name="visible">True</property>
@@ -441,11 +445,7 @@
     <property name="fill">False</property>
     <property name="position">0</property>
   </packing>
-</child><property name="visible">True</property>
-                <property name="can-focus">False</property>
-                <property name="vexpand">True</property>
-                <property name="orientation">vertical</property>
-                <child>
+</child><child>
                   <object class="GtkBox" id="Settings_Toolbar_Box">
                     <property name="visible">True</property>
                     <property name="can-focus">False</property>
