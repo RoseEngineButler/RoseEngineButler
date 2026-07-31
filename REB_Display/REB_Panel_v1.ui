@@ -168,14 +168,14 @@
     <property name="upper">10</property>
     <property name="value">1</property>
     <property name="step-increment">0.01</property>
-    <property name="page-increment">1.00</property>
+    <property name="page-increment">1</property>
   </object>
   <object class="GtkAdjustment" id="Sp1_Feed_Rate">
     <property name="lower">-1000</property>
     <property name="upper">1000</property>
     <property name="value">100</property>
     <property name="step-increment">0.01</property>
-    <property name="page-increment">5.00</property>
+    <property name="page-increment">5</property>
   </object>
   <object class="GtkAdjustment" id="Sp_Idx_Dis">
     <property name="upper">720</property>
@@ -260,12 +260,12 @@
           <!-- n-columns=14 n-rows=22 -->
           <object class="GtkGrid" id="MainGrid">
             <property name="visible">True</property>
+            <property name="sensitive">False</property>
             <property name="can-focus">False</property>
             <property name="halign">start</property>
             <property name="valign">start</property>
             <property name="margin-top">4</property>
             <property name="vexpand">True</property>
-            <property name="sensitive">False</property>
             <child>
               <object class="HAL_LightButton" id="Sp0_ENA">
                 <property name="visible">True</property>
@@ -929,7 +929,7 @@
                 <property name="can-focus">False</property>
                 <property name="halign">start</property>
                 <property name="hexpand">True</property>
-                <property name="label" translatable="yes">Alpha Version - 27 Jul 26</property>
+                <property name="label" translatable="yes">REB O/S 1.0 - alpha 31 July 2026</property>
                 <property name="justify">right</property>
                 <property name="width-chars">9</property>
                 <attributes>
