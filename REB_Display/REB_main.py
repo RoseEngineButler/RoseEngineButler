@@ -1495,6 +1495,13 @@ class HandlerClass:
         last_path = self._read_last_settings_path()
         if last_path and os.path.isfile(last_path):
             if self._load_settings_file(widget, last_path):
+                # _load_settings_file alone doesn't set self._settings_path
+                # (only Save/Save As/the Load button do, via
+                # _write_last_settings_path) - without this, a plain Save
+                # would always fall through to Settings_Save_As's file
+                # picker for the rest of the session, since it looked
+                # exactly like "no file active yet".
+                self._write_last_settings_path(last_path)
                 print("Reloaded last-used settings from " + last_path)
                 return False
             print("Could not reload last-used settings (" + last_path
