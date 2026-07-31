@@ -195,7 +195,7 @@ setp hm2_7i92.0.stepgen.04.maxvel           [JOINT_0]STEPGEN_MAXVEL
 setp pid.x.error-previous-target            true
 
 # P/I/D/FF0/FF1/FF2 below are now set live from REB_Settings_v1.ini by
-# rosetta.py (Settings tab "Stepper Motor Settings" section), not from
+# REB_main.py (Settings tab "Stepper Motor Settings" section), not from
 # this ini value, so the operator can retune them without restarting
 # LinuxCNC. REB_Scale_Persist.py writes the live values back into
 # REB_Settings_v1.ini at shutdown, the same as it already does for
@@ -307,7 +307,7 @@ setp hm2_7i92.0.stepgen.01.maxvel           [JOINT_1]STEPGEN_MAXVEL
 setp pid.z.error-previous-target            true
 
 # P/I/D/FF0/FF1/FF2 below are now set live from REB_Settings_v1.ini by
-# rosetta.py (Settings tab "Stepper Motor Settings" section), not from
+# REB_main.py (Settings tab "Stepper Motor Settings" section), not from
 # this ini value, so the operator can retune them without restarting
 # LinuxCNC. REB_Scale_Persist.py writes the live values back into
 # REB_Settings_v1.ini at shutdown, the same as it already does for
@@ -401,7 +401,7 @@ setp hm2_7i92.0.stepgen.05.maxvel           [JOINT_2]STEPGEN_MAXVEL
 setp pid.b.error-previous-target            true
 
 # P/I/D/FF0/FF1/FF2 below are now set live from REB_Settings_v1.ini by
-# rosetta.py (Settings tab "Stepper Motor Settings" section), not from
+# REB_main.py (Settings tab "Stepper Motor Settings" section), not from
 # this ini value, so the operator can retune them without restarting
 # LinuxCNC. REB_Scale_Persist.py writes the live values back into
 # REB_Settings_v1.ini at shutdown, the same as it already does for
@@ -494,7 +494,7 @@ setp hm2_7i92.0.stepgen.02.maxvel           [JOINT_3]STEPGEN_MAXVEL
 setp pid.u.error-previous-target            true
 
 # P/I/D/FF0/FF1/FF2 below are now set live from REB_Settings_v1.ini by
-# rosetta.py (Settings tab "Stepper Motor Settings" section), not from
+# REB_main.py (Settings tab "Stepper Motor Settings" section), not from
 # this ini value, so the operator can retune them without restarting
 # LinuxCNC. REB_Scale_Persist.py writes the live values back into
 # REB_Settings_v1.ini at shutdown, the same as it already does for
@@ -587,7 +587,7 @@ setp hm2_7i92.0.stepgen.03.maxvel           [JOINT_4]STEPGEN_MAXVEL
 setp pid.v.error-previous-target            true
 
 # P/I/D/FF0/FF1/FF2 below are now set live from REB_Settings_v1.ini by
-# rosetta.py (Settings tab "Stepper Motor Settings" section), not from
+# REB_main.py (Settings tab "Stepper Motor Settings" section), not from
 # this ini value, so the operator can retune them without restarting
 # LinuxCNC. REB_Scale_Persist.py writes the live values back into
 # REB_Settings_v1.ini at shutdown, the same as it already does for
@@ -687,7 +687,7 @@ setp hm2_7i92.0.stepgen.00.maxvel           [JOINT_5]STEPGEN_MAXVEL
 setp pid.w.error-previous-target            true
 
 # P/I/D/FF0/FF1/FF2 below are now set live from REB_Settings_v1.ini by
-# rosetta.py (Settings tab "Stepper Motor Settings" section), not from
+# REB_main.py (Settings tab "Stepper Motor Settings" section), not from
 # this ini value, so the operator can retune them without restarting
 # LinuxCNC. REB_Scale_Persist.py writes the live values back into
 # REB_Settings_v1.ini at shutdown, the same as it already does for
@@ -738,9 +738,9 @@ net machine-is-on                        => hm2_7i92.0.stepgen.06.enable
 
 # orient.0.angle now comes through mux2.2 instead of straight from
 # spindle.0.orient-angle, so it can be driven either by M19 (the normal
-# single-spindle path, mux2.2.in0, sel=FALSE) or by rosetta.py's
+# single-spindle path, mux2.2.in0, sel=FALSE) or by REB_main.py's
 # simultaneous Sp0+Sp1 index path (mux2.2.in1, sel=TRUE) - see
-# Sp0_Idx_Active/Sp1_Idx_Active in rosetta.py and the matching Sp1 block
+# Sp0_Idx_Active/Sp1_Idx_Active in REB_main.py and the matching Sp1 block
 # below. orient.0.mode is hardwired below instead of following
 # spindle.0.orient-mode - both paths only ever use shortest-path (mode 0,
 # same as M19's existing "P0").
@@ -805,7 +805,7 @@ net spindle.0-pos-cmd                   <=  orient.0.command
 net spindle.0-pos-cmd                    => pid.p0.command
 
 # spindle.0-pos-mode-enable is now the OR of the M19-driven enable
-# (spindle.0.orient, or2.0.in0) and rosetta.py's simultaneous
+# (spindle.0.orient, or2.0.in0) and REB_main.py's simultaneous
 # Sp0+Sp1 index path (Sp0-idx-active, or2.0.in1 - same bit used to
 # select mux2.2 above) - either path enables the same orient/PID/mux
 # chain identically, only the trigger source differs.
@@ -858,7 +858,7 @@ setp hm2_7i92.0.stepgen.06.maxvel           [SPINDLE_0]STEPGEN_MAXVEL
 setp pid.s0.error-previous-target           true
 
 # P/I/D/FF0/FF1/FF2 below are now set live from REB_Settings_v1.ini by
-# rosetta.py (Settings tab "Stepper Motor Settings" section), not from
+# REB_main.py (Settings tab "Stepper Motor Settings" section), not from
 # this ini value, so the operator can retune them without restarting
 # LinuxCNC. REB_Scale_Persist.py writes the live values back into
 # REB_Settings_v1.ini at shutdown, the same as it already does for
@@ -872,7 +872,7 @@ setp pid.p0.bias                            [SPINDLE_0]BIAS_POS
 # setp pid.p0.FF2                             [SPINDLE_0]FF2_POS
 setp orient.0.tolerance                     [SPINDLE_0]ORIENT_TOLERANCE
 # Hardwired shortest-path (see man orient) - both the M19 path (which has
-# always sent P0/shortest-path) and rosetta.py's simultaneous index path
+# always sent P0/shortest-path) and REB_main.py's simultaneous index path
 # only ever want this, so orient.0.mode no longer follows
 # spindle.0.orient-mode - it's simply always 0.
 setp orient.0.mode                          0
@@ -880,7 +880,7 @@ setp pid.p0.maxoutput                       [SPINDLE_0]MAX_OUTPUT_POS
 setp pid.p0.maxerrorI                       [SPINDLE_0]MAX_ERROR_I_POS
 
 # P/I/D/FF0/FF1/FF2 below are now set live from REB_Settings_v1.ini by
-# rosetta.py (Settings tab "Stepper Motor Settings" section), not from
+# REB_main.py (Settings tab "Stepper Motor Settings" section), not from
 # this ini value, so the operator can retune them without restarting
 # LinuxCNC. REB_Scale_Persist.py writes the live values back into
 # REB_Settings_v1.ini at shutdown, the same as it already does for
@@ -931,7 +931,7 @@ addf or2.1                                  servo-thread
 net machine-is-on                        => hm2_7i92.0.stepgen.07.enable
 
 # See the matching Sp0 block above for why orient.1.angle now comes
-# through mux2.3 (M19 vs rosetta.py's simultaneous Sp0+Sp1 index path)
+# through mux2.3 (M19 vs REB_main.py's simultaneous Sp0+Sp1 index path)
 # and orient.1.mode is hardwired below instead of following
 # spindle.1.orient-mode.
 net spindle.1-orient-angle-m19          <=  spindle.1.orient-angle
@@ -978,7 +978,7 @@ net spindle.1-pos-cmd                   <=  orient.1.command
 net spindle.1-pos-cmd                    => pid.p1.command
 
 # See the matching Sp0 block above - spindle.1-pos-mode-enable is now the
-# OR of the M19-driven enable and rosetta.py's simultaneous index path.
+# OR of the M19-driven enable and REB_main.py's simultaneous index path.
 net spindle.1-orient-m19                <=  spindle.1.orient
 net spindle.1-orient-m19                 => or2.1.in0
 
@@ -1033,7 +1033,7 @@ setp hm2_7i92.0.stepgen.07.maxvel           [SPINDLE_1]STEPGEN_MAXVEL
 setp pid.s1.error-previous-target           true
 
 # P/I/D/FF0/FF1/FF2 below are now set live from REB_Settings_v1.ini by
-# rosetta.py (Settings tab "Stepper Motor Settings" section), not from
+# REB_main.py (Settings tab "Stepper Motor Settings" section), not from
 # this ini value, so the operator can retune them without restarting
 # LinuxCNC. REB_Scale_Persist.py writes the live values back into
 # REB_Settings_v1.ini at shutdown, the same as it already does for
@@ -1052,7 +1052,7 @@ setp pid.p1.maxoutput                       [SPINDLE_1]MAX_OUTPUT_POS
 setp pid.p1.maxerrorI                       [SPINDLE_1]MAX_ERROR_I_POS
 
 # P/I/D/FF0/FF1/FF2 below are now set live from REB_Settings_v1.ini by
-# rosetta.py (Settings tab "Stepper Motor Settings" section), not from
+# REB_main.py (Settings tab "Stepper Motor Settings" section), not from
 # this ini value, so the operator can retune them without restarting
 # LinuxCNC. REB_Scale_Persist.py writes the live values back into
 # REB_Settings_v1.ini at shutdown, the same as it already does for
