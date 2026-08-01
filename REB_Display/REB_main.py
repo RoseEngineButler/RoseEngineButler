@@ -355,7 +355,7 @@ def _show_settings_error(widget, message):
     dialog.run()
     dialog.destroy()
 
-def _show_restart_required_popup(widget):
+def _show_restart_required_popup(widget, detail=None):
     dialog = Gtk.MessageDialog(
         transient_for=widget.get_toplevel(),
         flags=0,
@@ -364,6 +364,7 @@ def _show_restart_required_popup(widget):
         text="Restart required",
     )
     dialog.format_secondary_text(
+        detail if detail is not None else
         "The Measurement System change will not take effect until you exit "
         "and restart LinuxCNC."
     )
@@ -410,6 +411,88 @@ def _save_measurement_system(system):
         print("Saved measurement_system = " + system)
     except OSError as e:
         print("Could not write " + SETTINGS_PATH + ": " + str(e))
+
+def _save_max_jog_speed(value):
+    '''
+    Persists the Max Jog Speed choice into REB_Settings_v1.ini, the same
+    silent, automatic settings file _save_measurement_system already
+    writes <measurement_system> into.
+    '''
+    try:
+        with open(SETTINGS_PATH, "r") as f:
+            xml_text = f.read()
+    except OSError as e:
+        print("Could not read " + SETTINGS_PATH + ": " + str(e))
+        return
+
+    value_text = "%.4f" % value
+
+    if re.search(r'<max_jog_speed>[0-9.eE+-]+</max_jog_speed>', xml_text):
+        new_text, count = re.subn(
+            r'<max_jog_speed>[0-9.eE+-]+</max_jog_speed>',
+            "<max_jog_speed>" + value_text + "</max_jog_speed>",
+            xml_text,
+            count=1
+        )
+    else:
+        new_text, count = re.subn(
+            r'(<settings>)',
+            r'\1\n    <max_jog_speed>' + value_text + '</max_jog_speed>',
+            xml_text,
+            count=1
+        )
+
+    if count == 0:
+        print("Could not find a place to store <max_jog_speed> in " + SETTINGS_PATH)
+        return
+
+    try:
+        with open(SETTINGS_PATH, "w") as f:
+            f.write(new_text)
+        print("Saved max_jog_speed = " + value_text)
+    except OSError as e:
+        print("Could not write " + SETTINGS_PATH + ": " + str(e))
+
+def _apply_max_jog_speed_to_ini(value):
+    '''
+    Patches REB.ini's MAX_LINEAR_VELOCITY in both [TRAJ] (the trajectory
+    planner's actual hard ceiling for every move, jog or program - the
+    live "Max Velocity" override can never exceed this) and [DISPLAY]
+    (just the range of the AXIS GUI's own Jog Speed slider) so the two
+    stay in sync. Only takes effect on the next LinuxCNC start (REB.ini
+    is read once at launch) - see _show_restart_required_popup, shown
+    right after this runs.
+
+    Deliberately does NOT touch any [JOINT_n]STEPGEN_MAXVEL: those are
+    hardware-derived per-axis ceilings (see REB.ini's own tuning
+    comments) and may legitimately sit below this global jog cap already
+    (e.g. Z's stepgen tops out well under X's) - this setting only
+    lowers the shared ceiling everyone jogs under, it never raises an
+    axis past what its own hardware can do.
+    '''
+    try:
+        with open(REB_INI_PATH, "r") as f:
+            text = f.read()
+    except OSError as e:
+        print("Could not read " + REB_INI_PATH + ": " + str(e))
+        return
+
+    value_text = "%.4f" % value
+
+    new_text, n = re.subn(
+        r'(?m)^(MAX_LINEAR_VELOCITY\s*= )\S+',
+        lambda m: m.group(1) + value_text,
+        text
+    )
+    if n == 0:
+        print("MAX_LINEAR_VELOCITY line not found in " + REB_INI_PATH)
+
+    try:
+        with open(REB_INI_PATH, "w") as f:
+            f.write(new_text)
+        print("Updated " + str(n) + " MAX_LINEAR_VELOCITY line(s) in " + REB_INI_PATH)
+    except OSError as e:
+        print("Could not write " + REB_INI_PATH + ": " + str(e))
 
 def _apply_measurement_system_to_ini(system):
     '''
@@ -913,6 +996,30 @@ class HandlerClass:
 
         self._apply_measurement_system_labels(system)
 
+    def _load_max_jog_speed(self):
+        '''
+        Reads the persisted Max Jog Speed (default 1.0, matching REB.ini's
+        shipped [TRAJ]/[DISPLAY] MAX_LINEAR_VELOCITY) from
+        REB_Settings_v1.ini and applies it to the Settings tab's spin
+        button, if this component owns it - same no-op-in-the-wrong-
+        component pattern as _load_measurement_system.
+        '''
+        value = 1.0
+        try:
+            with open(SETTINGS_PATH, "r") as f:
+                xml_text = f.read()
+            match = re.search(r'<max_jog_speed>([0-9.eE+-]+)</max_jog_speed>', xml_text)
+            if match:
+                value = float(match.group(1))
+        except OSError as e:
+            print("Could not read " + SETTINGS_PATH + ": " + str(e))
+
+        spin = self.builder.get_object("Max_Jog_Speed")
+        if spin is not None:
+            self._applying_max_jog_speed = True
+            spin.set_value(value)
+            self._applying_max_jog_speed = False
+
     def _save_axis_comment(self, axis_id, text):
         '''
         Writes a single axis's comment back into REB_Settings_v1.ini,
@@ -1265,6 +1372,36 @@ class HandlerClass:
         _save_measurement_system(system)
         _apply_measurement_system_to_ini(system)
         _show_restart_required_popup(widget)
+
+#######################################################################
+# Max_Jog_Speed_Changed
+# Purpose:              User changed the Max Jog Speed on the Settings
+#                           tab's "General" section. Persists the value
+#                           to REB_Settings_v1.ini, patches REB.ini's
+#                           [TRAJ]/[DISPLAY] MAX_LINEAR_VELOCITY, and
+#                           warns that a restart is needed (REB.ini is
+#                           only read at LinuxCNC startup - this is a
+#                           trajectory-planner/GUI-startup ceiling, not
+#                           a live HAL pin like Scale/PID).
+# Updated:              ver 1.0, 1 August 2026, Claude
+# ---------------------------------------------------------------------
+# Called from:
+#   UI:                 REB_Tab_Settings_v1
+#   Widget:              Max_Jog_Speed  (GtkSpinButton)
+#   Signal:              GtkSpinButton/value-changed
+#######################################################################
+    def Max_Jog_Speed_Changed(self, widget):
+        if self._applying_max_jog_speed:
+            return
+
+        value = widget.get_value()
+        _save_max_jog_speed(value)
+        _apply_max_jog_speed_to_ini(value)
+        _show_restart_required_popup(
+            widget,
+            "The Max Jog Speed change will not take effect until you exit "
+            "and restart LinuxCNC."
+        )
 
 #######################################################################
 # Settings_Save
@@ -3680,6 +3817,11 @@ class HandlerClass:
         # restart notice.
         self._applying_measurement_system = False
 
+        # Same suppression as _applying_measurement_system above, for
+        # _load_max_jog_speed driving the Max Jog Speed spin button at
+        # startup.
+        self._applying_max_jog_speed = False
+
         _install_depress_css()
 
         # Independent pins this component owns, used to force each
@@ -3761,6 +3903,10 @@ class HandlerClass:
         # and the unit-of-measure labels this component owns on either
         # the main panel or the Settings tab.
         self._load_measurement_system()
+
+        # Restore the persisted Max Jog Speed (REB_Settings_v1.ini) into
+        # the Settings tab's spin button (if owned by this component).
+        self._load_max_jog_speed()
 
         # There's no stored "last loaded .settings.ini" carried across restarts
         # (only the auto-persisted REB_Settings_v1.ini values, already

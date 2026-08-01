@@ -107,12 +107,25 @@
 # Settings tab can force any axis disabled regardless of its panel
 # button's state.
 #
+# B/X/Z/U/V/W also AND in "machine-is-on" (a second and2 stage,
+# <axis>-estop-and) before the result reaches <axis>-enable - without
+# it, hm2_7i92.0.stepgen.NN.enable for these six joints was driven
+# solely by the panel-toggle/override chain above, with no path back to
+# E-stop/machine-off at all (confirmed live: pressing E-stop did not
+# stop these axes). Sp0/Sp1 don't need this same second stage: their
+# stepgen.06/07.enable pins are already wired directly to
+# "machine-is-on" in REB.hal, bypassing their own panel-toggle chain
+# entirely for the actual hardware enable - this brings the six axes up
+# to that same guarantee, just via an extra AND stage since their
+# stepgen.enable pins are driven by <axis>-enable (the panel-toggle
+# net) rather than by machine-is-on directly.
+#
 # All instances of a given realtime component must be declared in a
 # single loadrt line - the underlying kernel module can only be
 # inserted once.
 loadrt flipflop names=sp0-ena-flip,sp1-ena-flip,b-ena-flip,x-ena-flip,z-ena-flip,u-ena-flip,v-ena-flip,w-ena-flip
 loadrt not names=sp0-ena-not,sp1-ena-not,b-ena-not,x-ena-not,z-ena-not,u-ena-not,v-ena-not,w-ena-not
-loadrt and2 names=x-ena-and,z-ena-and,b-ena-and,u-ena-and,v-ena-and,w-ena-and,sp0-ena-and,sp1-ena-and
+loadrt and2 names=x-ena-and,z-ena-and,b-ena-and,u-ena-and,v-ena-and,w-ena-and,sp0-ena-and,sp1-ena-and,x-estop-and,z-estop-and,b-estop-and,u-estop-and,v-estop-and,w-estop-and
 
 # ******************************************
 # Spindles
@@ -156,6 +169,7 @@ net spindle.1-enable                     => gladevcp.Sp1_ENA-light
 addf b-ena-not servo-thread
 addf b-ena-flip servo-thread
 addf b-ena-and servo-thread
+addf b-estop-and servo-thread
 
 # net b-vel-cmd							 => gladevcp.B_Spd
 # net b-pos-fb							 => gladevcp.B_DRO
@@ -168,7 +182,10 @@ net b-ena-panel-inv                      <= b-ena-not.out
 net b-ena-panel-inv                      => b-ena-flip.data
 net b-ena-settings-allow                 <= REBCnfg.B_Ena_Override
 net b-ena-settings-allow                 => b-ena-and.in1
-net b-enable                             <= b-ena-and.out
+net b-ena-panel-allow                    <= b-ena-and.out
+net b-ena-panel-allow                    => b-estop-and.in0
+net machine-is-on                        => b-estop-and.in1
+net b-enable                             <= b-estop-and.out
 net b-enable                             => gladevcp.B_ENA-light
 
 # ******************************************
@@ -180,6 +197,7 @@ net b-enable                             => gladevcp.B_ENA-light
 addf x-ena-not servo-thread
 addf x-ena-flip servo-thread
 addf x-ena-and servo-thread
+addf x-estop-and servo-thread
 
 net x-ena-btn                            <= gladevcp.X_ENA-button
 net x-ena-btn                            => x-ena-flip.clk
@@ -190,7 +208,10 @@ net x-ena-panel-inv                      <= x-ena-not.out
 net x-ena-panel-inv                      => x-ena-flip.data
 net x-ena-settings-allow                 <= REBCnfg.X_Ena_Override
 net x-ena-settings-allow                 => x-ena-and.in1
-net x-enable                             <= x-ena-and.out
+net x-ena-panel-allow                    <= x-ena-and.out
+net x-ena-panel-allow                    => x-estop-and.in0
+net machine-is-on                        => x-estop-and.in1
+net x-enable                             <= x-estop-and.out
 net x-enable                             => gladevcp.X_ENA-light
 
 # net y-vel-cmd							 => gladevcp.Y_Spd
@@ -210,6 +231,10 @@ addf z-ena-and servo-thread
 addf u-ena-and servo-thread
 addf v-ena-and servo-thread
 addf w-ena-and servo-thread
+addf z-estop-and servo-thread
+addf u-estop-and servo-thread
+addf v-estop-and servo-thread
+addf w-estop-and servo-thread
 
 # net z-vel-cmd							 => gladevcp.Z_Spd
 # net z-pos-fb							 => gladevcp.Z_DRO
@@ -222,7 +247,10 @@ net z-ena-panel-inv                      <= z-ena-not.out
 net z-ena-panel-inv                      => z-ena-flip.data
 net z-ena-settings-allow                 <= REBCnfg.Z_Ena_Override
 net z-ena-settings-allow                 => z-ena-and.in1
-net z-enable                             <= z-ena-and.out
+net z-ena-panel-allow                    <= z-ena-and.out
+net z-ena-panel-allow                    => z-estop-and.in0
+net machine-is-on                        => z-estop-and.in1
+net z-enable                             <= z-estop-and.out
 net z-enable                             => gladevcp.Z_ENA-light
 
 # net u-vel-cmd							 => gladevcp.U_Spd
@@ -236,7 +264,10 @@ net u-ena-panel-inv                      <= u-ena-not.out
 net u-ena-panel-inv                      => u-ena-flip.data
 net u-ena-settings-allow                 <= REBCnfg.U_Ena_Override
 net u-ena-settings-allow                 => u-ena-and.in1
-net u-enable                             <= u-ena-and.out
+net u-ena-panel-allow                    <= u-ena-and.out
+net u-ena-panel-allow                    => u-estop-and.in0
+net machine-is-on                        => u-estop-and.in1
+net u-enable                             <= u-estop-and.out
 net u-enable                             => gladevcp.U_ENA-light
 
 # net v-vel-cmd							 => gladevcp.V_Spd
@@ -250,7 +281,10 @@ net v-ena-panel-inv                      <= v-ena-not.out
 net v-ena-panel-inv                      => v-ena-flip.data
 net v-ena-settings-allow                 <= REBCnfg.V_Ena_Override
 net v-ena-settings-allow                 => v-ena-and.in1
-net v-enable                             <= v-ena-and.out
+net v-ena-panel-allow                    <= v-ena-and.out
+net v-ena-panel-allow                    => v-estop-and.in0
+net machine-is-on                        => v-estop-and.in1
+net v-enable                             <= v-estop-and.out
 net v-enable                             => gladevcp.V_ENA-light
 
 # net w-vel-cmd							 => gladevcp.W_Spd
@@ -264,7 +298,10 @@ net w-ena-panel-inv                      <= w-ena-not.out
 net w-ena-panel-inv                      => w-ena-flip.data
 net w-ena-settings-allow                 <= REBCnfg.W_Ena_Override
 net w-ena-settings-allow                 => w-ena-and.in1
-net w-enable                             <= w-ena-and.out
+net w-ena-panel-allow                    <= w-ena-and.out
+net w-ena-panel-allow                    => w-estop-and.in0
+net machine-is-on                        => w-estop-and.in1
+net w-enable                             <= w-estop-and.out
 net w-enable                             => gladevcp.W_ENA-light
 
 # ******************************************
