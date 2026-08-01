@@ -188,8 +188,11 @@ unsaved-changes flag, and record `path` as both the last-used file
 5. Apply each axis's `scale` to that axis's `Set_Scale` spin button **and**
    the live `hm2_7i92.0.stepgen.NN.position-scale` HAL pin via `halcmd
    setp` — exactly what `_load_scale_settings` already does at startup.
-6. Apply each axis's `comment` to that axis's Comment entry on the main
-   panel, as `_load_axis_comments` already does.
+6. Apply each axis's `comment` to `REB_Settings_v1.ini`'s `<usercomment>`
+   via `_save_axis_comment` (picked up by the main panel's Comment entry
+   next time that component starts - see `_load_axis_comments`). Only for
+   an explicit, operator-clicked **Load Settings...** - see the bug note
+   under Decision 5 below for why the silent startup reload skips this.
 7. Set the Notes `GtkTextView` from the loaded `notes`. The Settings Name
    display is set from the **loaded file's own filename** (not its
    embedded `name` field - see Decision 2, revised, under Save flow), and
@@ -225,7 +228,41 @@ when there's genuinely nothing to reopen.
   `__init__` runs before the toplevel window is realized) first reads
   `LAST_SETTINGS_PATH_FILE`. If it names a file that still exists, that
   file is loaded straight through the same `_load_settings_file` helper
-  `Settings_Load` uses — no dialog, no prompt, nothing on screen.
+  `Settings_Load` uses — no dialog, no prompt, nothing on screen. Calls it
+  with `apply_comments=False` (see bug below).
+- **Bug found and fixed 1 August 2026 (Chuck, live testing):** comments
+  typed into the main panel survived a whole session but were gone after
+  quitting and reopening. Root cause was two independent bugs stacked
+  together:
+  1. `_save_axis_comment` only ever *updated* an existing `<usercomment>`
+     element - it never created one. Every `REB_Settings_v1.ini` in the
+     field predates this feature entirely (confirmed live: none of
+     X/Z/B/U/V/W had a `<usercomment>` element at all), so every save was
+     a silent no-op forever. Fixed by falling back to inserting one right
+     after `<scale>` when none exists yet.
+  2. Once (1) was fixed, `_save_axis_comment` started actually reaching
+     its `_mark_settings_dirty()` call at the end - which every
+     `.settings.ini` saved before (1) was fixed has `"comment": ""` baked
+     into every axis (since reading a comment that could never be saved
+     always returned empty). `_prompt_initial_settings_load`'s silent
+     startup reload was applying that blank value straight into
+     `REB_Settings_v1.ini` on **every** launch, undoing whatever the
+     operator had just typed in the previous session before they ever
+     got a chance to notice. Fixed by adding `_load_settings_file`'s
+     `apply_comments` parameter, `False` only for this silent/unattended
+     reload - an explicit **Load Settings...** click still carries
+     comments over, since that's a deliberate choice to load a named
+     profile wholesale.
+  3. Same underlying "reached `_mark_settings_dirty` for the first time"
+     change also exposed that `_write_pending_snapshot` (called via
+     `_mark_settings_dirty`) reads `<axis>_Set_Scale`-style widgets that
+     only exist in the Settings tab component - calling it from the main
+     panel (exactly what `_save_axis_comment` does) staged a
+     `PENDING_SETTINGS_PATH` full of `scale: null` for every axis, which
+     the shutdown-time prompt could have saved as a real, corrupted,
+     named `.settings.ini` if the operator said yes. Fixed by making
+     `_write_pending_snapshot` a no-op outside the Settings tab component
+     (`builder.get_object("X_Set_Scale") is None`).
 - **No `.settings.ini` on record → check for legacy values first.** A machine
   that's been in use since before this feature existed still has real,
   good values sitting in `REB_Settings_v1.ini` — and those are already

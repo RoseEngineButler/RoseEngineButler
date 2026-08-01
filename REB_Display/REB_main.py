@@ -845,6 +845,32 @@ class HandlerClass:
 
             widget.set_text(unescape(match.group(1)))
 
+    def _autosave_axis_comments(self):
+        '''
+        Polling backstop for the comment Entry widgets - see the
+        GLib.timeout_add call in __init__ for why this exists alongside
+        (not instead of) X_Comment/Z_Comment/etc.'s "activate"/
+        "focus-out-event" signals.
+
+        Only the main panel component has these widgets; every other
+        tab/panel finds them missing and returning False here cancels
+        the timer entirely (same pattern as _sync_run_operation_buttons).
+        '''
+        if self.builder.get_object("X_Comment") is None:
+            return False
+
+        for axis_id in COMMENT_AXES:
+            widget = self.builder.get_object(axis_id + "_Comment")
+            if widget is None:
+                continue
+
+            text = widget.get_text()
+            if text != self._last_saved_axis_comment.get(axis_id):
+                self._save_axis_comment(axis_id, text)
+                self._last_saved_axis_comment[axis_id] = text
+
+        return True
+
     def _apply_measurement_system_labels(self, system):
         '''
         Sets the feed-rate/indexing-distance unit labels on the main panel
@@ -926,8 +952,13 @@ class HandlerClass:
     def _save_axis_comment(self, axis_id, text):
         '''
         Writes a single axis's comment back into REB_Settings_v1.ini,
-        updating only that axis's <usercomment> value. Called from
-        each comment Entry's focus-out-event handler below.
+        updating that axis's <usercomment> value - or inserting one
+        right after its <scale> element if this axis doesn't have one
+        yet. Every existing REB_Settings_v1.ini predates <usercomment>
+        entirely (confirmed live: none of X/Z/B/U/V/W had one), so
+        without this fallback every comment save was a silent no-op
+        forever - there was nothing already there to update. Called
+        from each comment Entry's focus-out-event handler below.
         '''
         try:
             with open(SETTINGS_PATH, "r") as f:
@@ -936,21 +967,35 @@ class HandlerClass:
             print("Could not read " + SETTINGS_PATH + ": " + str(e))
             return
 
-        pattern = (
+        escaped = escape(text)
+
+        update_pattern = (
             r'(<axis\s+id="' + re.escape(axis_id) + r'">\s*<scale>-?[\d.]+</scale>\s*<usercomment>)'
             r'.*?'
             r'(</usercomment>)'
         )
         new_text, count = re.subn(
-            pattern,
-            lambda m: m.group(1) + escape(text) + m.group(2),
+            update_pattern,
+            lambda m: m.group(1) + escaped + m.group(2),
             xml_text,
             count=1,
             flags=re.DOTALL
         )
+
         if count == 0:
-            print("No <usercomment> entry found for axis " + axis_id
-                  + " in " + SETTINGS_PATH + " - leaving it unchanged")
+            insert_pattern = (
+                r'<axis\s+id="' + re.escape(axis_id) + r'">\s*<scale>-?[\d.]+</scale>'
+            )
+            new_text, count = re.subn(
+                insert_pattern,
+                lambda m: m.group(0) + "\n        <usercomment>" + escaped + "</usercomment>",
+                xml_text,
+                count=1
+            )
+
+        if count == 0:
+            print("No <axis id=\"" + axis_id + "\"> entry found in "
+                  + SETTINGS_PATH + " - leaving it unchanged")
             return
 
         try:
@@ -1013,7 +1058,18 @@ class HandlerClass:
         Called by _mark_settings_dirty and by _prompt_initial_settings_load's
         legacy/generic_example fallbacks, which force-dirty outside that
         normal path.
+
+        No-ops outside the Settings tab component: _gather_current_settings
+        reads <axis>_Set_Scale-style widgets that only exist there, so
+        calling this from, say, the main panel (_save_axis_comment also
+        calls _mark_settings_dirty, which calls this) would stage a
+        PENDING_SETTINGS_PATH full of scale: null for every axis - a real
+        risk since the shutdown-time prompt can save that pending
+        snapshot as a real, named .settings.ini if the operator says yes.
         '''
+        if self.builder.get_object("X_Set_Scale") is None:
+            return
+
         notes_view = self.builder.get_object("Settings_Notes")
         notes = ""
         if notes_view is not None:
@@ -1485,7 +1541,7 @@ class HandlerClass:
         if self._load_settings_file(widget, path):
             self._write_last_settings_path(path)
 
-    def _load_settings_file(self, widget, path):
+    def _load_settings_file(self, widget, path, apply_comments=True):
         '''
         Parses and applies a single .settings.ini file: validates it, stops
         motion and disables every axis (Decision 3), then applies its
@@ -1494,6 +1550,21 @@ class HandlerClass:
         through identical validation. Returns True on success, False if
         the file was rejected (an error dialog has already been shown in
         that case) - callers that need to react to failure check this.
+
+        apply_comments=False (used only by _prompt_initial_settings_load's
+        silent, unattended reload) skips patching REB_Settings_v1.ini's
+        <usercomment> values from this file's "comment" fields. Every
+        .settings.ini ever saved before axis comments actually persisted
+        (see _save_axis_comment) has "comment": "" baked in for every
+        axis, and the automatic reload used to push that blank value into
+        REB_Settings_v1.ini on every single startup - silently erasing
+        whatever the operator had typed into the main panel's comment
+        fields in the previous session (confirmed live: comment survived
+        a whole session but was gone after quitting and reopening).
+        Comments are live, main-panel-owned text, not really "part of a
+        profile" the way scale/PID are - so only an explicit, operator-
+        initiated Settings_Load (a deliberate choice to load a named
+        file) still carries them over.
         '''
         try:
             with open(path, "r") as f:
@@ -1558,7 +1629,7 @@ class HandlerClass:
                     except FileNotFoundError:
                         print("halcmd not found - is the LinuxCNC environment sourced?")
 
-                if axis_id in COMMENT_AXES and "comment" in entry:
+                if apply_comments and axis_id in COMMENT_AXES and "comment" in entry:
                     # Only patches REB_Settings_v1.ini - the main panel's
                     # own Comment entries are a different component's
                     # widgets (see _read_axis_comment) and will pick this
@@ -1645,7 +1716,7 @@ class HandlerClass:
 
         last_path = self._read_last_settings_path()
         if last_path and os.path.isfile(last_path):
-            if self._load_settings_file(widget, last_path):
+            if self._load_settings_file(widget, last_path, apply_comments=False):
                 # _load_settings_file alone doesn't set self._settings_path
                 # (only Save/Save As/the Load button do, via
                 # _write_last_settings_path) - without this, a plain Save
@@ -2125,23 +2196,38 @@ class HandlerClass:
             return
         grid.set_sensitive(bool(hal_pin.get()))
 
-    def X_Comment(self, widget):
+    # Each of these is wired to both the Entry's "activate" signal (Enter
+    # key - passes just widget) and "focus-out-event" (clicking or
+    # tabbing to another widget - passes widget, event, and expects a
+    # bool back) - see REB_Panel_v1.ui. Enter-only used to be the sole
+    # trigger, which silently lost the comment the moment an operator
+    # typed one and then clicked straight over to the Settings tab
+    # instead of pressing Enter first (confirmed live: no "Saved X
+    # comment" ever printed for that flow). *args/return False makes one
+    # method satisfy both signal signatures.
+    def X_Comment(self, widget, *args):
         self._save_axis_comment("X", widget.get_text())
+        return False
 
-    def Z_Comment(self, widget):
+    def Z_Comment(self, widget, *args):
         self._save_axis_comment("Z", widget.get_text())
+        return False
 
-    def U_Comment(self, widget):
+    def U_Comment(self, widget, *args):
         self._save_axis_comment("U", widget.get_text())
+        return False
 
-    def V_Comment(self, widget):
+    def V_Comment(self, widget, *args):
         self._save_axis_comment("V", widget.get_text())
+        return False
 
-    def W_Comment(self, widget):
+    def W_Comment(self, widget, *args):
         self._save_axis_comment("W", widget.get_text())
+        return False
 
-    def B_Comment(self, widget):
+    def B_Comment(self, widget, *args):
         self._save_axis_comment("B", widget.get_text())
+        return False
 
 # ********************************************************************
 #    AA    XX    XX IIIIIIII  SSSSSS      BBBBBBB
@@ -3804,6 +3890,31 @@ class HandlerClass:
         # component other than the main panel (gladevcp), which is the
         # only one with these widgets.
         self._load_axis_comments()
+
+        # Baseline for _autosave_axis_comments below - what's on screen
+        # right after the load above already matches REB_Settings_v1.ini,
+        # so there's nothing to flush until an operator actually changes
+        # a field.
+        self._last_saved_axis_comment = {
+            axis_id: widget.get_text()
+            for axis_id in COMMENT_AXES
+            for widget in [self.builder.get_object(axis_id + "_Comment")]
+            if widget is not None
+        }
+
+        # Backstop for X_Comment/Z_Comment/etc.'s "activate"/
+        # "focus-out-event" signals: focus-out-event firing reliably when
+        # focus moves from the main panel to a widget in a DIFFERENT
+        # gladevcp process (e.g. clicking straight from a comment field
+        # over to the Settings tab) turned out not to be guaranteed in
+        # this embedded environment (confirmed live: a typed comment,
+        # followed by clicking over to Settings and saving, still wasn't
+        # in REB_Settings_v1.ini). Polling every second and only writing
+        # a field whose text actually changed since the last flush costs
+        # nothing while idle and guarantees a comment is captured within
+        # about a second of being typed, regardless of which signal (if
+        # any) actually fired - see _autosave_axis_comments.
+        GLib.timeout_add(1000, self._autosave_axis_comments)
 
         # Restore the persisted Measurement System (REB_Settings_v1.ini)
         # into the Settings tab's combo box (if owned by this component)
