@@ -1102,7 +1102,7 @@ revolution</property>
                                 <property name="margin-left">4</property>
                                 <property name="margin-start">4</property>
                                 <property name="margin-end">4</property>
-                                <property name="label" translatable="yes">For these fields, enter a number between 100,000 and -100,000 (without the commas).
+                                <property name="label" translatable="yes">These fields determine how far devices connected to the drivers move for a given command. The numbers may range into hundreds of thousands for devices with gear ratios. Negative numbers are accepted to change the direction of travel.
 
 SETTING THE VALUES
 The best manner for setting these is to direct your machine to move a certain distance (e.g., 1 inch or 10 degrees), and then change this value as necessary to achieve the requested movement.  For example, if you directed it to move 1 inch, and it moves 1.1 inches, then divide the setting by 1.1.  You may have to go thru a few iterations of this to get it perfect.
@@ -1484,6 +1484,109 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                           </packing>
                         </child>
                         <child>
+                          <object class="GtkBox" id="Stepper_Tuning_Help_Box">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="orientation">vertical</property>
+                            <property name="spacing">4</property>
+                            <property name="margin-top">2</property>
+                            <property name="margin-bottom">6</property>
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="halign">start</property>
+                                <property name="valign">center</property>
+                                <property name="use-markup">True</property>
+                                <property name="label" translatable="yes">Hover over any P/I/D/FF value below for a description.
+&lt;b&gt;References:&lt;/b&gt;</property>
+                                <attributes>
+                                  <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                </attributes>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkBox" id="Stepper_Tuning_Reference_Buttons">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="orientation">horizontal</property>
+                                <property name="spacing">8</property>
+                                <child>
+                                  <object class="GtkButton" id="PID_Tuning_Reference">
+                                    <property name="label" translatable="yes">LinuxCNC PID Component Reference</property>
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="receives-default">True</property>
+                                    <property name="use-underline">True</property>
+                                    <property name="tooltip-text" translatable="yes">Opens the official LinuxCNC documentation for the pid HAL component (the control loop these P/I/D/FF values tune) in your web browser.</property>
+                                    <signal name="clicked" handler="OpenPidTuningReference" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">True</property>
+                                    <property name="position">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkButton" id="PID_Controller_Wikipedia">
+                                    <property name="label" translatable="yes">PID Controller (Wikipedia)</property>
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="receives-default">True</property>
+                                    <property name="use-underline">True</property>
+                                    <property name="tooltip-text" translatable="yes">Opens Wikipedia's PID controller article - general background on what P/I/D/FF terms are and how they interact - in your web browser.</property>
+                                    <signal name="clicked" handler="OpenPidControllerWikipedia" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">True</property>
+                                    <property name="position">1</property>
+                                  </packing>
+                                </child>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">1</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="halign">start</property>
+                            <property name="valign">start</property>
+                            <property name="margin-left">4</property>
+                            <property name="margin-right">4</property>
+                            <property name="margin-start">4</property>
+                            <property name="margin-end">4</property>
+                            <property name="margin-bottom">6</property>
+                            <property name="label" translatable="yes">NO ENCODERS - OPEN-LOOP STEPPER MOTORS
+Every axis (X, Z, B, U, V, W) and both spindles (Sp0, Sp1) are driven by a bare stepper motor with no position or velocity sensor of any kind - LinuxCNC has no way to know whether a motor actually followed a step command. The P/I/D/FF values below don't correct real-world position error; they only shape how closely the stepgen's step timing tracks the motion planner's commanded trajectory internally. A step lost to mechanical or electrical interference is invisible to this system and will silently offset that axis until the next home. Good drive current/microstepping settings, mechanical rigidity, and clean wiring - not PID tuning - are what actually prevent missed steps.</property>
+                            <property name="wrap">True</property>
+                            <attributes>
+                              <attribute name="font-desc" value="DejaVu Serif 10"/>
+                            </attributes>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">2</property>
+                          </packing>
+                        </child>
+                        <child>
                           <!-- n-columns=5 n-rows=32 -->
                           <object class="GtkGrid">
                             <property name="visible">True</property>
@@ -1506,6 +1609,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Proportional gain. Output += error × P. Pushes toward the target in proportion to how far off it is. Too high causes overshoot/oscillation; too low is sluggish.</property>
                                 <signal name="value-changed" handler="X_Set_P" swapped="no"/>
                               </object>
                               <packing>
@@ -1639,6 +1743,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.009999999776482582</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Integral gain. Output += (accumulated error over time) × I. Corrects lingering error P alone can't close. Too high causes slow overshoot-then-correct ("windup").</property>
                                 <signal name="value-changed" handler="X_Set_I" swapped="no"/>
                               </object>
                               <packing>
@@ -1664,6 +1769,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.009999999776482582</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Derivative gain. Output += (rate of change of error) × D. Damps oscillation/overshoot caused by P and I.</property>
                                 <signal name="value-changed" handler="X_Set_D" swapped="no"/>
                               </object>
                               <packing>
@@ -1689,6 +1795,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.009999999776482582</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Zeroth-order feedforward. Output += FF0 × commanded position. Normally left at 0 for a position loop.</property>
                                 <signal name="value-changed" handler="X_Set_FF0" swapped="no"/>
                               </object>
                               <packing>
@@ -1714,6 +1821,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.009999999776482582</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">First-order feedforward. Output += FF1 × commanded speed. Lets the loop anticipate motion instead of only reacting to error. On this machine, FF1 - not P/I - does most of the tracking; see REB.ini's tuning notes for this axis.</property>
                                 <signal name="value-changed" handler="X_Set_FF1" swapped="no"/>
                               </object>
                               <packing>
@@ -1739,6 +1847,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.009999999776482582</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Second-order feedforward. Output += FF2 × commanded acceleration. Can compensate for inertia.</property>
                                 <signal name="value-changed" handler="X_Set_FF2" swapped="no"/>
                               </object>
                               <packing>
@@ -2276,6 +2385,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Proportional gain. Output += error × P. Pushes toward the target in proportion to how far off it is. Too high causes overshoot/oscillation; too low is sluggish.</property>
                                 <signal name="value-changed" handler="Sp0_Set_P_Pos" swapped="no"/>
                               </object>
                               <packing>
@@ -2301,6 +2411,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Proportional gain. Output += error × P. Pushes toward the target speed in proportion to how far off it is. Too high causes overshoot/oscillation; too low is sluggish.</property>
                                 <signal name="value-changed" handler="Sp0_Set_P_Vel" swapped="no"/>
                               </object>
                               <packing>
@@ -2326,6 +2437,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Proportional gain. Output += error × P. Pushes toward the target in proportion to how far off it is. Too high causes overshoot/oscillation; too low is sluggish.</property>
                                 <signal name="value-changed" handler="Sp1_Set_P_Pos" swapped="no"/>
                               </object>
                               <packing>
@@ -2351,6 +2463,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Proportional gain. Output += error × P. Pushes toward the target speed in proportion to how far off it is. Too high causes overshoot/oscillation; too low is sluggish.</property>
                                 <signal name="value-changed" handler="Sp1_Set_P_Vel" swapped="no"/>
                               </object>
                               <packing>
@@ -2376,6 +2489,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Proportional gain. Output += error × P. Pushes toward the target in proportion to how far off it is. Too high causes overshoot/oscillation; too low is sluggish.</property>
                                 <signal name="value-changed" handler="U_Set_P" swapped="no"/>
                               </object>
                               <packing>
@@ -2401,6 +2515,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Integral gain. Output += (accumulated error over time) × I. Corrects lingering error P alone can't close. Too high causes slow overshoot-then-correct ("windup").</property>
                                 <signal name="value-changed" handler="U_Set_I" swapped="no"/>
                               </object>
                               <packing>
@@ -2426,6 +2541,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Derivative gain. Output += (rate of change of error) × D. Damps oscillation/overshoot caused by P and I.</property>
                                 <signal name="value-changed" handler="U_Set_D" swapped="no"/>
                               </object>
                               <packing>
@@ -2451,6 +2567,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Zeroth-order feedforward. Output += FF0 × commanded position. Normally left at 0 for a position loop.</property>
                                 <signal name="value-changed" handler="U_Set_FF0" swapped="no"/>
                               </object>
                               <packing>
@@ -2476,6 +2593,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">First-order feedforward. Output += FF1 × commanded speed. Lets the loop anticipate motion instead of only reacting to error. On this machine, FF1 - not P/I - does most of the tracking; see REB.ini's tuning notes for this axis.</property>
                                 <signal name="value-changed" handler="U_Set_FF1" swapped="no"/>
                               </object>
                               <packing>
@@ -2501,6 +2619,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Second-order feedforward. Output += FF2 × commanded acceleration. Can compensate for inertia.</property>
                                 <signal name="value-changed" handler="U_Set_FF2" swapped="no"/>
                               </object>
                               <packing>
@@ -2526,6 +2645,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Second-order feedforward. Output += FF2 × commanded acceleration. Can compensate for inertia.</property>
                                 <signal name="value-changed" handler="B_Set_FF2" swapped="no"/>
                               </object>
                               <packing>
@@ -2551,6 +2671,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">First-order feedforward. Output += FF1 × commanded speed. Lets the loop anticipate motion instead of only reacting to error. On this machine, FF1 - not P/I - does most of the tracking; see REB.ini's tuning notes for this axis.</property>
                                 <signal name="value-changed" handler="B_Set_FF1" swapped="no"/>
                               </object>
                               <packing>
@@ -2576,6 +2697,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Zeroth-order feedforward. Output += FF0 × commanded position. Normally left at 0 for a position loop.</property>
                                 <signal name="value-changed" handler="B_Set_FF0" swapped="no"/>
                               </object>
                               <packing>
@@ -2601,6 +2723,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Derivative gain. Output += (rate of change of error) × D. Damps oscillation/overshoot caused by P and I.</property>
                                 <signal name="value-changed" handler="B_Set_D" swapped="no"/>
                               </object>
                               <packing>
@@ -2626,6 +2749,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Integral gain. Output += (accumulated error over time) × I. Corrects lingering error P alone can't close. Too high causes slow overshoot-then-correct ("windup").</property>
                                 <signal name="value-changed" handler="B_Set_I" swapped="no"/>
                               </object>
                               <packing>
@@ -2651,6 +2775,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Proportional gain. Output += error × P. Pushes toward the target in proportion to how far off it is. Too high causes overshoot/oscillation; too low is sluggish.</property>
                                 <signal name="value-changed" handler="B_Set_P" swapped="no"/>
                               </object>
                               <packing>
@@ -2676,6 +2801,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Integral gain. Output += (accumulated error over time) × I. Corrects lingering error P alone can't close. Too high causes slow overshoot-then-correct ("windup").</property>
                                 <signal name="value-changed" handler="Sp0_Set_I_Pos" swapped="no"/>
                               </object>
                               <packing>
@@ -2701,6 +2827,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Derivative gain. Output += (rate of change of error) × D. Damps oscillation/overshoot caused by P and I.</property>
                                 <signal name="value-changed" handler="Sp0_Set_D_Pos" swapped="no"/>
                               </object>
                               <packing>
@@ -2726,6 +2853,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Zeroth-order feedforward. Output += FF0 × commanded position. Normally left at 0 for a position loop.</property>
                                 <signal name="value-changed" handler="Sp0_Set_FF0_Pos" swapped="no"/>
                               </object>
                               <packing>
@@ -2751,6 +2879,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">First-order feedforward. Output += FF1 × commanded speed. Lets the loop anticipate motion instead of only reacting to error. On this machine, FF1 - not P/I - does most of the tracking; see REB.ini's tuning notes for this axis.</property>
                                 <signal name="value-changed" handler="Sp0_Set_FF1_Pos" swapped="no"/>
                               </object>
                               <packing>
@@ -2776,6 +2905,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Second-order feedforward. Output += FF2 × commanded acceleration. Can compensate for inertia.</property>
                                 <signal name="value-changed" handler="Sp0_Set_FF2_Pos" swapped="no"/>
                               </object>
                               <packing>
@@ -2801,6 +2931,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Proportional gain. Output += error × P. Pushes toward the target in proportion to how far off it is. Too high causes overshoot/oscillation; too low is sluggish.</property>
                                 <signal name="value-changed" handler="Z_Set_P" swapped="no"/>
                               </object>
                               <packing>
@@ -2826,6 +2957,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Integral gain. Output += (accumulated error over time) × I. Corrects lingering error P alone can't close. Too high causes slow overshoot-then-correct ("windup").</property>
                                 <signal name="value-changed" handler="Z_Set_I" swapped="no"/>
                               </object>
                               <packing>
@@ -2851,6 +2983,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Derivative gain. Output += (rate of change of error) × D. Damps oscillation/overshoot caused by P and I.</property>
                                 <signal name="value-changed" handler="Z_Set_D" swapped="no"/>
                               </object>
                               <packing>
@@ -2876,6 +3009,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Zeroth-order feedforward. Output += FF0 × commanded position. Normally left at 0 for a position loop.</property>
                                 <signal name="value-changed" handler="Z_Set_FF0" swapped="no"/>
                               </object>
                               <packing>
@@ -2901,6 +3035,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">First-order feedforward. Output += FF1 × commanded speed. Lets the loop anticipate motion instead of only reacting to error. On this machine, FF1 - not P/I - does most of the tracking; see REB.ini's tuning notes for this axis.</property>
                                 <signal name="value-changed" handler="Z_Set_FF1" swapped="no"/>
                               </object>
                               <packing>
@@ -2926,6 +3061,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Second-order feedforward. Output += FF2 × commanded acceleration. Can compensate for inertia.</property>
                                 <signal name="value-changed" handler="Z_Set_FF2" swapped="no"/>
                               </object>
                               <packing>
@@ -2951,6 +3087,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Proportional gain. Output += error × P. Pushes toward the target in proportion to how far off it is. Too high causes overshoot/oscillation; too low is sluggish.</property>
                                 <signal name="value-changed" handler="V_Set_P" swapped="no"/>
                               </object>
                               <packing>
@@ -2976,6 +3113,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Integral gain. Output += (accumulated error over time) × I. Corrects lingering error P alone can't close. Too high causes slow overshoot-then-correct ("windup").</property>
                                 <signal name="value-changed" handler="V_Set_I" swapped="no"/>
                               </object>
                               <packing>
@@ -3001,6 +3139,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Derivative gain. Output += (rate of change of error) × D. Damps oscillation/overshoot caused by P and I.</property>
                                 <signal name="value-changed" handler="V_Set_D" swapped="no"/>
                               </object>
                               <packing>
@@ -3026,6 +3165,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Zeroth-order feedforward. Output += FF0 × commanded position. Normally left at 0 for a position loop.</property>
                                 <signal name="value-changed" handler="V_Set_FF0" swapped="no"/>
                               </object>
                               <packing>
@@ -3051,6 +3191,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">First-order feedforward. Output += FF1 × commanded speed. Lets the loop anticipate motion instead of only reacting to error. On this machine, FF1 - not P/I - does most of the tracking; see REB.ini's tuning notes for this axis.</property>
                                 <signal name="value-changed" handler="V_Set_FF1" swapped="no"/>
                               </object>
                               <packing>
@@ -3076,6 +3217,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Second-order feedforward. Output += FF2 × commanded acceleration. Can compensate for inertia.</property>
                                 <signal name="value-changed" handler="V_Set_FF2" swapped="no"/>
                               </object>
                               <packing>
@@ -3101,6 +3243,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Proportional gain. Output += error × P. Pushes toward the target in proportion to how far off it is. Too high causes overshoot/oscillation; too low is sluggish.</property>
                                 <signal name="value-changed" handler="W_Set_P" swapped="no"/>
                               </object>
                               <packing>
@@ -3126,6 +3269,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Integral gain. Output += (accumulated error over time) × I. Corrects lingering error P alone can't close. Too high causes slow overshoot-then-correct ("windup").</property>
                                 <signal name="value-changed" handler="W_Set_I" swapped="no"/>
                               </object>
                               <packing>
@@ -3151,6 +3295,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Derivative gain. Output += (rate of change of error) × D. Damps oscillation/overshoot caused by P and I.</property>
                                 <signal name="value-changed" handler="W_Set_D" swapped="no"/>
                               </object>
                               <packing>
@@ -3176,6 +3321,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Zeroth-order feedforward. Output += FF0 × commanded position. Normally left at 0 for a position loop.</property>
                                 <signal name="value-changed" handler="W_Set_FF0" swapped="no"/>
                               </object>
                               <packing>
@@ -3201,6 +3347,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">First-order feedforward. Output += FF1 × commanded speed. Lets the loop anticipate motion instead of only reacting to error. On this machine, FF1 - not P/I - does most of the tracking; see REB.ini's tuning notes for this axis.</property>
                                 <signal name="value-changed" handler="W_Set_FF1" swapped="no"/>
                               </object>
                               <packing>
@@ -3226,6 +3373,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Second-order feedforward. Output += FF2 × commanded acceleration. Can compensate for inertia.</property>
                                 <signal name="value-changed" handler="W_Set_FF2" swapped="no"/>
                               </object>
                               <packing>
@@ -3251,6 +3399,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Integral gain. Output += (accumulated error over time) × I. Corrects lingering speed error P alone can't close. Too high causes slow overshoot-then-correct ("windup").</property>
                                 <signal name="value-changed" handler="Sp0_Set_I_Vel" swapped="no"/>
                               </object>
                               <packing>
@@ -3276,6 +3425,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Derivative gain. Output += (rate of change of error) × D. Damps oscillation/overshoot caused by P and I.</property>
                                 <signal name="value-changed" handler="Sp0_Set_D_Vel" swapped="no"/>
                               </object>
                               <packing>
@@ -3301,6 +3451,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Zeroth-order feedforward. Output += FF0 × commanded speed. Compensates friction/motor back-EMF - typically the dominant term for a velocity loop.</property>
                                 <signal name="value-changed" handler="Sp0_Set_FF0_Vel" swapped="no"/>
                               </object>
                               <packing>
@@ -3326,6 +3477,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">First-order feedforward. Output += FF1 × commanded acceleration. Compensates inertia.</property>
                                 <signal name="value-changed" handler="Sp0_Set_FF1_Vel" swapped="no"/>
                               </object>
                               <packing>
@@ -3351,6 +3503,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Second-order feedforward. Output += FF2 × commanded jerk. Normally left at 0 for a velocity loop.</property>
                                 <signal name="value-changed" handler="Sp0_Set_FF2_Vel" swapped="no"/>
                               </object>
                               <packing>
@@ -3376,6 +3529,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Integral gain. Output += (accumulated error over time) × I. Corrects lingering speed error P alone can't close. Too high causes slow overshoot-then-correct ("windup").</property>
                                 <signal name="value-changed" handler="Sp1_Set_I_Vel" swapped="no"/>
                               </object>
                               <packing>
@@ -3401,6 +3555,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Derivative gain. Output += (rate of change of error) × D. Damps oscillation/overshoot caused by P and I.</property>
                                 <signal name="value-changed" handler="Sp1_Set_D_Vel" swapped="no"/>
                               </object>
                               <packing>
@@ -3426,6 +3581,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Zeroth-order feedforward. Output += FF0 × commanded speed. Compensates friction/motor back-EMF - typically the dominant term for a velocity loop.</property>
                                 <signal name="value-changed" handler="Sp1_Set_FF0_Vel" swapped="no"/>
                               </object>
                               <packing>
@@ -3451,6 +3607,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">First-order feedforward. Output += FF1 × commanded acceleration. Compensates inertia.</property>
                                 <signal name="value-changed" handler="Sp1_Set_FF1_Vel" swapped="no"/>
                               </object>
                               <packing>
@@ -3476,6 +3633,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Second-order feedforward. Output += FF2 × commanded jerk. Normally left at 0 for a velocity loop.</property>
                                 <signal name="value-changed" handler="Sp1_Set_FF2_Vel" swapped="no"/>
                               </object>
                               <packing>
@@ -3501,6 +3659,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Second-order feedforward. Output += FF2 × commanded acceleration. Can compensate for inertia.</property>
                                 <signal name="value-changed" handler="Sp1_Set_FF2_Pos" swapped="no"/>
                               </object>
                               <packing>
@@ -3526,6 +3685,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">First-order feedforward. Output += FF1 × commanded speed. Lets the loop anticipate motion instead of only reacting to error. On this machine, FF1 - not P/I - does most of the tracking; see REB.ini's tuning notes for this axis.</property>
                                 <signal name="value-changed" handler="Sp1_Set_FF1_Pos" swapped="no"/>
                               </object>
                               <packing>
@@ -3551,6 +3711,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Zeroth-order feedforward. Output += FF0 × commanded position. Normally left at 0 for a position loop.</property>
                                 <signal name="value-changed" handler="Sp1_Set_FF0_Pos" swapped="no"/>
                               </object>
                               <packing>
@@ -3576,6 +3737,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Derivative gain. Output += (rate of change of error) × D. Damps oscillation/overshoot caused by P and I.</property>
                                 <signal name="value-changed" handler="Sp1_Set_D_Pos" swapped="no"/>
                               </object>
                               <packing>
@@ -3601,6 +3763,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                                 <property name="climb-rate">0.01</property>
                                 <property name="digits">1</property>
                                 <property name="numeric">True</property>
+                                <property name="tooltip-text" translatable="yes">Integral gain. Output += (accumulated error over time) × I. Corrects lingering error P alone can't close. Too high causes slow overshoot-then-correct ("windup").</property>
                                 <signal name="value-changed" handler="Sp1_Set_I_Pos" swapped="no"/>
                               </object>
                               <packing>
@@ -3807,7 +3970,7 @@ There is far more descriptive help  in the Rose Engine Butler's User Manual, in 
                           <packing>
                             <property name="expand">False</property>
                             <property name="fill">True</property>
-                            <property name="position">1</property>
+                            <property name="position">3</property>
                           </packing>
                         </child>
                       </object>

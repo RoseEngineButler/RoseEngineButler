@@ -50,23 +50,24 @@ feature doesn't touch that path (see Decision 4 below for why).
 - **Encoding:** JSON (replacing the ad hoc regex-patched XML used for the
   automatic file — much less fragile to parse/write correctly, and Python's
   `json` module needs no new dependency)
-- **Top-level shape:**
+- **Top-level shape (v2 - see Decision 11 for the `pid`/`pid_pos`/`pid_vel`
+  fields):**
 
 ```json
 {
-  "format_version": 1,
+  "format_version": 2,
   "name": "Chuck's brass rosette setup",
   "notes": "Tighter B backlash comp for the brass box.\nRun spindle slower than usual on this one.",
   "saved_at": "2026-07-29T14:32:00",
   "axes": {
-    "X":   { "scale": -196000, "comment": "" },
-    "Z":   { "scale": 254427,  "comment": "" },
-    "B":   { "scale": 57599,   "comment": "" },
-    "U":   { "scale": 20320,   "comment": "" },
-    "V":   { "scale": 20319,   "comment": "" },
-    "W":   { "scale": 20320,   "comment": "" },
-    "Sp0": { "scale": 57602 },
-    "Sp1": { "scale": -57599 }
+    "X":   { "scale": -196000, "comment": "", "pid": { "P": 5, "I": 1, "D": 1.2, "FF0": 0.0, "FF1": 1.0, "FF2": 0.0 } },
+    "Z":   { "scale": 254427,  "comment": "", "pid": { "P": 5, "I": 1, "D": 1.2, "FF0": 0.0, "FF1": 1.0, "FF2": 0.0 } },
+    "B":   { "scale": 57599,   "comment": "", "pid": { "P": 5, "I": 1, "D": 1.2, "FF0": 0.0, "FF1": 1.0, "FF2": 0.0 } },
+    "U":   { "scale": 20320,   "comment": "", "pid": { "P": 5, "I": 1, "D": 1.2, "FF0": 0.0, "FF1": 1.0, "FF2": 0.0 } },
+    "V":   { "scale": 20319,   "comment": "", "pid": { "P": 5, "I": 1, "D": 1.2, "FF0": 0.0, "FF1": 1.0, "FF2": 0.0 } },
+    "W":   { "scale": 20320,   "comment": "", "pid": { "P": 5, "I": 1, "D": 1.2, "FF0": 0.0, "FF1": 1.0, "FF2": 0.0 } },
+    "Sp0": { "scale": 57602, "pid_pos": { "P": 2.0, "I": 1.0, "D": 1.2, "FF0": 0.0, "FF1": 0.0, "FF2": 0.0 }, "pid_vel": { "P": 35, "I": 20, "D": 1.2, "FF0": 1.0, "FF1": 0.0, "FF2": 0.0 } },
+    "Sp1": { "scale": -57599, "pid_pos": { "P": 2.0, "I": 1.0, "D": 1.2, "FF0": 0.0, "FF1": 0.0, "FF2": 0.0 }, "pid_vel": { "P": 35, "I": 20, "D": 1.2, "FF0": 1.0, "FF1": 0.0, "FF2": 0.0 } }
   }
 }
 ```
@@ -75,6 +76,8 @@ feature doesn't touch that path (see Decision 4 below for why).
   axis id ↔ stepgen channel in both `REB_main.py` and
   `REB_Scale_Persist.py`). `comment` is only meaningful for
   `COMMENT_AXES = ("X","Z","U","V","W","B")`; omit it for `Sp0`/`Sp1`.
+  `pid` (axes)/`pid_pos`+`pid_vel` (`Sp0`/`Sp1`) are optional - see
+  Decision 11.
 - `name` and `notes` are the two new fields this feature adds beyond what
   today's XML file stores.
 
@@ -356,8 +359,19 @@ to pop a blocking dialog.
   `Settings_Save` / `Settings_Save_As` / `Settings_Load` signal handlers
   (naming matches the existing `<Widget>_<Action>` convention).
 - `REB_Display/generic_example.settings.ini` — the shipped starter profile
-  (Decision 5), tracked in this repo like any other config asset.
+  (Decision 5), tracked in this repo like any other config asset. Now
+  `format_version: 2` with real baseline PID data (Decision 11).
 - `REB_Display/REB_main.py`:
+  - `REBSET_FORMAT_VERSION = 2`, `_migrate_settings_v1_to_v2(data)` -
+    stamps the new version onto an old-shape v1 payload, which is
+    already valid v2 with `pid`/`pid_pos`/`pid_vel` simply absent
+    (Decision 11). `_load_settings_file` dispatches on `format_version`
+    before the strict version check, per the Versioning section above.
+  - `_read_pid_gains(self, widget_id_for_param)` /
+    `_apply_pid_gains(self, values, widget_id_for_param)` (Decision 11) -
+    the JSON-dict counterparts to `_export_pid_block`/`_import_pid_block`
+    below, used by `_gather_current_settings`/`_load_settings_file`
+    instead of those XML-based ones.
   - `Settings_Save(self, widget)` (no dialog if a file's already active,
     otherwise delegates to Save As) / `Settings_Save_As(self, widget)`
     (always shows the file chooser) / `Settings_Load(self, widget)`
@@ -467,6 +481,48 @@ to pop a blocking dialog.
     `REB_Settings_v1.ini` or the repo's shipped template respectively,
     even though neither of those establishes `self._settings_path` /
     enables a no-dialog plain Save).
+11. **PID gains moved into `.settings.ini` (Chuck, 1 August 2026):** after
+    Rich split the Settings tab into three tabs, Chuck reported every
+    field in the new "Stepper Motor Tuning" tab reading zero. Root cause
+    (see "Bug found live" below): PID gains had never been part of
+    `.settings.ini` and had never actually been auto-persisted into
+    `REB_Settings_v1.ini` either - the live `pid.*` HAL gain pins were
+    sitting at the raw HAL `pid` component defaults (`Pgain=1`, everything
+    else `0`), not REB.ini's documented starting values, apparently ever
+    since Rich's PID-persistence branch disabled REB.hal's direct
+    `setp pid.x.Pgain [JOINT_0]P`-style lines. Chuck framed the fix as
+    three cases, mirroring how Scale already works:
+    1. **Defaults for a new system** - `generic_example.settings.ini`
+       (shipped in this repo) now includes a `pid`/`pid_pos`/`pid_vel`
+       block per axis, using REB.ini's own documented starting values
+       (`[JOINT_n]`/`[SPINDLE_n]` - `P=5, I=1, D=1.2, FF0=0.0, FF1=1.0,
+       FF2=0.0` for axes; `Sp0`/`Sp1` position loop `P=2.0, I=1.0, D=1.2`,
+       velocity loop `P=35, I=20, D=1.2`, `FF0_VEL=1.0`) - unlike Scale's
+       deliberately-wrong `1` placeholders, PID has no equivalent
+       "obviously broken" placeholder concept (0 gain already *is*
+       obviously broken - no control at all), so the shipped defaults are
+       the real, reasonable-across-machines starting values instead.
+    2. **Per-machine persistence** - PID gains are now a first-class,
+       optional part of the `.settings.ini` schema (`format_version` 2 -
+       see the migration below), saved/loaded by `_gather_current_settings`/
+       `_load_settings_file` exactly like Scale, via two new small
+       helpers, `_read_pid_gains`/`_apply_pid_gains` - the JSON
+       counterparts to the existing XML `_export_pid_block`/
+       `_import_pid_block` (kept as separate, parallel code rather than
+       shared/refactored - one builds/reads an `ElementTree` element, the
+       other a plain dict, and Export/Import was already working,
+       tested code not worth touching for this).
+    3. **Existing legacy-format machines (Rich's and Chuck's - explicitly
+       not generalized):** Chuck was explicit that since only he and Rich
+       have pre-existing settings in the old, pre-`.settings.ini` format
+       today, this doesn't need migration *code* - just make sure his own
+       file actually has real data in it. Fixed by hand: seeded real
+       `pid`/`pid_pos`/`pid_vel` blocks (REB.ini's baseline values, same
+       as `generic_example`) directly into Chuck's active
+       `~/Documents/Chucks_LRE.settings.ini` (bumped to `format_version:
+       2`) and, for defense-in-depth, into the legacy
+       `RoseEngineButlerLocal/REB_Settings_v1.ini` fallback too - a
+       one-time manual data patch, not new code.
 
 ### Bug found live: compound extension broke name derivation (30 July 2026)
 
@@ -527,6 +583,42 @@ fallback branch was removed since `_load_settings_file` covers it too;
 `_write_last_settings_path`'s own call stays, since `_save_to_path`
 (Save/Save As) doesn't go through `_load_settings_file` at all.
 
+### Bug found live: Stepper Motor Tuning tab reading all zero (1 August 2026)
+
+Symptom: after Rich split the Settings tab into three tabs (Decision 11),
+Chuck reported every P/I/D/FF0/FF1/FF2 field on the new "Stepper Motor
+Tuning" tab reading `0`. Investigated live with `halcmd getp`:
+`pid.x.Pgain` etc. were sitting at `1`/`0`/`0`/`0`/`0`/`0` for every axis
+and both spindle loops - the raw HAL `pid` component's built-in defaults,
+not REB.ini's documented starting values (`P=5, I=1, D=1.2, FF0=0.0,
+FF1=1.0, FF2=0.0`).
+
+Root cause: nothing had ever actually pushed real gains into HAL on this
+machine. `REB.hal`'s own `setp pid.x.Pgain [JOINT_0]P`-style lines (which
+used to do this unconditionally at HAL load) were commented out when
+Rich's earlier PID-persistence branch merged, in favor of
+`_load_pid_settings()` reading `<pid>` blocks from
+`RoseEngineButlerLocal/REB_Settings_v1.ini` at Settings-tab startup - but
+that per-machine file had never had `<pid>` blocks written into it (only
+`<scale>`), on either Chuck's or Rich's machine. So `_load_pid_settings()`
+found nothing to apply, every startup, silently, since that merge landed
+- this was already true before the three-tab split and before this
+session's dev-rich merge; the new dedicated tab just made the gap
+visible for the first time. Confirmed nothing was actually lost: every
+saved `.settings.ini`/`.export.ini` file on Chuck's machine, and
+`REB_Settings_v1.ini` itself, was checked and none had ever contained
+`<pid>`/`"pid"` data - the only real values that had ever existed
+anywhere were REB.ini's own documented generic starting values, still
+intact and unchanged.
+
+Fixed per Decision 11: PID gains are now part of `.settings.ini` (so
+Save/Load actually captures/restores them going forward, case 2),
+`generic_example.settings.ini` now ships real baseline PID values (case
+1), and Chuck's own active `.settings.ini` plus the legacy
+`REB_Settings_v1.ini` fallback were hand-seeded with those same baseline
+values (case 3) so the very next load actually applies working gains
+instead of silently finding nothing.
+
 ## Export/Import (`.export.ini`) — a separate, smaller mechanism
 
 Added after Rich's Measurement System change landed. Deliberately **not**
@@ -581,15 +673,14 @@ a full named setup." Differences from `.settings.ini`, by design:
   per-field safety logic duplicated a third time. A value not present in
   the file is left completely untouched. A short summary popup lists what
   was actually imported.
-- **PID gains are intentionally outside `.settings.ini`'s dirty-tracking**,
-  matching how a live PID edit already behaves (`_pid_set` never calls
-  `_mark_settings_dirty` - PID gains are only captured by the automatic,
-  unnamed `REB_Settings_v1.ini` persistence at shutdown, the same as
-  Scale was before `.settings.ini` existed). Importing a PID subset
-  inherits that same behavior for free by going through the real
-  widgets - it does *not* mark the Settings Name label dirty, since
-  Save/Save As wouldn't capture the change either way.
-- Imported Scale/Measurement System values do feed into the same
+- **PID gains are now part of `.settings.ini`'s dirty-tracking (revised,
+  see Decision 11)** - originally excluded (see the superseded paragraph
+  in Decision 11's own write-up below), but once PID moved into the
+  `.settings.ini` schema, a live PID edit needed to behave like Scale:
+  `_pid_set` now also calls `_mark_settings_dirty()`. Importing a PID
+  subset inherits that for free by going through the real widgets, the
+  same as importing a Scale value.
+- Imported Scale/PID/Measurement System values all feed into the same
   unsaved-changes tracking as any other edit (Decision 4) - the operator
   still needs to Save/Save As afterward (to the *active* `.settings.ini`,
   if any) to persist those into a named profile; Import only changes the

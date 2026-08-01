@@ -161,9 +161,27 @@ REB_INI_PATH = os.path.join(
 # profiles). ".settings.ini" stays recognizable while keeping each
 # format's own file-chooser filter (and a human skimming a folder)
 # able to tell all three apart.
-REBSET_FORMAT_VERSION = 1
+REBSET_FORMAT_VERSION = 2
 REBSET_EXTENSION = ".settings.ini"
 REBSET_DEFAULT_DIR = os.path.expanduser("~/Documents")
+
+def _migrate_settings_v1_to_v2(data):
+    '''
+    v1 .settings.ini files have no per-axis "pid"/"pid_pos"/"pid_vel"
+    data - PID gains used to be outside this format entirely, only ever
+    auto-persisted in the legacy REB_Settings_v1.ini (see
+    docs/settings_file.md's Export/Import section, "PID gains are
+    intentionally outside .settings.ini's dirty-tracking" - superseded by
+    this version). v2 adds those as optional per-axis fields; a v1
+    payload is already a valid v2 payload with them simply absent, so
+    migrating is just stamping the new version number -
+    _load_settings_file's existing "no stored data for this axis"
+    handling covers the missing fields for free, the same as it already
+    does for an axis missing "comment".
+    '''
+    data = dict(data)
+    data["format_version"] = REBSET_FORMAT_VERSION
+    return data
 
 def _name_from_settings_path(path):
     '''
@@ -963,9 +981,10 @@ class HandlerClass:
     def _mark_settings_dirty(self):
         '''
         Flags that something covered by a .settings.ini snapshot (axis scales,
-        comments, or notes) has changed since the last Settings_Save/
-        Settings_Load, and stages a full snapshot on disk for the
-        shutdown-time exit prompt to offer (see PENDING_SETTINGS_PATH).
+        PID gains, comments, or notes) has changed since the last
+        Settings_Save/Settings_Load, and stages a full snapshot on disk
+        for the shutdown-time exit prompt to offer (see
+        PENDING_SETTINGS_PATH).
         Suppressed while Settings_Load is itself the one poking widgets
         (self._applying_settings) - otherwise re-applying a loaded scale
         value would immediately re-dirty the settings it just loaded.
@@ -977,7 +996,7 @@ class HandlerClass:
 
     def _write_pending_snapshot(self):
         '''
-        Writes the full current settings (scale/comment/notes/name) to
+        Writes the full current settings (scale/PID/comment/notes/name) to
         PENDING_SETTINGS_PATH, in the same shape as a saved .settings.ini, so
         the shutdown-time prompt (a separate process - see
         PENDING_SETTINGS_PATH) has something concrete to offer saving.
@@ -1128,6 +1147,53 @@ class HandlerClass:
             print(axis_id + " axis is enabled - disabling for settings load")
             self.halcomp[axis_id + '_Ena_Override'] = False
 
+    def _read_pid_gains(self, widget_id_for_param):
+        '''
+        Reads P/I/D/FF0/FF1/FF2 from one axis's/spindle loop's own
+        Settings tab widgets into a plain {param: value} dict, for
+        embedding directly in a .settings.ini JSON "pid"/"pid_pos"/
+        "pid_vel" entry - the JSON counterpart to _export_pid_block's XML
+        sub-element (kept separate rather than shared, since one builds
+        an ElementTree element and this builds a dict). Missing widgets
+        are skipped; returns {} if none of this axis's PID widgets exist
+        in this component.
+        '''
+        values = {}
+        for param in PID_PARAMS:
+            widget = self.builder.get_object(widget_id_for_param(param))
+            if widget is not None:
+                values[param] = widget.get_value()
+        return values
+
+    def _apply_pid_gains(self, values, widget_id_for_param):
+        '''
+        Mirror of _read_pid_gains: applies a .settings.ini JSON "pid"/
+        "pid_pos"/"pid_vel" dict's P/I/D/FF0/FF1/FF2 values to that
+        axis's/spindle loop's own Settings tab widgets via set_value() -
+        fires the same _pid_set handler a live edit would (straight to
+        the live pid.* HAL gain pin; see _pid_set's docstring for why PID
+        doesn't need the abort/disable dance Scale does). The JSON
+        counterpart to _import_pid_block's XML equivalent. Returns True
+        if anything was actually applied.
+        '''
+        if not isinstance(values, dict):
+            return False
+        applied = False
+        for param in PID_PARAMS:
+            if param not in values:
+                continue
+            widget = self.builder.get_object(widget_id_for_param(param))
+            if widget is None:
+                continue
+            try:
+                value = float(values[param])
+            except (TypeError, ValueError):
+                print("Skipping " + widget_id_for_param(param) + " - not a number: " + str(values[param]))
+                continue
+            widget.set_value(value)
+            applied = True
+        return applied
+
     def _gather_current_settings(self, name, notes):
         axes = {}
         for axis_id in AXIS_STEPGEN:
@@ -1135,6 +1201,22 @@ class HandlerClass:
             entry = {"scale": widget.get_value() if widget is not None else None}
             if axis_id in COMMENT_AXES:
                 entry["comment"] = self._read_axis_comment(axis_id)
+
+            # PID gains (v2 - see _migrate_settings_v1_to_v2): read the
+            # same widgets Export/_export_pid_block reads, straight into
+            # the JSON entry instead of an XML sub-element.
+            if axis_id in PID_AXES:
+                pid = self._read_pid_gains(lambda param, axis_id=axis_id: axis_id + "_Set_" + param)
+                if pid:
+                    entry["pid"] = pid
+            elif axis_id in PID_SPINDLE_LOOPS:
+                for suffix, block_tag in (("Pos", "pid_pos"), ("Vel", "pid_vel")):
+                    loop = self._read_pid_gains(
+                        lambda param, axis_id=axis_id, suffix=suffix: axis_id + "_Set_" + param + "_" + suffix
+                    )
+                    if loop:
+                        entry[block_tag] = loop
+
             axes[axis_id] = entry
 
         return {
@@ -1313,10 +1395,10 @@ class HandlerClass:
 #######################################################################
 # Settings_Load
 # Purpose:              Loads a previously saved .settings.ini JSON file,
-#                           applying its axis scales/comments/notes.
-#                           Stops all motion and disables every axis
-#                           first (docs/settings_file.md, Decision 3).
-# Updated:              ver 1.0, 29 July 2026, Claude
+#                           applying its axis scales/PID gains/comments/
+#                           notes. Stops all motion and disables every
+#                           axis first (docs/settings_file.md, Decision 3).
+# Updated:              ver 1.0, 1 August 2026, Claude
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Tab_Settings_v1
@@ -1363,7 +1445,7 @@ class HandlerClass:
         '''
         Parses and applies a single .settings.ini file: validates it, stops
         motion and disables every axis (Decision 3), then applies its
-        scale/comment/notes/name. Shared by the Settings_Load button and
+        scale/PID/comment/notes/name. Shared by the Settings_Load button and
         _prompt_initial_settings_load (the startup prompt) so both go
         through identical validation. Returns True on success, False if
         the file was rejected (an error dialog has already been shown in
@@ -1377,6 +1459,10 @@ class HandlerClass:
             return False
 
         version = data.get("format_version")
+        if version == 1:
+            data = _migrate_settings_v1_to_v2(data)
+            version = data.get("format_version")
+
         if version != REBSET_FORMAT_VERSION:
             _show_settings_error(
                 widget,
@@ -1401,29 +1487,32 @@ class HandlerClass:
         try:
             for axis_id, stepgen_ch in AXIS_STEPGEN.items():
                 entry = axes.get(axis_id)
-                if not isinstance(entry, dict) or "scale" not in entry:
-                    print("No stored scale for axis " + axis_id + " in " + path)
+                if not isinstance(entry, dict):
+                    print("No stored settings for axis " + axis_id + " in " + path)
                     continue
 
-                scale = entry["scale"]
+                if "scale" not in entry:
+                    print("No stored scale for axis " + axis_id + " in " + path)
+                else:
+                    scale = entry["scale"]
 
-                spin = self.builder.get_object(axis_id + "_Set_Scale")
-                if spin is not None:
-                    spin.set_value(scale)
+                    spin = self.builder.get_object(axis_id + "_Set_Scale")
+                    if spin is not None:
+                        spin.set_value(scale)
 
-                hal_pin = "hm2_7i92.0.stepgen." + stepgen_ch + ".position-scale"
-                try:
-                    subprocess.run(
-                        ["halcmd", "setp", hal_pin, str(scale)],
-                        check=True,
-                        capture_output=True,
-                        text=True
-                    )
-                    print("Loaded " + hal_pin + " = " + str(scale))
-                except subprocess.CalledProcessError as e:
-                    print("Error setting " + hal_pin + ": " + str(e.stderr))
-                except FileNotFoundError:
-                    print("halcmd not found - is the LinuxCNC environment sourced?")
+                    hal_pin = "hm2_7i92.0.stepgen." + stepgen_ch + ".position-scale"
+                    try:
+                        subprocess.run(
+                            ["halcmd", "setp", hal_pin, str(scale)],
+                            check=True,
+                            capture_output=True,
+                            text=True
+                        )
+                        print("Loaded " + hal_pin + " = " + str(scale))
+                    except subprocess.CalledProcessError as e:
+                        print("Error setting " + hal_pin + ": " + str(e.stderr))
+                    except FileNotFoundError:
+                        print("halcmd not found - is the LinuxCNC environment sourced?")
 
                 if axis_id in COMMENT_AXES and "comment" in entry:
                     # Only patches REB_Settings_v1.ini - the main panel's
@@ -1432,6 +1521,24 @@ class HandlerClass:
                     # up next time that component starts, the same way
                     # _load_axis_comments only runs once at startup today.
                     self._save_axis_comment(axis_id, entry["comment"])
+
+                # PID gains (v2 - see _migrate_settings_v1_to_v2): scale
+                # and PID are independent, same as Export/Import - a file
+                # missing one shouldn't block the other. Straight to the
+                # widgets via _apply_pid_gains, which pushes to the live
+                # pid.* HAL gain pin the same way a live edit would (no
+                # abort/disable needed - see _pid_set's docstring).
+                if axis_id in PID_AXES and "pid" in entry:
+                    self._apply_pid_gains(
+                        entry["pid"], lambda param, axis_id=axis_id: axis_id + "_Set_" + param
+                    )
+                elif axis_id in PID_SPINDLE_LOOPS:
+                    for suffix, block_tag in (("Pos", "pid_pos"), ("Vel", "pid_vel")):
+                        if block_tag in entry:
+                            self._apply_pid_gains(
+                                entry[block_tag],
+                                lambda param, axis_id=axis_id, suffix=suffix: axis_id + "_Set_" + param + "_" + suffix
+                            )
 
             notes_view = self.builder.get_object("Settings_Notes")
             if notes_view is not None:
@@ -2400,6 +2507,58 @@ class HandlerClass:
         print("FUNCTION OpenGcodeQuickReference")
 
         url = "https://linuxcnc.org/docs/html/gcode.html"
+        webbrowser.open(url)
+
+        Prt1 = "Opening website " + url
+        print(Prt1)
+
+#######################################################################
+# OpenPidTuningReference
+# Purpose:              Opens LinuxCNC's own documentation for the pid
+#                           HAL component (the control loop the Stepper
+#                           Motor Tuning tab's P/I/D/FF0/FF1/FF2 spin
+#                           buttons drive) in a web browser - the same
+#                           content as the locally-installed `man pid`
+#                           page, which is also where the per-widget
+#                           tooltip text on that tab was sourced from.
+# Updated:              ver 1.0, 1 August 2026, Claude
+# ---------------------------------------------------------------------
+# Called from:
+#   UI:                 REB_Tab_Settings_v1
+#   Button:              PID_Tuning_Reference  (GtkButton)
+#   Signal:              GtkButton/clicked
+#######################################################################
+    def OpenPidTuningReference(self,widget):
+
+        print("=================================================")
+        print("FUNCTION OpenPidTuningReference")
+
+        url = "https://linuxcnc.org/docs/html/man/man9/pid.9.html"
+        webbrowser.open(url)
+
+        Prt1 = "Opening website " + url
+        print(Prt1)
+
+#######################################################################
+# OpenPidControllerWikipedia
+# Purpose:              Opens Wikipedia's PID controller article -
+#                           general background on what a PID controller
+#                           is, separate from LinuxCNC's own
+#                           pid-HAL-component-specific reference
+#                           (OpenPidTuningReference above).
+# Updated:              ver 1.0, 1 August 2026, Claude
+# ---------------------------------------------------------------------
+# Called from:
+#   UI:                 REB_Tab_Settings_v1
+#   Button:              PID_Controller_Wikipedia  (GtkButton)
+#   Signal:              GtkButton/clicked
+#######################################################################
+    def OpenPidControllerWikipedia(self,widget):
+
+        print("=================================================")
+        print("FUNCTION OpenPidControllerWikipedia")
+
+        url = "https://en.wikipedia.org/wiki/PID_controller"
         webbrowser.open(url)
 
         Prt1 = "Opening website " + url
@@ -3864,6 +4023,15 @@ def _pid_set(hal_pin):
     REB_Settings_v1.ini itself is not written here - same as scale,
     that only happens at shutdown (REB_Scale_Persist.py reading the
     live HAL pins), not on every keystroke/spin-click.
+
+    Also marks the active .settings.ini dirty (_mark_settings_dirty),
+    now that PID gains are part of that format (v2 - see
+    _migrate_settings_v1_to_v2) instead of being excluded from it. Safe
+    to call unconditionally: _mark_settings_dirty already no-ops during
+    a programmatic load (self._applying_settings), the same guard that
+    already covers set_value() calls on the Scale/comment/notes widgets
+    from _load_settings_file - so this only fires for a real live edit
+    or an Import_Settings PID import, not a Load.
     '''
     def handler(self, widget):
         value = widget.get_value()
@@ -3879,6 +4047,7 @@ def _pid_set(hal_pin):
             print("Error setting " + hal_pin + ": " + e.stderr)
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
+        self._mark_settings_dirty()
     return handler
 
 for _axis_id, _component in PID_AXES.items():
