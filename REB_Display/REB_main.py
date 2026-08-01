@@ -137,14 +137,6 @@ SIMULTANEOUS_INDEX_TIMEOUT = 20.0
 
 SETTINGS_PATH = "/home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Settings_v1.ini"
 
-# REB.ini lives in this repo (one directory up from REB_Display/), not in
-# RoseEngineButlerLocal - computed from this file's own location rather than
-# hardcoded like SETTINGS_PATH above, since this repo (unlike the Local
-# sibling) is expected to be relocatable/clonable.
-REB_INI_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "REB.ini"
-)
-
 # User-facing, explicitly named/located settings snapshots (see
 # docs/settings_file.md) - separate from and in addition to the automatic,
 # fixed-path REB_Settings_v1.ini above. format_version is written into
@@ -452,95 +444,6 @@ def _save_max_jog_speed(value):
         print("Saved max_jog_speed = " + value_text)
     except OSError as e:
         print("Could not write " + SETTINGS_PATH + ": " + str(e))
-
-def _apply_max_jog_speed_to_ini(value):
-    '''
-    Patches REB.ini's MAX_LINEAR_VELOCITY in both [TRAJ] (the trajectory
-    planner's actual hard ceiling for every move, jog or program - the
-    live "Max Velocity" override can never exceed this) and [DISPLAY]
-    (just the range of the AXIS GUI's own Jog Speed slider) so the two
-    stay in sync. Only takes effect on the next LinuxCNC start (REB.ini
-    is read once at launch) - see _show_restart_required_popup, shown
-    right after this runs.
-
-    Deliberately does NOT touch any [JOINT_n]STEPGEN_MAXVEL: those are
-    hardware-derived per-axis ceilings (see REB.ini's own tuning
-    comments) and may legitimately sit below this global jog cap already
-    (e.g. Z's stepgen tops out well under X's) - this setting only
-    lowers the shared ceiling everyone jogs under, it never raises an
-    axis past what its own hardware can do.
-    '''
-    try:
-        with open(REB_INI_PATH, "r") as f:
-            text = f.read()
-    except OSError as e:
-        print("Could not read " + REB_INI_PATH + ": " + str(e))
-        return
-
-    value_text = "%.4f" % value
-
-    new_text, n = re.subn(
-        r'(?m)^(MAX_LINEAR_VELOCITY\s*= )\S+',
-        lambda m: m.group(1) + value_text,
-        text
-    )
-    if n == 0:
-        print("MAX_LINEAR_VELOCITY line not found in " + REB_INI_PATH)
-
-    try:
-        with open(REB_INI_PATH, "w") as f:
-            f.write(new_text)
-        print("Updated " + str(n) + " MAX_LINEAR_VELOCITY line(s) in " + REB_INI_PATH)
-    except OSError as e:
-        print("Could not write " + REB_INI_PATH + ": " + str(e))
-
-def _apply_measurement_system_to_ini(system):
-    '''
-    Patches REB.ini's [TRAJ] LINEAR_UNITS and each linear [JOINT_n]'s UNITS
-    to match the chosen Measurement System. Only takes effect on the next
-    LinuxCNC start (REB.ini is read once at launch) - see
-    _show_restart_required_popup, shown right after this runs.
-
-    Matches the file's existing casing convention: LINEAR_UNITS lowercase
-    ("inch"/"mm"), per-joint UNITS uppercase ("INCH"/"MM") - both accepted
-    case-insensitively by LinuxCNC, kept this way only for consistency with
-    what was already there. JOINT_2 (B, angular) uses UNITS = DEGREE and is
-    never matched by the INCH/MM pattern below, so it's left untouched.
-    '''
-    try:
-        with open(REB_INI_PATH, "r") as f:
-            text = f.read()
-    except OSError as e:
-        print("Could not read " + REB_INI_PATH + ": " + str(e))
-        return
-
-    if system == "Metric":
-        linear_units, joint_units = "mm", "MM"
-    else:
-        linear_units, joint_units = "inch", "INCH"
-
-    new_text, n1 = re.subn(
-        r'(?m)^(LINEAR_UNITS\s*= )\S+',
-        lambda m: m.group(1) + linear_units,
-        text,
-        count=1
-    )
-    if n1 == 0:
-        print("LINEAR_UNITS line not found in " + REB_INI_PATH)
-
-    new_text, n2 = re.subn(
-        r'(?m)^(UNITS\s*= )(INCH|MM)$',
-        lambda m: m.group(1) + joint_units,
-        new_text
-    )
-
-    try:
-        with open(REB_INI_PATH, "w") as f:
-            f.write(new_text)
-        print("Updated " + str(n1) + " LINEAR_UNITS line(s) and " + str(n2)
-              + " UNITS line(s) in " + REB_INI_PATH)
-    except OSError as e:
-        print("Could not write " + REB_INI_PATH + ": " + str(e))
 
 # The indexing Fwd/Rev handlers block on c.wait_complete() for as long as
 # each M19 takes to converge (or time out), which otherwise leaves the UI
@@ -1348,12 +1251,16 @@ class HandlerClass:
 #                           tab's "Other" section. Updates this
 #                           component's own unit-of-measure labels for
 #                           immediate feedback, persists the choice to
-#                           REB_Settings_v1.ini, patches REB.ini's
-#                           LINEAR_UNITS/UNITS, and warns that a restart
+#                           REB_Settings_v1.ini, and warns that a restart
 #                           is needed for the new units to actually take
-#                           effect (REB.ini is only read at LinuxCNC
-#                           startup).
-# Updated:              ver 1.0, 30 July 2026, Claude
+#                           effect. REB.ini itself is never patched here
+#                           any more - REB_Setup/REB_Launch.sh overlays
+#                           this persisted choice onto a fresh copy of
+#                           REB.ini (RoseEngineButlerLocal/REB.local.ini)
+#                           on every LinuxCNC launch, so a `git pull` of
+#                           REB.ini can never clobber it (see
+#                           REB_Setup/REB_Generate_Local_Ini.py).
+# Updated:              ver 1.1, 1 August 2026, Claude
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Tab_Settings_v1
@@ -1370,20 +1277,21 @@ class HandlerClass:
 
         self._apply_measurement_system_labels(system)
         _save_measurement_system(system)
-        _apply_measurement_system_to_ini(system)
         _show_restart_required_popup(widget)
 
 #######################################################################
 # Max_Jog_Speed_Changed
 # Purpose:              User changed the Max Jog Speed on the Settings
 #                           tab's "General" section. Persists the value
-#                           to REB_Settings_v1.ini, patches REB.ini's
-#                           [TRAJ]/[DISPLAY] MAX_LINEAR_VELOCITY, and
-#                           warns that a restart is needed (REB.ini is
-#                           only read at LinuxCNC startup - this is a
-#                           trajectory-planner/GUI-startup ceiling, not
-#                           a live HAL pin like Scale/PID).
-# Updated:              ver 1.0, 1 August 2026, Claude
+#                           to REB_Settings_v1.ini and warns that a
+#                           restart is needed. REB.ini itself is never
+#                           patched here any more - REB_Setup/REB_Launch.sh
+#                           overlays this persisted value onto a fresh
+#                           copy of REB.ini (RoseEngineButlerLocal/
+#                           REB.local.ini) on every LinuxCNC launch, so a
+#                           `git pull` of REB.ini can never clobber it
+#                           (see REB_Setup/REB_Generate_Local_Ini.py).
+# Updated:              ver 1.1, 1 August 2026, Claude
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Tab_Settings_v1
@@ -1396,7 +1304,6 @@ class HandlerClass:
 
         value = widget.get_value()
         _save_max_jog_speed(value)
-        _apply_max_jog_speed_to_ini(value)
         _show_restart_required_popup(
             widget,
             "The Max Jog Speed change will not take effect until you exit "

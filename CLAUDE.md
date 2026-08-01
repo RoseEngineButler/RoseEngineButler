@@ -18,11 +18,18 @@ This repo (`RoseEngineButler`) is the **shared/distributable** config. A sibling
 
 The repo also ships its own `REB_Custom/REB_Custom.hal` and `REB_Custom/REB_Tool.tbl` as templates/fallback copies — don't confuse the two when tracing which file is actually loaded at runtime (check the absolute paths in REB.ini's `[HAL]` and `[EMCIO]` sections).
 
-`sim.var` / `sim.var.bak` and `REB_Display/__pycache__/` appearing in `git status` are runtime artifacts, not tracked source — don't commit them.
+`sim.var` / `sim.var.bak`, `REB.local.ini`, and `REB_Display/__pycache__/` appearing in `git status` are runtime artifacts (all gitignored), not tracked source — don't commit them.
+
+**`REB.local.ini`** (gitignored, lives right next to `REB.ini` in this repo's own directory — see why below) is regenerated on every launch by `REB_Setup/REB_Generate_Local_Ini.py`: a full copy of REB.ini with this machine's persisted Max Jog Speed / Measurement System (from `RoseEngineButlerLocal/REB_Settings_v1.ini`) overlaid onto it. This is the file LinuxCNC is actually launched against (see `REB_Setup/REB_Launch.sh`) — never edit it directly, it's overwritten on the next launch.
+
+Why it exists: `[TRAJ]`/`[DISPLAY]` `MAX_LINEAR_VELOCITY` and `[TRAJ]LINEAR_UNITS`/`[JOINT_n]UNITS` are read once by LinuxCNC at process startup — before any HAL component or `REB_main.py` runs — so, unlike stepgen scale/PID gains (live HAL pins), they can't be corrected mid-session. An earlier version of the Settings tab's Max Jog Speed / Measurement System controls patched these values directly into the tracked REB.ini, which meant a `git pull` of someone else's REB.ini change could silently clobber a machine's own choice. `REB_main.py` only ever writes to `REB_Settings_v1.ini` now; it no longer touches REB.ini at all.
+
+Why it must live next to REB.ini and NOT in `RoseEngineButlerLocal`: LinuxCNC treats the directory of whichever ini file is actually passed on its command line as "the configuration directory," and resolves every *relative* path anywhere in that config against it — REB.ini's own `HALFILE = REB.hal`, `POSTGUI_HALFILE = REB_Display/REB_PostGUI_v1.hal`, `PARAMETER_FILE = sim.var`, and even the relative `loadusr python3 REB_Display/REB_Scale_Persist.py` line inside `REB_Shutdown.hal`. Generating `REB.local.ini` into `RoseEngineButlerLocal` broke every one of those (confirmed live: `CANNOT FIND FILE FOR:REB.hal`, and `REB_Scale_Persist.py` not found at shutdown) since that became the new configuration directory. Writing it next to REB.ini keeps every relative path resolving exactly where it always has.
 
 ## Architecture
 
 **Load order or a LinuxCNC session** (see `REB.ini`):
+0. `REB_Setup/REB_Launch.sh` — the actual desktop-launcher entry point (not `linuxcnc REB.ini` directly). Runs `REB_Generate_Local_Ini.py` to regenerate `REB.local.ini` (next to REB.ini) from the tracked REB.ini, then execs `linuxcnc` against that generated file.
 1. `REB.ini` — the master config: `[EMC]`/`[DISPLAY]`/`[KINS]`/`[TRAJ]` sections plus one `[AXIS_*]`/`[JOINT_n]` section per axis and one `[SPINDLE_n]` per spindle. All axis tuning (PID gains, STEPGEN_MAXVEL/MAXACCEL, step timing) lives here now — the old per-axis `REB_Axes/*.inc` files were merged into REB.ini's `[JOINT_n]`/`[SPINDLE_n]` sections (see git history) and no longer exist.
 2. `REB.hal` — loads realtime components (`hostmot2`, `hm2_eth`, `pid`, `orient`, `sum2`) and wires each joint's stepgen ↔ PID ↔ HAL pins. **Not meant to be user-edited.**
 3. `RoseEngineButlerLocal/REB_Custom/REB_Custom.hal` — user HAL additions, loaded after REB.hal.

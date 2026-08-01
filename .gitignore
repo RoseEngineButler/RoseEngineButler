@@ -7,6 +7,7 @@ __pycache__/
 
 # Generated/runtime files
 /REB.ini.expanded
+/REB.local.ini
 /sim.var
 /sim.var.bak
 REB_Display/idx_debug.log
