@@ -20,28 +20,34 @@
 #   Regenerates REB.local.ini (written alongside REB.ini, in this repo's
 #   own directory - see below for why it can't live in
 #   RoseEngineButlerLocal) from this repo's tracked REB.ini, overlaying
-#   whatever local Max Jog Speed / Measurement System choices are
-#   currently persisted in RoseEngineButlerLocal/REB_Settings_v1.ini.
+#   whatever local Max Jog Speed / the five VELOCITY_SETTINGS jog-speed
+#   values (Default/Max/Min Angular, Default/Min Linear) / Measurement
+#   System choices are currently persisted in
+#   RoseEngineButlerLocal/REB_Settings_v1.ini.
 #
-#   REB.ini's [TRAJ]/[DISPLAY] MAX_LINEAR_VELOCITY and [TRAJ]LINEAR_UNITS
-#   / [JOINT_n]UNITS are read once by LinuxCNC at process startup, before
-#   any HAL component or the GladeVCP panel's own Python (REB_main.py)
-#   ever runs - so they can't be corrected from within a running session
-#   the way stepgen scale/PID gains are (those have real HAL pins).
+#   REB.ini's [TRAJ]/[DISPLAY] MAX_LINEAR_VELOCITY (and its four
+#   VELOCITY_SETTINGS siblings) and [TRAJ]LINEAR_UNITS / [JOINT_n]UNITS
+#   are read once by LinuxCNC at process startup, before any HAL
+#   component or the GladeVCP panel's own Python (REB_main.py) ever
+#   runs - so they can't be corrected from within a running session the
+#   way stepgen scale/PID/backlash are (those have real HAL pins).
 #   REB_main.py used to patch them directly into the tracked REB.ini, but
 #   that meant a `git pull` of someone else's REB.ini change could
 #   silently overwrite this machine's own jog-speed/units choice.
 #
 #   Run this instead, before every LinuxCNC launch (see REB_Launch.sh):
 #   it always starts from the current tracked REB.ini and overlays only
-#   the two settings below, so upstream REB.ini edits still flow through
+#   the settings below, so upstream REB.ini edits still flow through
 #   untouched and the local choice never gets committed or clobbered.
 #
 #   A setting is only overlaid if a persisted value actually exists in
-#   REB_Settings_v1.ini - if the Settings tab's Max Jog Speed /
-#   Measurement System controls have never been touched on this machine,
-#   REB.ini's own shipped values are carried through exactly as
-#   committed.
+#   REB_Settings_v1.ini - if a given Settings tab control has never been
+#   touched on this machine, REB.ini's own shipped value for it is
+#   carried through exactly as committed (see VELOCITY_SETTINGS/
+#   _load_velocity_settings in REB_main.py, which apply that same
+#   REB.ini-shipped value as their in-memory fallback for exactly this
+#   reason - the two stay in sync until an operator actually changes
+#   one on the Settings tab).
 #
 #   REB.local.ini MUST live next to REB.ini (this repo's own directory),
 #   not in RoseEngineButlerLocal: LinuxCNC treats the directory of the
@@ -143,6 +149,39 @@ def _overlay_max_jog_speed(text, xml_text):
     return text, (value_text, n)
 
 
+# REB_Settings_v1.ini tag -> REB.ini key, for the five jog-speed values
+# the Settings tab's General tab makes user-editable alongside Max Jog
+# Speed above. Mirrors VELOCITY_SETTINGS in REB_main.py (see AXIS_STEPGEN
+# there for why small constants like this are duplicated across scripts
+# rather than imported). Each key is overlaid everywhere it appears in
+# REB.ini - both [DISPLAY] (jog slider) and [TRAJ] (trajectory-planner
+# ceiling) for the three keys present in both sections - same as
+# MAX_LINEAR_VELOCITY above, per an explicit decision to unify them
+# under one operator-facing control rather than leave two different
+# values behind one label.
+VELOCITY_SETTINGS = {
+    "default_linear_velocity":  "DEFAULT_LINEAR_VELOCITY",
+    "min_linear_velocity":      "MIN_LINEAR_VELOCITY",
+    "max_angular_velocity":     "MAX_ANGULAR_VELOCITY",
+    "default_angular_velocity": "DEFAULT_ANGULAR_VELOCITY",
+    "min_angular_velocity":     "MIN_ANGULAR_VELOCITY",
+}
+
+
+def _overlay_velocity_setting(text, xml_text, xml_tag, ini_key):
+    match = re.search(r'<' + xml_tag + r'>([0-9.eE+-]+)</' + xml_tag + r'>', xml_text)
+    if not match:
+        return text, None
+
+    value_text = "%.6f" % float(match.group(1))
+    text, n = re.subn(
+        r'(?m)^(' + ini_key + r'\s*= )\S+',
+        lambda m: m.group(1) + value_text,
+        text,
+    )
+    return text, (value_text, n)
+
+
 def _overlay_measurement_system(text, xml_text):
     match = re.search(r'<measurement_system>(Metric|Imperial)</measurement_system>', xml_text)
     if not match:
@@ -186,6 +225,12 @@ def main():
     if jog_result:
         value_text, n = jog_result
         print("Overlaid MAX_LINEAR_VELOCITY = " + value_text + " (" + str(n) + " line(s))")
+
+    for xml_tag, ini_key in VELOCITY_SETTINGS.items():
+        text, result = _overlay_velocity_setting(text, xml_text, xml_tag, ini_key)
+        if result:
+            value_text, n = result
+            print("Overlaid " + ini_key + " = " + value_text + " (" + str(n) + " line(s))")
 
     text, units_result = _overlay_measurement_system(text, xml_text)
     if units_result:

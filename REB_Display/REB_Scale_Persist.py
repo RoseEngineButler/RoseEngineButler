@@ -18,6 +18,14 @@ longer set from REB.ini directly), so this is the only place that
 carries a retuned gain forward into the next session - exactly mirroring
 how scale already worked before PID gains were added to this file.
 
+Also persists each axis's/spindle's live joint.N.backlash HAL
+parameter into that axis's <backlash> value the same way - see
+JOINT_NUMBER below. Set live from REB_Settings_v1.ini by REB_main.py's
+_load_backlash_settings() at Settings-tab load and by each Backlash
+spin button's value-changed handler while running (see REB.ini for why
+it's no longer relied on directly at LinuxCNC startup beyond an initial
+default).
+
 Also offers to save any pending named .settings.ini changes (see
 docs/settings_file.md) - see prompt_save_pending_settings() below for
 why that lives here rather than in REB_main.py/the Settings tab itself.
@@ -45,6 +53,22 @@ AXIS_STEPGEN = {
     "W":   "00",
     "Sp0": "06",
     "Sp1": "07",
+}
+
+# Axis id -> LinuxCNC joint number, for the live joint.N.backlash HAL
+# parameter. Mirrors JOINT_NUMBER in REB_main.py (see AXIS_STEPGEN above
+# for why small constants are duplicated across these two scripts
+# rather than imported) - NOT the same numbering as AXIS_STEPGEN's hm2
+# stepgen channel map.
+JOINT_NUMBER = {
+    "X":   0,
+    "Z":   1,
+    "B":   2,
+    "U":   3,
+    "V":   4,
+    "W":   5,
+    "Sp1": 6,
+    "Sp0": 7,
 }
 
 SETTINGS_PATH = "/home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Settings_v1.ini"
@@ -114,6 +138,49 @@ def get_pid_gain(hal_component, param):
         text=True
     )
     return result.stdout.strip()
+
+def get_backlash(joint_num):
+    hal_pin = "joint." + str(joint_num) + ".backlash"
+    result = subprocess.run(
+        ["halcmd", "getp", hal_pin],
+        check=True,
+        capture_output=True,
+        text=True
+    )
+    return result.stdout.strip()
+
+def set_single_value(xml_text, axis_id, tag, value):
+    '''
+    Patches a single flat <tag>value</tag> element (e.g. <backlash>)
+    inside a specific axis's <axis id="..."> block, leaving everything
+    else in the file - including any other element on that same axis -
+    untouched. Same two-step "find the axis block, then find the tag
+    within it" approach as set_pid_block above (more robust than
+    assuming a fixed element order within <axis>, unlike the scale
+    patch in main() below). Returns (new_xml_text, ok).
+    '''
+    axis_match = re.search(
+        r'<axis\s+id="' + re.escape(axis_id) + r'">.*?</axis>',
+        xml_text, re.DOTALL
+    )
+    if not axis_match:
+        print("No <axis id=\"" + axis_id + "\"> entry found in "
+              + SETTINGS_PATH + " - leaving it unchanged")
+        return xml_text, False
+
+    axis_block = axis_match.group(0)
+    new_axis_block, count = re.subn(
+        r'(<' + tag + r'>)-?[\d.]+(</' + tag + r'>)',
+        r'\g<1>' + value + r'\g<2>',
+        axis_block, count=1
+    )
+    if count == 0:
+        print("No <" + tag + "> entry found for axis " + axis_id
+              + " in " + SETTINGS_PATH + " - leaving it unchanged")
+        return xml_text, False
+
+    new_xml_text = xml_text[:axis_match.start()] + new_axis_block + xml_text[axis_match.end():]
+    return new_xml_text, True
 
 def set_pid_block(xml_text, axis_id, block_tag, values):
     '''
@@ -225,6 +292,20 @@ def main():
             xml_text, ok = set_pid_block(xml_text, spindle_id, block_tag, values)
             if ok:
                 print("Saved " + spindle_id + " " + suffix + " PID gains = " + str(values))
+
+    for axis_id, joint_num in JOINT_NUMBER.items():
+        try:
+            value = get_backlash(joint_num)
+        except subprocess.CalledProcessError as e:
+            print("Error reading backlash for axis " + axis_id + ": " + e.stderr)
+            continue
+        except FileNotFoundError:
+            print("halcmd not found - is the LinuxCNC environment sourced?")
+            sys.exit(1)
+
+        xml_text, ok = set_single_value(xml_text, axis_id, "backlash", value)
+        if ok:
+            print("Saved " + axis_id + " backlash = " + value)
 
     try:
         with open(SETTINGS_PATH, "w") as f:

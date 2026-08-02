@@ -93,6 +93,23 @@ AXIS_STEPGEN = {
     "Sp1": "07",
 }
 
+# Axis id -> LinuxCNC joint number, for the live joint.N.backlash HAL
+# parameter (motion's own per-joint backlash compensation - see
+# REB.ini's [JOINT_n] sections and the axis/joint map in CLAUDE.md).
+# NOT the same numbering as AXIS_STEPGEN's hm2 stepgen channel map
+# above - joint numbers come from [KINS]JOINTS/trivkins ordering, not
+# hm2 wiring.
+JOINT_NUMBER = {
+    "X":   0,
+    "Z":   1,
+    "B":   2,
+    "U":   3,
+    "V":   4,
+    "W":   5,
+    "Sp1": 6,
+    "Sp0": 7,
+}
+
 # Axis id -> HAL `pid` component instance driving that axis's PID loop
 # (see the `loadrt pid names=...` line and each axis's `setp pid.<x>.*`
 # block in REB.hal). Sp0/Sp1 each have two loops instead of one - a
@@ -442,6 +459,66 @@ def _save_max_jog_speed(value):
         with open(SETTINGS_PATH, "w") as f:
             f.write(new_text)
         print("Saved max_jog_speed = " + value_text)
+    except OSError as e:
+        print("Could not write " + SETTINGS_PATH + ": " + str(e))
+
+# Settings tab jog-speed-grid widget id -> (REB_Settings_v1.ini tag,
+# fallback default matching REB.ini's own shipped value). Mirrors
+# MAX_LINEAR_VELOCITY/<max_jog_speed> above, generalized to the other
+# [DISPLAY]/[TRAJ] jog-speed values (see REB_Setup/REB_Generate_Local_Ini.py
+# for the overlay side - like Max Jog Speed, each of these patches ALL
+# occurrences of its ini key, both [DISPLAY] (jog slider) and [TRAJ]
+# (trajectory-planner ceiling), since REB.ini ships the same value in
+# both places for these keys - unlike MAX_ANGULAR_VELOCITY historically,
+# where [TRAJ] carried a much larger, effectively-unlimited value; this
+# was a deliberate choice to unify them under one operator-facing
+# control rather than leave two different meanings behind one label).
+VELOCITY_SETTINGS = {
+    "Default_Linear_Velocity":  ("default_linear_velocity",  0.250000),
+    "Min_Linear_Velocity":      ("min_linear_velocity",      0.016670),
+    "Max_Angular_Velocity":     ("max_angular_velocity",     1.000000),
+    "Default_Angular_Velocity": ("default_angular_velocity", 12.000000),
+    "Min_Angular_Velocity":     ("min_angular_velocity",     1.666667),
+}
+
+def _save_velocity_setting(tag, value):
+    '''
+    Persists one of VELOCITY_SETTINGS' values into REB_Settings_v1.ini -
+    generic version of _save_max_jog_speed above, parameterized by tag
+    name since these five all follow the exact same shape.
+    '''
+    try:
+        with open(SETTINGS_PATH, "r") as f:
+            xml_text = f.read()
+    except OSError as e:
+        print("Could not read " + SETTINGS_PATH + ": " + str(e))
+        return
+
+    value_text = "%.6f" % value
+
+    if re.search(r'<' + tag + r'>[0-9.eE+-]+</' + tag + r'>', xml_text):
+        new_text, count = re.subn(
+            r'<' + tag + r'>[0-9.eE+-]+</' + tag + r'>',
+            "<" + tag + ">" + value_text + "</" + tag + ">",
+            xml_text,
+            count=1
+        )
+    else:
+        new_text, count = re.subn(
+            r'(<settings>)',
+            r'\1\n    <' + tag + '>' + value_text + '</' + tag + '>',
+            xml_text,
+            count=1
+        )
+
+    if count == 0:
+        print("Could not find a place to store <" + tag + "> in " + SETTINGS_PATH)
+        return
+
+    try:
+        with open(SETTINGS_PATH, "w") as f:
+            f.write(new_text)
+        print("Saved " + tag + " = " + value_text)
     except OSError as e:
         print("Could not write " + SETTINGS_PATH + ": " + str(e))
 
@@ -807,6 +884,66 @@ class HandlerClass:
                       lambda param, spindle_id=spindle_id, suffix=suffix:
                           spindle_id + "_Set_" + param + "_" + suffix)
 
+    def _load_backlash_settings(self):
+        '''
+        Reads persisted axis/spindle backlash values from
+        REB_Settings_v1.ini (each axis's <backlash> element) and applies
+        them to the Settings tab's Backlash spin buttons and the live
+        joint.N.backlash HAL parameters - mirrors _load_scale_settings
+        above. REB_Scale_Persist.py is what writes these back into
+        REB_Settings_v1.ini at shutdown, the same as it already does for
+        scale and PID gains.
+
+        Only runs in the component that actually owns the Settings tab's
+        Backlash spin buttons (X_Set_Backlash etc.) - every other tab/
+        panel also using REB_main.py will find that widget missing and
+        return immediately.
+        '''
+        if self.builder.get_object("X_Set_Backlash") is None:
+            return
+
+        try:
+            with open(SETTINGS_PATH, "r") as f:
+                xml_text = f.read()
+        except OSError as e:
+            print("Could not read " + SETTINGS_PATH + ": " + str(e))
+            return
+
+        for axis_id, joint_num in JOINT_NUMBER.items():
+            axis_match = re.search(
+                r'<axis\s+id="' + re.escape(axis_id) + r'">(.*?)</axis>',
+                xml_text, re.DOTALL
+            )
+            if not axis_match:
+                print("No <axis id=\"" + axis_id + "\"> entry found in " + SETTINGS_PATH)
+                continue
+
+            match = re.search(r'<backlash>(-?[\d.]+)</backlash>', axis_match.group(1))
+            if not match:
+                print("No stored backlash found for axis " + axis_id
+                      + " in " + SETTINGS_PATH)
+                continue
+
+            value = float(match.group(1))
+
+            widget = self.builder.get_object(axis_id + "_Set_Backlash")
+            if widget is not None:
+                widget.set_value(value)
+
+            hal_pin = "joint." + str(joint_num) + ".backlash"
+            try:
+                subprocess.run(
+                    ["halcmd", "setp", hal_pin, str(value)],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                print("Restored " + hal_pin + " = " + str(value))
+            except subprocess.CalledProcessError as e:
+                print("Error restoring " + hal_pin + ": " + e.stderr)
+            except FileNotFoundError:
+                print("halcmd not found - is the LinuxCNC environment sourced?")
+
     def _load_axis_comments(self):
         '''
         Reads each axis's persisted user comment from REB_Settings_v1.ini
@@ -948,6 +1085,38 @@ class HandlerClass:
             self._applying_max_jog_speed = True
             spin.set_value(value)
             self._applying_max_jog_speed = False
+
+    def _load_velocity_settings(self):
+        '''
+        Reads each of VELOCITY_SETTINGS' persisted values from
+        REB_Settings_v1.ini (default to REB.ini's own shipped value if
+        never persisted) and applies them to their Settings tab spin
+        buttons, if this component owns them - mirrors
+        _load_max_jog_speed above, generalized to all five at once under
+        one shared guard flag (they're only ever loaded together, so one
+        flag covering the whole batch is enough - no risk of one load
+        call falsely suppressing a genuine edit to a different widget).
+        '''
+        try:
+            with open(SETTINGS_PATH, "r") as f:
+                xml_text = f.read()
+        except OSError as e:
+            print("Could not read " + SETTINGS_PATH + ": " + str(e))
+            xml_text = ""
+
+        self._applying_velocity_settings = True
+        try:
+            for widget_id, (tag, default) in VELOCITY_SETTINGS.items():
+                value = default
+                match = re.search(r'<' + tag + r'>([0-9.eE+-]+)</' + tag + r'>', xml_text)
+                if match:
+                    value = float(match.group(1))
+
+                spin = self.builder.get_object(widget_id)
+                if spin is not None:
+                    spin.set_value(value)
+        finally:
+            self._applying_velocity_settings = False
 
     def _save_axis_comment(self, axis_id, text):
         '''
@@ -1267,6 +1436,10 @@ class HandlerClass:
             entry = {"scale": widget.get_value() if widget is not None else None}
             if axis_id in COMMENT_AXES:
                 entry["comment"] = self._read_axis_comment(axis_id)
+
+            backlash_widget = self.builder.get_object(axis_id + "_Set_Backlash")
+            if backlash_widget is not None:
+                entry["backlash"] = backlash_widget.get_value()
 
             # PID gains (v2 - see _migrate_settings_v1_to_v2): read the
             # same widgets Export/_export_pid_block reads, straight into
@@ -1629,6 +1802,29 @@ class HandlerClass:
                     except FileNotFoundError:
                         print("halcmd not found - is the LinuxCNC environment sourced?")
 
+                if "backlash" not in entry:
+                    print("No stored backlash for axis " + axis_id + " in " + path)
+                else:
+                    backlash = entry["backlash"]
+
+                    spin = self.builder.get_object(axis_id + "_Set_Backlash")
+                    if spin is not None:
+                        spin.set_value(backlash)
+
+                    hal_pin = "joint." + str(JOINT_NUMBER[axis_id]) + ".backlash"
+                    try:
+                        subprocess.run(
+                            ["halcmd", "setp", hal_pin, str(backlash)],
+                            check=True,
+                            capture_output=True,
+                            text=True
+                        )
+                        print("Loaded " + hal_pin + " = " + str(backlash))
+                    except subprocess.CalledProcessError as e:
+                        print("Error setting " + hal_pin + ": " + str(e.stderr))
+                    except FileNotFoundError:
+                        print("halcmd not found - is the LinuxCNC environment sourced?")
+
                 if apply_comments and axis_id in COMMENT_AXES and "comment" in entry:
                     # Only patches REB_Settings_v1.ini - the main panel's
                     # own Comment entries are a different component's
@@ -1871,6 +2067,13 @@ class HandlerClass:
             ET.SubElement(get_axis_el(axis_id), "scale").text = str(spin.get_value())
             exported.append(axis_id + " Scale")
 
+        for axis_id in selected.get("backlash_axes", ()):
+            spin = self.builder.get_object(axis_id + "_Set_Backlash")
+            if spin is None:
+                continue
+            ET.SubElement(get_axis_el(axis_id), "backlash").text = str(spin.get_value())
+            exported.append(axis_id + " Backlash")
+
         for axis_id in selected.get("pid_axes", ()):
             if axis_id in PID_AXES:
                 self._export_pid_block(get_axis_el(axis_id), axis_id, "pid",
@@ -1924,15 +2127,16 @@ class HandlerClass:
 
     def _run_export_selection_dialog(self, widget):
         '''
-        Modal checklist: one row per axis's Scale, one row per axis's/
-        spindle loop's PID gains (P/I/D/FF0/FF1/FF2 as a single unit -
-        Sp0/Sp1 each cover both their position and velocity loops
-        together, matching the coarse per-axis granularity already used
-        for Scale rather than exposing every individual gain), plus
-        Measurement System - all pre-checked, with Select All/None
-        convenience buttons. Returns {"axes": [...ids...], "pid_axes":
-        [...ids...], "measurement_system": bool} on Export, or None if
-        cancelled/nothing was selected.
+        Modal checklist: one row per axis's Scale, one row per axis's
+        Backlash, one row per axis's/spindle loop's PID gains (P/I/D/
+        FF0/FF1/FF2 as a single unit - Sp0/Sp1 each cover both their
+        position and velocity loops together, matching the coarse
+        per-axis granularity already used for Scale/Backlash rather
+        than exposing every individual gain), plus Measurement System -
+        all pre-checked, with Select All/None convenience buttons.
+        Returns {"axes": [...ids...], "backlash_axes": [...ids...],
+        "pid_axes": [...ids...], "measurement_system": bool} on Export,
+        or None if cancelled/nothing was selected.
         '''
         dialog = Gtk.Dialog(
             title="Export Settings - Choose What to Include",
@@ -1957,14 +2161,17 @@ class HandlerClass:
 
         content.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0)
 
-        # Two columns side by side (Scale, PID) so ~19 checkboxes stay a
-        # manageable dialog height instead of one long list.
+        # Three columns side by side (Scale, Backlash, PID) so the
+        # checkboxes stay a manageable dialog height instead of one long
+        # list.
         columns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
         content.pack_start(columns, False, False, 0)
 
         scale_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        backlash_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         pid_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         columns.pack_start(scale_col, False, False, 0)
+        columns.pack_start(backlash_col, False, False, 0)
         columns.pack_start(pid_col, False, False, 0)
 
         def section_label(text):
@@ -1981,6 +2188,14 @@ class HandlerClass:
             scale_col.pack_start(check, False, False, 0)
             checks[axis_id] = check
 
+        backlash_col.pack_start(section_label("Backlash"), False, False, 0)
+        backlash_checks = {}
+        for axis_id in AXIS_STEPGEN:
+            check = Gtk.CheckButton(label=axis_id + " Backlash")
+            check.set_active(True)
+            backlash_col.pack_start(check, False, False, 0)
+            backlash_checks[axis_id] = check
+
         pid_col.pack_start(section_label("PID Gains"), False, False, 0)
         pid_checks = {}
         for axis_id in list(PID_AXES) + list(PID_SPINDLE_LOOPS):
@@ -1995,7 +2210,10 @@ class HandlerClass:
         measurement_check.set_active(True)
         content.pack_start(measurement_check, False, False, 0)
 
-        all_checks = list(checks.values()) + list(pid_checks.values()) + [measurement_check]
+        all_checks = (
+            list(checks.values()) + list(backlash_checks.values())
+            + list(pid_checks.values()) + [measurement_check]
+        )
         select_all_btn.connect("clicked", lambda b: [c.set_active(True) for c in all_checks])
         select_none_btn.connect("clicked", lambda b: [c.set_active(False) for c in all_checks])
 
@@ -2008,13 +2226,19 @@ class HandlerClass:
                 break
 
             axes = [axis_id for axis_id, c in checks.items() if c.get_active()]
+            backlash_axes = [axis_id for axis_id, c in backlash_checks.items() if c.get_active()]
             pid_axes = [axis_id for axis_id, c in pid_checks.items() if c.get_active()]
             measurement_system = measurement_check.get_active()
-            if not axes and not pid_axes and not measurement_system:
+            if not axes and not backlash_axes and not pid_axes and not measurement_system:
                 _show_settings_error(widget, "Select at least one item to export.")
                 continue
 
-            result = {"axes": axes, "pid_axes": pid_axes, "measurement_system": measurement_system}
+            result = {
+                "axes": axes,
+                "backlash_axes": backlash_axes,
+                "pid_axes": pid_axes,
+                "measurement_system": measurement_system,
+            }
             break
 
         dialog.destroy()
@@ -2023,17 +2247,18 @@ class HandlerClass:
 #######################################################################
 # Import_Settings
 # Purpose:              Reads a .export.ini file and applies whatever
-#                           subset of axis Scale/Measurement System
-#                           values it contains to the current settings -
-#                           everything else on the Settings tab is left
-#                           untouched. Applies each value through the
-#                           same widget handlers a live edit would use
-#                           (<Axis>_Set_Scale/Measurement_System_Changed),
+#                           subset of axis Scale/Backlash/PID/
+#                           Measurement System values it contains to the
+#                           current settings - everything else on the
+#                           Settings tab is left untouched. Applies each
+#                           value through the same widget handlers a
+#                           live edit would use (<Axis>_Set_Scale/
+#                           <Axis>_Set_Backlash/Measurement_System_Changed),
 #                           so the usual per-axis safety checks (motion
 #                           abort, disable-if-enabled) and dirty-tracking
 #                           all apply exactly as if the operator had
 #                           typed/selected each value themselves.
-# Updated:              ver 1.0, 30 July 2026, Claude
+# Updated:              ver 1.1, 2 August 2026, Claude
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Tab_Settings_v1
@@ -2105,6 +2330,19 @@ class HandlerClass:
                     if scale is not None:
                         spin.set_value(scale)  # fires <Axis>_Set_Scale: abort/disable-if-enabled/halcmd setp/mark dirty
                         imported.append(axis_id + " Scale")
+
+            backlash_el = axis_el.find("backlash")
+            if backlash_el is not None and backlash_el.text is not None:
+                spin = self.builder.get_object(axis_id + "_Set_Backlash")
+                if spin is not None:
+                    try:
+                        backlash = float(backlash_el.text.strip())
+                    except ValueError:
+                        print("Skipping " + axis_id + " backlash - not a number: " + backlash_el.text)
+                        backlash = None
+                    if backlash is not None:
+                        spin.set_value(backlash)  # fires <Axis>_Set_Backlash: halcmd setp/mark dirty
+                        imported.append(axis_id + " Backlash")
 
             pid_applied = False
             if axis_id in PID_AXES:
@@ -3815,6 +4053,10 @@ class HandlerClass:
         # startup.
         self._applying_max_jog_speed = False
 
+        # Same suppression as above, for _load_velocity_settings driving
+        # the five VELOCITY_SETTINGS spin buttons at startup.
+        self._applying_velocity_settings = False
+
         _install_depress_css()
 
         # Independent pins this component owns, used to force each
@@ -3885,6 +4127,13 @@ class HandlerClass:
         # widgets.
         self._load_pid_settings()
 
+        # Restore persisted backlash values (REB_Settings_v1.ini) into
+        # the Settings tab's Backlash spin buttons and the live
+        # joint.N.backlash HAL parameters. No-ops in every component
+        # other than the Settings tab (REBCnfg), which is the only one
+        # with these widgets.
+        self._load_backlash_settings()
+
         # Restore persisted per-axis user comments (REB_Settings_v1.ini)
         # into the main panel's comment fields. No-ops in every
         # component other than the main panel (gladevcp), which is the
@@ -3925,6 +4174,11 @@ class HandlerClass:
         # Restore the persisted Max Jog Speed (REB_Settings_v1.ini) into
         # the Settings tab's spin button (if owned by this component).
         self._load_max_jog_speed()
+
+        # Restore the five persisted VELOCITY_SETTINGS values
+        # (REB_Settings_v1.ini) into the Settings tab's jog-speed spin
+        # buttons (if owned by this component).
+        self._load_velocity_settings()
 
         # There's no stored "last loaded .settings.ini" carried across restarts
         # (only the auto-persisted REB_Settings_v1.ini values, already
@@ -4176,6 +4430,43 @@ for _axis in LINEAR_AXES:
     setattr(HandlerClass, _axis + "_Set_Scale", _axis_set_scale(_axis))
 del _axis
 
+def _axis_set_backlash(axis):
+    '''
+    Generic value-changed handler for a single axis's/spindle's
+    Backlash spin button: pushes the new value straight to the live
+    joint.N.backlash HAL parameter (motion's own per-joint backlash
+    compensation - see JOINT_NUMBER above). Unlike _axis_set_scale,
+    there's no need to disable the axis first - same reasoning as
+    _pid_set below: a backlash change is safe to make on the fly, it
+    doesn't invalidate an in-progress move the way a scale change can.
+
+    REB_Settings_v1.ini itself is not written here - same as scale/PID,
+    that only happens at shutdown (REB_Scale_Persist.py reading the
+    live HAL pins), not on every keystroke/spin-click.
+    '''
+    hal_pin = "joint." + str(JOINT_NUMBER[axis]) + ".backlash"
+    def handler(self, widget):
+        value = widget.get_value()
+        try:
+            subprocess.run(
+                ["halcmd", "setp", hal_pin, str(value)],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            print("Set " + hal_pin + " = " + str(value))
+        except subprocess.CalledProcessError as e:
+            print("Error setting " + hal_pin + ": " + e.stderr)
+        except FileNotFoundError:
+            print("halcmd not found - is the LinuxCNC environment sourced?")
+        self._mark_settings_dirty()
+    handler.__name__ = axis + "_Set_Backlash"
+    return handler
+
+for _axis_id in JOINT_NUMBER:
+    setattr(HandlerClass, _axis_id + "_Set_Backlash", _axis_set_backlash(_axis_id))
+del _axis_id
+
 def _pid_set(hal_pin):
     '''
     Generic value-changed handler for a single P/I/D/FF0/FF1/FF2 spin
@@ -4230,6 +4521,31 @@ for _spindle_id, _loops in PID_SPINDLE_LOOPS.items():
             _handler.__name__ = _widget_id
             setattr(HandlerClass, _widget_id, _handler)
 del _spindle_id, _loops, _suffix, _component, _param, _widget_id, _handler
+
+def _velocity_setting_changed(tag):
+    '''
+    Generic value-changed handler for one of VELOCITY_SETTINGS' spin
+    buttons: persists to REB_Settings_v1.ini and warns that a restart is
+    needed, same as Max_Jog_Speed_Changed - these are read once by
+    LinuxCNC at process startup (see REB_Setup/REB_Generate_Local_Ini.py),
+    not live HAL pins, so there's no halcmd setp to also do here.
+    '''
+    def handler(self, widget):
+        if self._applying_velocity_settings:
+            return
+        value = widget.get_value()
+        _save_velocity_setting(tag, value)
+        _show_restart_required_popup(
+            widget,
+            "This change will not take effect until you exit and restart LinuxCNC."
+        )
+    return handler
+
+for _widget_id, (_tag, _default) in VELOCITY_SETTINGS.items():
+    _handler = _velocity_setting_changed(_tag)
+    _handler.__name__ = _widget_id + "_Changed"
+    setattr(HandlerClass, _widget_id + "_Changed", _handler)
+del _widget_id, _tag, _default, _handler
 
 def get_handlers(halcomp,builder,useropts):
     '''

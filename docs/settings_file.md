@@ -51,7 +51,7 @@ feature doesn't touch that path (see Decision 4 below for why).
   automatic file — much less fragile to parse/write correctly, and Python's
   `json` module needs no new dependency)
 - **Top-level shape (v2 - see Decision 11 for the `pid`/`pid_pos`/`pid_vel`
-  fields):**
+  fields, and "Backlash added to the Settings tab" below for `backlash`):**
 
 ```json
 {
@@ -60,14 +60,14 @@ feature doesn't touch that path (see Decision 4 below for why).
   "notes": "Tighter B backlash comp for the brass box.\nRun spindle slower than usual on this one.",
   "saved_at": "2026-07-29T14:32:00",
   "axes": {
-    "X":   { "scale": -196000, "comment": "", "pid": { "P": 5, "I": 1, "D": 1.2, "FF0": 0.0, "FF1": 1.0, "FF2": 0.0 } },
-    "Z":   { "scale": 254427,  "comment": "", "pid": { "P": 5, "I": 1, "D": 1.2, "FF0": 0.0, "FF1": 1.0, "FF2": 0.0 } },
-    "B":   { "scale": 57599,   "comment": "", "pid": { "P": 5, "I": 1, "D": 1.2, "FF0": 0.0, "FF1": 1.0, "FF2": 0.0 } },
-    "U":   { "scale": 20320,   "comment": "", "pid": { "P": 5, "I": 1, "D": 1.2, "FF0": 0.0, "FF1": 1.0, "FF2": 0.0 } },
-    "V":   { "scale": 20319,   "comment": "", "pid": { "P": 5, "I": 1, "D": 1.2, "FF0": 0.0, "FF1": 1.0, "FF2": 0.0 } },
-    "W":   { "scale": 20320,   "comment": "", "pid": { "P": 5, "I": 1, "D": 1.2, "FF0": 0.0, "FF1": 1.0, "FF2": 0.0 } },
-    "Sp0": { "scale": 57602, "pid_pos": { "P": 2.0, "I": 1.0, "D": 1.2, "FF0": 0.0, "FF1": 0.0, "FF2": 0.0 }, "pid_vel": { "P": 35, "I": 20, "D": 1.2, "FF0": 1.0, "FF1": 0.0, "FF2": 0.0 } },
-    "Sp1": { "scale": -57599, "pid_pos": { "P": 2.0, "I": 1.0, "D": 1.2, "FF0": 0.0, "FF1": 0.0, "FF2": 0.0 }, "pid_vel": { "P": 35, "I": 20, "D": 1.2, "FF0": 1.0, "FF1": 0.0, "FF2": 0.0 } }
+    "X":   { "scale": -196000, "comment": "", "backlash": 0.0008, "pid": { "P": 5, "I": 1, "D": 1.2, "FF0": 0.0, "FF1": 1.0, "FF2": 0.0 } },
+    "Z":   { "scale": 254427,  "comment": "", "backlash": 0.0,    "pid": { "P": 5, "I": 1, "D": 1.2, "FF0": 0.0, "FF1": 1.0, "FF2": 0.0 } },
+    "B":   { "scale": 57599,   "comment": "", "backlash": 0.02,   "pid": { "P": 5, "I": 1, "D": 1.2, "FF0": 0.0, "FF1": 1.0, "FF2": 0.0 } },
+    "U":   { "scale": 20320,   "comment": "", "backlash": 0.0,    "pid": { "P": 5, "I": 1, "D": 1.2, "FF0": 0.0, "FF1": 1.0, "FF2": 0.0 } },
+    "V":   { "scale": 20319,   "comment": "", "backlash": 0.0,    "pid": { "P": 5, "I": 1, "D": 1.2, "FF0": 0.0, "FF1": 1.0, "FF2": 0.0 } },
+    "W":   { "scale": 20320,   "comment": "", "backlash": 0.0,    "pid": { "P": 5, "I": 1, "D": 1.2, "FF0": 0.0, "FF1": 1.0, "FF2": 0.0 } },
+    "Sp0": { "scale": 57602, "backlash": 0.0, "pid_pos": { "P": 2.0, "I": 1.0, "D": 1.2, "FF0": 0.0, "FF1": 0.0, "FF2": 0.0 }, "pid_vel": { "P": 35, "I": 20, "D": 1.2, "FF0": 1.0, "FF1": 0.0, "FF2": 0.0 } },
+    "Sp1": { "scale": -57599, "backlash": 0.0, "pid_pos": { "P": 2.0, "I": 1.0, "D": 1.2, "FF0": 0.0, "FF1": 0.0, "FF2": 0.0 }, "pid_vel": { "P": 35, "I": 20, "D": 1.2, "FF0": 1.0, "FF1": 0.0, "FF2": 0.0 } }
   }
 }
 ```
@@ -77,7 +77,8 @@ feature doesn't touch that path (see Decision 4 below for why).
   `REB_Scale_Persist.py`). `comment` is only meaningful for
   `COMMENT_AXES = ("X","Z","U","V","W","B")`; omit it for `Sp0`/`Sp1`.
   `pid` (axes)/`pid_pos`+`pid_vel` (`Sp0`/`Sp1`) are optional - see
-  Decision 11.
+  Decision 11. `backlash` is a single value per axis (including `Sp0`/
+  `Sp1`) - see "Backlash added to the Settings tab" below.
 - `name` and `notes` are the two new fields this feature adds beyond what
   today's XML file stores.
 
@@ -782,6 +783,45 @@ commit - the last point they shared):
 - `REB.hal`, `REB.ini`, `CLAUDE.md`, `REB_Setup/REB_Settings_v1.ini`,
   the three file renames, and the two `docs/` files auto-merged cleanly
   with no changes from my side to reconcile against.
+
+### Backlash added to the Settings tab (2 August 2026)
+
+Moved `[JOINT_n]BACKLASH` out of `REB.ini` and onto the Stepper Motor
+Tuning tab as a live-editable value, the same pattern PID gains already
+follow: `REB.ini`'s `BACKLASH = 0.0000` lines are now historical
+starting values only (commented as such), and the real, live value is
+`joint.N.backlash` - a genuine runtime-settable HAL parameter of the
+`motion` component (confirmed via `emccalib`'s own man page, which
+exists specifically to make `[JOINT_n]`-sourced `setp` values like this
+one live-tunable).
+
+- **UI:** one `Backlash` row added to each axis's/spindle's block on
+  the Stepper Motor Tuning grid, right after FF2. For `Sp0`/`Sp1` the
+  spin button sits under the **Position** column only (per Rich's
+  request) - there's no separate velocity-loop backlash, since
+  backlash is a single per-joint quantity, not a Pos/Vel pair.
+- **`REB_main.py`:** new `JOINT_NUMBER` map (axis id → joint number,
+  distinct from `AXIS_STEPGEN`'s hm2 channel numbering), a generic
+  `_axis_set_backlash(axis)` handler factory (mirrors `_pid_set` - no
+  abort/disable dance needed, a backlash change is safe to make live),
+  `_load_backlash_settings()` (mirrors `_load_scale_settings`, called
+  from `__init__` alongside it), and `backlash` support threaded
+  through `_gather_current_settings`/`_load_settings_file` (Save/Load)
+  and Export/Import (a third `Backlash` checklist column, one row per
+  axis, same granularity as Scale).
+- **`REB_Scale_Persist.py`:** new `JOINT_NUMBER` map, `get_backlash()`,
+  and a generic `set_single_value()` patch helper (same robust
+  find-the-axis-block-first approach as `set_pid_block`, rather than
+  scale's fragile immediate-adjacency regex) - persists live
+  `joint.N.backlash` into each axis's `<backlash>` element at shutdown.
+- **Seed data:** `<backlash>0.0000</backlash>` added to every `<axis>`
+  block in both `REB_Setup/REB_Settings_v1.ini` (the shipped template)
+  and the live `RoseEngineButlerLocal/REB_Settings_v1.ini` on this
+  machine, and `"backlash": 0.0` added to every axis in
+  `generic_example.settings.ini` - avoiding the exact class of bug
+  described above ("Stepper Motor Tuning tab reading all zero"): a
+  live HAL parameter with nothing ever seeded into the persisted file
+  it's restored from at startup.
 
 ## Testing plan
 
