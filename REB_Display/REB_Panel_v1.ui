@@ -136,12 +136,12 @@
   <object class="GtkImage" id="Image_W_Down">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
-    <property name="pixbuf">Images/Axis-Zpos.png</property>
+    <property name="pixbuf">Images/Axis-Zneg.png</property>
   </object>
   <object class="GtkImage" id="Image_W_Up">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
-    <property name="pixbuf">Images/Axis-Zneg.png</property>
+    <property name="pixbuf">Images/Axis-Zpos.png</property>
   </object>
   <object class="GtkImage" id="Image_X_Left">
     <property name="visible">True</property>
@@ -156,12 +156,12 @@
   <object class="GtkImage" id="Image_Z_Left">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
-    <property name="pixbuf">Images/Axis-Zneg.png</property>
+    <property name="pixbuf">Images/Axis-Zpos.png</property>
   </object>
   <object class="GtkImage" id="Image_Z_Right">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
-    <property name="pixbuf">Images/Axis-Zpos.png</property>
+    <property name="pixbuf">Images/Axis-Zneg.png</property>
   </object>
   <object class="GtkAdjustment" id="Sp0_Feed_Rate">
     <property name="lower">-10</property>
@@ -550,7 +550,7 @@
                 <signal name="pressed" handler="X_Idx_Minus" swapped="no"/>
               </object>
               <packing>
-                <property name="left-attach">13</property>
+                <property name="left-attach">12</property>
                 <property name="top-attach">10</property>
               </packing>
             </child>
@@ -567,7 +567,7 @@
                 <signal name="pressed" handler="W_Idx_Minus" swapped="no"/>
               </object>
               <packing>
-                <property name="left-attach">13</property>
+                <property name="left-attach">12</property>
                 <property name="top-attach">15</property>
               </packing>
             </child>
@@ -586,7 +586,7 @@
                 <signal name="pressed" handler="W_Idx_Plus" swapped="no"/>
               </object>
               <packing>
-                <property name="left-attach">12</property>
+                <property name="left-attach">13</property>
                 <property name="top-attach">15</property>
               </packing>
             </child>
@@ -603,7 +603,7 @@
                 <signal name="pressed" handler="Z_Idx_Minus" swapped="no"/>
               </object>
               <packing>
-                <property name="left-attach">13</property>
+                <property name="left-attach">12</property>
                 <property name="top-attach">12</property>
               </packing>
             </child>
@@ -620,7 +620,7 @@
                 <signal name="pressed" handler="U_Idx_Minus" swapped="no"/>
               </object>
               <packing>
-                <property name="left-attach">13</property>
+                <property name="left-attach">12</property>
                 <property name="top-attach">13</property>
               </packing>
             </child>
@@ -637,7 +637,7 @@
                 <signal name="pressed" handler="X_Idx_Plus" swapped="no"/>
               </object>
               <packing>
-                <property name="left-attach">12</property>
+                <property name="left-attach">13</property>
                 <property name="top-attach">10</property>
               </packing>
             </child>
@@ -656,7 +656,7 @@
                 <signal name="pressed" handler="Z_Idx_Plus" swapped="no"/>
               </object>
               <packing>
-                <property name="left-attach">12</property>
+                <property name="left-attach">13</property>
                 <property name="top-attach">12</property>
               </packing>
             </child>
@@ -675,7 +675,7 @@
                 <signal name="pressed" handler="U_Idx_Plus" swapped="no"/>
               </object>
               <packing>
-                <property name="left-attach">12</property>
+                <property name="left-attach">13</property>
                 <property name="top-attach">13</property>
               </packing>
             </child>
@@ -692,7 +692,7 @@
                 <signal name="pressed" handler="V_Idx_Minus" swapped="no"/>
               </object>
               <packing>
-                <property name="left-attach">13</property>
+                <property name="left-attach">12</property>
                 <property name="top-attach">14</property>
               </packing>
             </child>
@@ -711,7 +711,7 @@
                 <signal name="pressed" handler="V_Idx_Plus" swapped="no"/>
               </object>
               <packing>
-                <property name="left-attach">12</property>
+                <property name="left-attach">13</property>
                 <property name="top-attach">14</property>
               </packing>
             </child>
