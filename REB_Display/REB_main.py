@@ -1612,13 +1612,26 @@ class HandlerClass:
 
         device_names = self._read_device_names()
 
-        scale_col.pack_start(section_label("Axis Scales"), False, False, 0)
+        # Sized so the "Device" header lines up with the combo boxes
+        # below it, not just with wherever "Axis Scales" happens to end -
+        # axis labels are different widths (e.g. "X Scale" vs.
+        # "Sp0 Scale"), so without this the combos (and this header)
+        # would drift depending on which axis's row is widest.
+        scale_label_group = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
+
+        scale_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        axis_scales_label = section_label("Axis Scales")
+        scale_label_group.add_widget(axis_scales_label)
+        scale_header.pack_start(axis_scales_label, False, False, 0)
+        scale_header.pack_start(section_label("Device"), False, False, 0)
+        scale_col.pack_start(scale_header, False, False, 0)
         checks = {}
         comment_combos = {}
         for axis_id in AXIS_STEPGEN:
             row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
             check = Gtk.CheckButton(label=axis_id + " Scale")
             check.set_active(True)
+            scale_label_group.add_widget(check)
             row.pack_start(check, False, False, 0)
 
             combo = Gtk.ComboBoxText()
@@ -1657,6 +1670,17 @@ class HandlerClass:
         measurement_check = Gtk.CheckButton(label="Measurement System")
         measurement_check.set_active(True)
         content.pack_start(measurement_check, False, False, 0)
+
+        device_note = Gtk.Label()
+        device_note.set_markup(
+            "<i>You must select a device for any axis data you wish to "
+            "save. You can change that name on the file save screen "
+            "which pops up next.</i>"
+        )
+        device_note.set_xalign(0)
+        device_note.set_line_wrap(True)
+        device_note.set_max_width_chars(60)
+        content.pack_start(device_note, False, False, 0)
 
         all_checks = (
             list(checks.values()) + list(backlash_checks.values())
