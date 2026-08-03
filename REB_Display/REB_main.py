@@ -1636,7 +1636,7 @@ class HandlerClass:
             checks[axis_id] = check
             comment_combos[axis_id] = combo
 
-        backlash_col.pack_start(section_label("Backlash"), False, False, 0)
+        backlash_col.pack_start(section_label("\nBacklash"), False, False, 0)
         backlash_checks = {}
         for axis_id in AXIS_STEPGEN:
             check = Gtk.CheckButton(label=axis_id + " Backlash")
@@ -1644,10 +1644,10 @@ class HandlerClass:
             backlash_col.pack_start(check, False, False, 0)
             backlash_checks[axis_id] = check
 
-        pid_col.pack_start(section_label("PID Gains"), False, False, 0)
+        pid_col.pack_start(section_label("Stepper Motor\nTuning"), False, False, 0)
         pid_checks = {}
         for axis_id in list(PID_AXES) + list(PID_SPINDLE_LOOPS):
-            check = Gtk.CheckButton(label=axis_id + " PID")
+            check = Gtk.CheckButton(label=axis_id + " PID/FFx")
             check.set_active(True)
             pid_col.pack_start(check, False, False, 0)
             pid_checks[axis_id] = check
