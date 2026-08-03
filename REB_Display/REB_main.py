@@ -65,8 +65,6 @@ import hal
 import hal_glib
 import glib
 import time
-import datetime
-import json
 import os
 import linuxcnc
 import webbrowser
@@ -152,117 +150,25 @@ PID_PARAMS = ("P", "I", "D", "FF0", "FF1", "FF2")
 # already used for the single-spindle M19 path elsewhere in this file.
 SIMULTANEOUS_INDEX_TIMEOUT = 20.0
 
-SETTINGS_PATH = "/home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Settings_v1.ini"
+SETTINGS_PATH = "/home/reuben/Documents/REBset_v1.ini"
 
-# User-facing, explicitly named/located settings snapshots (see
-# docs/settings_file.md) - separate from and in addition to the automatic,
-# fixed-path REB_Settings_v1.ini above. format_version is written into
-# every settings file and checked on load; bump it and add a
-# _migrate_v<N>_to_v<N+1>-style function if the schema below ever changes.
-#
-# Extension is ".settings.ini", not the original ".rebset": a made-up
-# extension like ".rebset" means nothing to an operator browsing their
-# Documents folder (Rich's feedback, 30 July 2026) - ".ini" reads as an
-# ordinary settings file at a glance. Not bare ".ini" though: that would
-# collide with both REB_Settings_v1.ini and the separate .export.ini
-# format below, making the three indistinguishable under a naive *.ini
-# filter (e.g. Load Settings could show export files mixed in with full
-# profiles). ".settings.ini" stays recognizable while keeping each
-# format's own file-chooser filter (and a human skimming a folder)
-# able to tell all three apart.
-REBSET_FORMAT_VERSION = 2
-REBSET_EXTENSION = ".settings.ini"
+# Default directory Export/Import's file choosers start in.
 REBSET_DEFAULT_DIR = os.path.expanduser("~/Documents")
-
-def _migrate_settings_v1_to_v2(data):
-    '''
-    v1 .settings.ini files have no per-axis "pid"/"pid_pos"/"pid_vel"
-    data - PID gains used to be outside this format entirely, only ever
-    auto-persisted in the legacy REB_Settings_v1.ini (see
-    docs/settings_file.md's Export/Import section, "PID gains are
-    intentionally outside .settings.ini's dirty-tracking" - superseded by
-    this version). v2 adds those as optional per-axis fields; a v1
-    payload is already a valid v2 payload with them simply absent, so
-    migrating is just stamping the new version number -
-    _load_settings_file's existing "no stored data for this axis"
-    handling covers the missing fields for free, the same as it already
-    does for an axis missing "comment".
-    '''
-    data = dict(data)
-    data["format_version"] = REBSET_FORMAT_VERSION
-    return data
-
-def _name_from_settings_path(path):
-    '''
-    Derives a display/JSON "name" from a .settings.ini file's own
-    filename. NOT os.path.splitext(basename)[0] - that only strips the
-    single final suffix (".ini"), leaving ".settings" stuck to the name
-    for this extension specifically, since it has two dots (confirmed
-    live: reloading "Chucks_LRE.settings.ini" produced the name
-    "Chucks_LRE.settings", which then got baked into a
-    "Chucks_LRE_settings.settings.ini" on the next Save As). Strips the
-    whole known REBSET_EXTENSION suffix instead; falls back to a plain
-    splitext for anything else (e.g. an old .rebset file from before the
-    rename) so those still work too.
-    '''
-    basename = os.path.basename(path)
-    if basename.endswith(REBSET_EXTENSION):
-        return basename[:-len(REBSET_EXTENSION)]
-    return os.path.splitext(basename)[0]
-
-# Default name offered when there's real REB_Settings_v1.ini data but no
-# .settings.ini has ever been saved yet (see _legacy_settings_available).
-# Was literally "legacy" - meaningless to an operator browsing their
-# Documents folder once saved as a filename (Rich's feedback, 30 July
-# 2026) - so this is what they'd actually recognize as theirs.
-DEFAULT_LEGACY_SETTINGS_NAME = "RoseEngineButler_Settings"
-
-# Shipped starter profile, read from this repo (not RoseEngineButlerLocal
-# or a user's ~/Documents) - see _prompt_initial_settings_load. Its scale
-# values are deliberately 1 (no meaningful motion per commanded unit, on
-# any machine's real step/unit calibration) rather than a plausible-looking
-# number: an uncalibrated axis should fail toward "barely moves", never
-# toward "moves far more than commanded".
-REBSET_GENERIC_EXAMPLE_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "generic_example" + REBSET_EXTENSION
-)
-
-# Per-machine record of the last .settings.ini actually opened/saved by the
-# operator (not the generic_example fallback - see
-# _prompt_initial_settings_load), so the next session can reload it
-# automatically instead of prompting. Lives in RoseEngineButlerLocal
-# alongside REB_Settings_v1.ini, same reasoning as that file: this is
-# per-machine state, not something to track in the shared repo.
-LAST_SETTINGS_PATH_FILE = "/home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Last_Settings_Path.txt"
-
-# A full, ready-to-save .settings.ini payload, kept continuously up to date by
-# _mark_settings_dirty (and the two _prompt_initial_settings_load
-# fallbacks) for as long as there are unsaved changes; removed again once
-# they're saved or discarded. This is what lets the exit prompt work at
-# all: a GTK delete-event/destroy hook on this component's own window
-# does NOT fire on real AXIS exit (confirmed live - AXIS tears embedded
-# tabs down by yanking their X window out from under them, not a normal
-# close negotiation), so the actual prompt has to run from a different,
-# proven-reliable point in the shutdown sequence: REB_Scale_Persist.py,
-# run via `loadusr -w` from REB_Shutdown.hal, which already blocks
-# shutdown until it finishes. That script is a separate process with no
-# access to this component's live widgets, hence staging the full
-# payload here rather than just a boolean flag.
-PENDING_SETTINGS_PATH = "/home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Pending_Settings.settings.ini"
 
 # Axes (not spindles) that have a free-text comment field on the main
 # panel, persisted to REB_Settings_v1.ini as each <axis>'s <usercomment>.
 COMMENT_AXES = ("X", "Z", "U", "V", "W", "B")
 
 # Export_Settings/Import_Settings (see docs/settings_file.md): a
-# deliberately different, smaller mechanism from .settings.ini - a hand-picked
-# subset of just what's literally on the Settings tab itself (each axis's
-# Scale, plus Measurement System), not the full axis/comment/notes
-# snapshot a .settings.ini carries. Plain XML (matching REB_Settings_v1.ini's
-# own shape), not JSON, and no format_version - this is meant for quick,
-# ad hoc sharing of a few values (e.g. "just my B-axis calibration"), not
-# a versioned profile format.
-EXPORT_EXTENSION = ".export.ini"
+# hand-picked subset of just what's literally on the Settings tab itself
+# (each axis's Scale, plus Measurement System), for quick, ad hoc sharing
+# of a few values (e.g. "just my B-axis calibration") rather than a full
+# profile. Plain XML (matching REB_Settings_v1.ini's own shape). The
+# filename itself is "<comment>.REBset_v1.ini", where <comment> is the
+# single device name the operator picked in the export selection dialog
+# (see Export_Settings) - not related to SETTINGS_PATH, which is always
+# the fixed "REBset_v1.ini" name with no comment prefix.
+EXPORT_EXTENSION = ".REBset_v1.ini"
 
 # Establish connection to command and status channels
 c = linuxcnc.command()
@@ -418,6 +324,54 @@ def _save_measurement_system(system):
         with open(SETTINGS_PATH, "w") as f:
             f.write(new_text)
         print("Saved measurement_system = " + system)
+    except OSError as e:
+        print("Could not write " + SETTINGS_PATH + ": " + str(e))
+
+def _save_device_names(names):
+    '''
+    Persists the maintained device-name list (General tab's Device
+    Names box - one name per line, e.g. "Spindle (Sp0)", "Rosette
+    Phaser/Multiplier (Sp1)", "Retractor") into REBset_v1.ini as a
+    <device_names><name>...</name>...</device_names> block, replacing
+    the whole block each time rather than patching individual <name>
+    entries - simpler than tracking adds/removes/reorders across saves,
+    and the block is small enough that a full rewrite costs nothing.
+    escape()/unescape() (already imported for axis comments) keep any
+    stray XML-special characters in a name (&, <, >) from corrupting
+    the file.
+    '''
+    try:
+        with open(SETTINGS_PATH, "r") as f:
+            xml_text = f.read()
+    except OSError as e:
+        print("Could not read " + SETTINGS_PATH + ": " + str(e))
+        return
+
+    lines = ["    <device_names>"]
+    for name in names:
+        lines.append("        <name>" + escape(name) + "</name>")
+    lines.append("    </device_names>")
+    block = "\n".join(lines)
+
+    pattern = re.compile(r'<device_names>.*?</device_names>', re.DOTALL)
+    if pattern.search(xml_text):
+        new_text, count = pattern.subn(lambda m: block, xml_text, count=1)
+    else:
+        new_text, count = re.subn(
+            r'(<settings>)',
+            lambda m: m.group(1) + "\n" + block,
+            xml_text,
+            count=1
+        )
+
+    if count == 0:
+        print("Could not find a place to store <device_names> in " + SETTINGS_PATH)
+        return
+
+    try:
+        with open(SETTINGS_PATH, "w") as f:
+            f.write(new_text)
+        print("Saved " + str(len(names)) + " device name(s)")
     except OSError as e:
         print("Could not write " + SETTINGS_PATH + ": " + str(e))
 
@@ -1062,6 +1016,48 @@ class HandlerClass:
 
         self._apply_measurement_system_labels(system)
 
+    def _load_device_names(self):
+        '''
+        Reads the persisted device-name list (REBset_v1.ini's
+        <device_names> block) and applies it to the General tab's
+        Device Names GtkTextView, one name per line - mirrors
+        _load_measurement_system above. No-ops outside the component
+        that owns that widget.
+        '''
+        view = self.builder.get_object("Device_Names")
+        if view is None:
+            return
+
+        names = []
+        try:
+            with open(SETTINGS_PATH, "r") as f:
+                xml_text = f.read()
+            match = re.search(r'<device_names>(.*?)</device_names>', xml_text, re.DOTALL)
+            if match:
+                names = [unescape(n) for n in re.findall(r'<name>(.*?)</name>', match.group(1), re.DOTALL)]
+        except OSError as e:
+            print("Could not read " + SETTINGS_PATH + ": " + str(e))
+
+        self._applying_device_names = True
+        view.get_buffer().set_text("\n".join(names))
+        self._applying_device_names = False
+
+    def _read_device_names(self):
+        '''
+        Reads the maintained device-name list straight from the live
+        Device Names widget (kept in sync with REBset_v1.ini by
+        Device_Names_Changed on every edit) rather than re-reading the
+        file - used by _run_export_selection_dialog to populate each
+        axis's comment dropdown. Blank/whitespace-only lines are
+        dropped. Returns [] if this component doesn't own the widget.
+        '''
+        view = self.builder.get_object("Device_Names")
+        if view is None:
+            return []
+        buf = view.get_buffer()
+        text = buf.get_text(buf.get_start_iter(), buf.get_end_iter(), False)
+        return [line.strip() for line in text.splitlines() if line.strip()]
+
     def _load_max_jog_speed(self):
         '''
         Reads the persisted Max Jog Speed (default 1.0, matching REB.ini's
@@ -1175,213 +1171,6 @@ class HandlerClass:
             print("Could not write " + SETTINGS_PATH + ": " + str(e))
             return
 
-        self._mark_settings_dirty()
-
-    def _read_axis_comment(self, axis_id):
-        '''
-        Reads a single axis's current comment straight out of
-        REB_Settings_v1.ini. Used by Settings_Save to gather a snapshot
-        for a .settings.ini file - the Settings tab component doesn't own the
-        Comment Entry widgets (those live on the main panel, a separate
-        gladevcp process/widget tree - see docs/settings_file.md), so the
-        shared settings file, which the main panel keeps current via
-        _save_axis_comment on every focus-out, is the only common ground.
-        '''
-        try:
-            with open(SETTINGS_PATH, "r") as f:
-                xml_text = f.read()
-        except OSError as e:
-            print("Could not read " + SETTINGS_PATH + ": " + str(e))
-            return ""
-
-        match = re.search(
-            r'<axis\s+id="' + re.escape(axis_id) + r'">\s*<scale>-?[\d.]+</scale>\s*'
-            r'<usercomment>(.*?)</usercomment>',
-            xml_text,
-            re.DOTALL
-        )
-        return unescape(match.group(1)) if match else ""
-
-    def _mark_settings_dirty(self):
-        '''
-        Flags that something covered by a .settings.ini snapshot (axis scales,
-        PID gains, comments, or notes) has changed since the last
-        Settings_Save/Settings_Load, and stages a full snapshot on disk
-        for the shutdown-time exit prompt to offer (see
-        PENDING_SETTINGS_PATH).
-        Suppressed while Settings_Load is itself the one poking widgets
-        (self._applying_settings) - otherwise re-applying a loaded scale
-        value would immediately re-dirty the settings it just loaded.
-        '''
-        if not self._applying_settings:
-            self._settings_dirty = True
-            self._write_pending_snapshot()
-            self._refresh_settings_name_label()
-
-    def _write_pending_snapshot(self):
-        '''
-        Writes the full current settings (scale/PID/comment/notes/name) to
-        PENDING_SETTINGS_PATH, in the same shape as a saved .settings.ini, so
-        the shutdown-time prompt (a separate process - see
-        PENDING_SETTINGS_PATH) has something concrete to offer saving.
-        Called by _mark_settings_dirty and by _prompt_initial_settings_load's
-        legacy/generic_example fallbacks, which force-dirty outside that
-        normal path.
-
-        No-ops outside the Settings tab component: _gather_current_settings
-        reads <axis>_Set_Scale-style widgets that only exist there, so
-        calling this from, say, the main panel (_save_axis_comment also
-        calls _mark_settings_dirty, which calls this) would stage a
-        PENDING_SETTINGS_PATH full of scale: null for every axis - a real
-        risk since the shutdown-time prompt can save that pending
-        snapshot as a real, named .settings.ini if the operator says yes.
-        '''
-        if self.builder.get_object("X_Set_Scale") is None:
-            return
-
-        notes_view = self.builder.get_object("Settings_Notes")
-        notes = ""
-        if notes_view is not None:
-            buf = notes_view.get_buffer()
-            notes = buf.get_text(buf.get_start_iter(), buf.get_end_iter(), False)
-
-        data = self._gather_current_settings(self._settings_name or "", notes)
-        try:
-            with open(PENDING_SETTINGS_PATH, "w") as f:
-                json.dump(data, f, indent=2)
-        except OSError as e:
-            print("Could not stage pending settings snapshot: " + str(e))
-
-    def _clear_pending_settings_snapshot(self):
-        try:
-            os.remove(PENDING_SETTINGS_PATH)
-        except FileNotFoundError:
-            pass
-        except OSError as e:
-            print("Could not clear pending settings snapshot: " + str(e))
-
-    def _set_settings_name_display(self, name):
-        self._settings_name = name
-        self._refresh_settings_name_label()
-
-    def _refresh_settings_name_label(self):
-        '''
-        Renders the Settings Name label from self._settings_name plus a
-        trailing " *" whenever self._settings_dirty is True - the same
-        "unsaved changes" convention as a text editor's title bar. This
-        is what lets the operator notice and save proactively, while the
-        GUI is still fully up and interactive, instead of relying on the
-        shutdown-time prompt (which can't appear until well after the
-        screen has already visually torn down - see
-        docs/settings_file.md, Decision 4).
-        '''
-        label = self.builder.get_object("Settings_Name")
-        if label is None:
-            return
-        text = "Settings: " + self._settings_name if self._settings_name else "Settings: (unsaved)"
-        if self._settings_dirty:
-            text += " *"
-        label.set_text(text)
-
-    def _set_settings_source_path_display(self, path):
-        '''
-        Shows the full path of wherever the current settings actually
-        came from, on its own line above the toolbar (Rich's feedback,
-        30 July 2026: the abbreviated Settings Name label alone lost
-        track of the actual file). Broader than self._settings_path
-        (which is specifically "where plain Save writes to", and is
-        deliberately left None for the legacy/generic_example fallbacks
-        so a plain Save can't silently overwrite REB_Settings_v1.ini or
-        the shipped repo template) - this is set for those fallbacks too,
-        via their own direct calls, since seeing the real source path is
-        useful even when nothing's been saved as a named file yet.
-        '''
-        self._settings_source_path = path
-        label = self.builder.get_object("Settings_File_Path")
-        if label is not None:
-            label.set_text("Settings File: " + path if path else "Settings File: (unsaved)")
-
-    def _read_last_settings_path(self):
-        try:
-            with open(LAST_SETTINGS_PATH_FILE, "r") as f:
-                path = f.read().strip()
-            return path or None
-        except OSError:
-            return None
-
-    def _write_last_settings_path(self, path):
-        '''
-        Records path as the file to silently reload next session
-        (_prompt_initial_settings_load), and as this session's own
-        "current file" (self._settings_path), so plain Settings_Save can
-        re-save straight to it with no dialog (Settings_Save_As always
-        prompts). Only called for a file the operator actually chose via
-        Save/Save As or Load - never for the generic_example fallback,
-        which must keep prompting (and must never be silently
-        overwritten by a plain Save) until the operator saves a real
-        copy of their own.
-        '''
-        self._settings_path = path
-        self._set_settings_source_path_display(path)
-        try:
-            os.makedirs(os.path.dirname(LAST_SETTINGS_PATH_FILE), exist_ok=True)
-            with open(LAST_SETTINGS_PATH_FILE, "w") as f:
-                f.write(path)
-        except OSError as e:
-            print("Could not record last-used settings path: " + str(e))
-
-    def _legacy_settings_available(self):
-        '''
-        True if REB_Settings_v1.ini has at least one real <axis>/<scale>
-        entry - i.e. there's a pre-existing, pre-.settings.ini machine setup
-        worth treating as the starting point instead of an empty
-        ~/Documents picker or the generic_example placeholder. Its values
-        are already live by the time this is checked: _load_scale_settings/
-        _load_axis_comments already applied them earlier in __init__,
-        unconditionally, regardless of anything to do with .settings.ini files -
-        this only decides how _prompt_initial_settings_load should react
-        to that, not whether to (re-)apply them.
-        '''
-        try:
-            with open(SETTINGS_PATH, "r") as f:
-                xml_text = f.read()
-        except OSError:
-            return False
-        return re.search(r'<axis\s+id="[^"]+">\s*<scale>-?[\d.]+</scale>', xml_text) is not None
-
-    def _disable_axis(self, axis_id):
-        '''
-        Forces one axis disabled from this component, the same way
-        _axis_set_scale/Sp0_Set_Scale/Sp1_Set_Scale already force their
-        own axis disabled when its scale changes - only touches it if
-        it's actually enabled right now (cross-component read of
-        <axis>_ENA-light, which belongs to the main panel's "gladevcp"
-        component), then clears this component's own <axis>_Ena_Override
-        pin (ANDed with the panel's ENA button in REB_PostGUI_v1.hal).
-        Used by Settings_Load to force every axis off before a loaded
-        scale value can take effect under it (docs/settings_file.md,
-        Decision 3).
-        '''
-        status_pin = "gladevcp." + axis_id + "_ENA-light"
-        try:
-            result = subprocess.run(
-                ["halcmd", "getp", status_pin],
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            is_enabled = result.stdout.strip().upper() in ("TRUE", "1")
-        except subprocess.CalledProcessError as e:
-            print("Error checking " + status_pin + ": " + str(e.stderr))
-            return
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
-            return
-
-        if is_enabled:
-            print(axis_id + " axis is enabled - disabling for settings load")
-            self.halcomp[axis_id + '_Ena_Override'] = False
-
     def _read_pid_gains(self, widget_id_for_param):
         '''
         Reads P/I/D/FF0/FF1/FF2 from one axis's/spindle loop's own
@@ -1400,79 +1189,12 @@ class HandlerClass:
                 values[param] = widget.get_value()
         return values
 
-    def _apply_pid_gains(self, values, widget_id_for_param):
-        '''
-        Mirror of _read_pid_gains: applies a .settings.ini JSON "pid"/
-        "pid_pos"/"pid_vel" dict's P/I/D/FF0/FF1/FF2 values to that
-        axis's/spindle loop's own Settings tab widgets via set_value() -
-        fires the same _pid_set handler a live edit would (straight to
-        the live pid.* HAL gain pin; see _pid_set's docstring for why PID
-        doesn't need the abort/disable dance Scale does). The JSON
-        counterpart to _import_pid_block's XML equivalent. Returns True
-        if anything was actually applied.
-        '''
-        if not isinstance(values, dict):
-            return False
-        applied = False
-        for param in PID_PARAMS:
-            if param not in values:
-                continue
-            widget = self.builder.get_object(widget_id_for_param(param))
-            if widget is None:
-                continue
-            try:
-                value = float(values[param])
-            except (TypeError, ValueError):
-                print("Skipping " + widget_id_for_param(param) + " - not a number: " + str(values[param]))
-                continue
-            widget.set_value(value)
-            applied = True
-        return applied
-
-    def _gather_current_settings(self, name, notes):
-        axes = {}
-        for axis_id in AXIS_STEPGEN:
-            widget = self.builder.get_object(axis_id + "_Set_Scale")
-            entry = {"scale": widget.get_value() if widget is not None else None}
-            if axis_id in COMMENT_AXES:
-                entry["comment"] = self._read_axis_comment(axis_id)
-
-            backlash_widget = self.builder.get_object(axis_id + "_Set_Backlash")
-            if backlash_widget is not None:
-                entry["backlash"] = backlash_widget.get_value()
-
-            # PID gains (v2 - see _migrate_settings_v1_to_v2): read the
-            # same widgets Export/_export_pid_block reads, straight into
-            # the JSON entry instead of an XML sub-element.
-            if axis_id in PID_AXES:
-                pid = self._read_pid_gains(lambda param, axis_id=axis_id: axis_id + "_Set_" + param)
-                if pid:
-                    entry["pid"] = pid
-            elif axis_id in PID_SPINDLE_LOOPS:
-                for suffix, block_tag in (("Pos", "pid_pos"), ("Vel", "pid_vel")):
-                    loop = self._read_pid_gains(
-                        lambda param, axis_id=axis_id, suffix=suffix: axis_id + "_Set_" + param + "_" + suffix
-                    )
-                    if loop:
-                        entry[block_tag] = loop
-
-            axes[axis_id] = entry
-
-        return {
-            "format_version": REBSET_FORMAT_VERSION,
-            "name": name,
-            "notes": notes,
-            "saved_at": datetime.datetime.now().isoformat(timespec="seconds"),
-            "axes": axes,
-        }
-
     def Settings_Notes_Changed(self, buffer):
         # Wired to the Notes GtkTextView's GtkTextBuffer "changed" signal.
-        # Also fires when Settings_Load sets the buffer's text
-        # programmatically - _mark_settings_dirty's own
-        # self._applying_settings check is what keeps that from re-dirtying
-        # the settings that were just loaded.
-        self._mark_settings_dirty()
+        # The Notes field is free-text scratch space only - nothing
+        # persists it (the .settings.ini profile mechanism that used to
+        # save it has been removed; REBset_v1.ini has no notes field).
+        pass
 
 #######################################################################
 # Measurement_System_Changed
@@ -1508,6 +1230,17 @@ class HandlerClass:
         _save_measurement_system(system)
         _show_restart_required_popup(widget)
 
+    def Device_Names_Changed(self, buffer):
+        # Wired to the Device Names GtkTextView's GtkTextBuffer
+        # "changed" signal - mirrors Measurement_System_Changed's
+        # save-immediately pattern. Suppressed while _load_device_names
+        # is itself the one driving the buffer text at startup.
+        if self._applying_device_names:
+            return
+        text = buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), False)
+        names = [line.strip() for line in text.splitlines() if line.strip()]
+        _save_device_names(names)
+
 #######################################################################
 # Max_Jog_Speed_Changed
 # Purpose:              User changed the Max Jog Speed on the Settings
@@ -1541,14 +1274,20 @@ class HandlerClass:
 
 #######################################################################
 # Settings_Save
-# Purpose:              Saves the current Settings tab (axis scales +
-#                           comments) plus the Notes field back to
-#                           whichever .settings.ini file is currently active,
-#                           with no dialog. Falls back to Settings_Save_As
-#                           if nothing is active yet (e.g. still on the
-#                           legacy/generic_example starting point - see
-#                           docs/settings_file.md, Decision 5/6).
-# Updated:              ver 1.0, 29 July 2026, Claude
+# Purpose:              Writes the live scale/backlash/PID values -
+#                           read straight from this tab's own widgets,
+#                           which already mirror the live HAL pins via
+#                           their own value-changed handlers - into
+#                           SETTINGS_PATH (/home/reuben/Documents/
+#                           REBset_v1.ini), in the same XML shape
+#                           REB_Scale_Persist.py already writes there at
+#                           shutdown. This is an on-demand trigger of
+#                           that same patch -
+#                           Measurement System/Max Jog Speed/the five
+#                           VELOCITY_SETTINGS values aren't touched here
+#                           since each of those already writes itself
+#                           into SETTINGS_PATH immediately on change.
+# Updated:              ver 2.0, 2 August 2026, Claude
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Tab_Settings_v1
@@ -1559,447 +1298,111 @@ class HandlerClass:
         if self.builder.get_object("X_Set_Scale") is None:
             return
 
-        if not self._settings_path:
-            self.Settings_Save_As(widget)
-            return
-
         print("=================================================")
         print("FUNCTION Settings_Save")
-        self._save_to_path(widget, self._settings_path)
+        self._write_rebset_snapshot()
 
-#######################################################################
-# Settings_Save_As
-# Purpose:              Always shows the file chooser, so the operator
-#                           can pick a new location/filename (or
-#                           overwrite an existing one) rather than
-#                           re-saving over whatever's currently active.
-#                           The chosen filename IS the name - shown as
-#                           the Settings Name and stored in the file's
-#                           own "name" field - there's no separate typed
-#                           name to keep in sync (see docs/settings_file.md,
-#                           Decision 2, revised).
-# Updated:              ver 1.0, 29 July 2026, Claude
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Tab_Settings_v1
-#   Button:              Settings_Save_As  (GtkButton)
-#   Signal:              GtkButton/clicked
-#######################################################################
-    def Settings_Save_As(self, widget):
-        if self.builder.get_object("X_Set_Scale") is None:
-            return
-
-        print("=================================================")
-        print("FUNCTION Settings_Save_As")
-
-        os.makedirs(REBSET_DEFAULT_DIR, exist_ok=True)
-
-        dialog = Gtk.FileChooserDialog(
-            title="Save Settings As",
-            transient_for=widget.get_toplevel(),
-            action=Gtk.FileChooserAction.SAVE,
-        )
-        dialog.add_buttons(
-            "_Cancel", Gtk.ResponseType.CANCEL,
-            "_Save", Gtk.ResponseType.OK,
-        )
-        dialog.set_current_folder(REBSET_DEFAULT_DIR)
-        dialog.set_do_overwrite_confirmation(True)
-
-        file_filter = Gtk.FileFilter()
-        file_filter.set_name("Rose Engine Butler Settings (*" + REBSET_EXTENSION + ")")
-        file_filter.add_pattern("*" + REBSET_EXTENSION)
-        dialog.add_filter(file_filter)
-
-        # Suggest the current name as a starting filename, but the
-        # operator can freely change it - whatever they end up with is
-        # the new name, going forward.
-        if self._settings_name:
-            safe_name = re.sub(r'[^A-Za-z0-9 _-]', '_', self._settings_name)
-            dialog.set_current_name(safe_name + REBSET_EXTENSION)
-
-        response = dialog.run()
-        path = dialog.get_filename() if response == Gtk.ResponseType.OK else None
-        dialog.destroy()
-
-        if not path:
-            print("Settings_Save_As cancelled")
-            return
-
-        if not path.endswith(REBSET_EXTENSION):
-            path += REBSET_EXTENSION
-
-        self._save_to_path(widget, path)
-
-    def _save_to_path(self, widget, path):
+    def _patch_pid_block(self, text, block_tag, values):
         '''
-        Shared by Settings_Save (re-saving the active file with no
-        dialog) and Settings_Save_As (always via the file chooser
-        above). The name is always derived from path's filename - see
-        Settings_Save_As's banner comment for why that replaced a
-        separately-typed name field.
+        Patches P/I/D/FF0/FF1/FF2 values into a <pid>/<pid_pos>/
+        <pid_vel> sub-element within text (an already-extracted <axis>
+        block), leaving everything else untouched. Mirrors
+        REB_Scale_Persist.py's set_pid_block, but operating on values
+        already read from this component's own widgets rather than via
+        halcmd getp (this component IS the live process, no subprocess
+        round-trip needed). Returns the patched text unchanged if the
+        block isn't found.
         '''
-        name = _name_from_settings_path(path)
+        block_match = re.search(r'<' + block_tag + r'>.*?</' + block_tag + r'>', text, re.DOTALL)
+        if not block_match:
+            return text
 
-        notes_view = self.builder.get_object("Settings_Notes")
-        notes_buffer = notes_view.get_buffer() if notes_view is not None else None
-        notes = ""
-        if notes_buffer is not None:
-            notes = notes_buffer.get_text(
-                notes_buffer.get_start_iter(), notes_buffer.get_end_iter(), False
+        block = block_match.group(0)
+        for param, value in values.items():
+            block = re.sub(
+                r'(<' + param + r'>)-?[\d.]+(</' + param + r'>)',
+                lambda m: m.group(1) + str(value) + m.group(2),
+                block, count=1
             )
+        return text[:block_match.start()] + block + text[block_match.end():]
 
-        data = self._gather_current_settings(name, notes)
-
+    def _write_rebset_snapshot(self):
+        '''
+        Writes this tab's live Scale/Backlash/PID widget values into
+        SETTINGS_PATH's <axis> blocks - see Settings_Save above for why
+        Measurement System/Max Jog Speed/VELOCITY_SETTINGS aren't
+        touched here. Reads the whole file once, patches every axis in
+        memory, then writes it back once - unlike the shutdown path
+        (REB_Scale_Persist.py), which patches and writes incrementally
+        since it goes through separate halcmd calls per value.
+        '''
         try:
-            with open(path, "w") as f:
-                json.dump(data, f, indent=2)
+            with open(SETTINGS_PATH, "r") as f:
+                xml_text = f.read()
         except OSError as e:
-            _show_settings_error(widget, "Could not write " + path + ":\n" + str(e))
+            print("Could not read " + SETTINGS_PATH + ": " + str(e))
             return
 
-        print("Saved settings '" + name + "' to " + path)
-        self._set_settings_name_display(name)
-        self._settings_dirty = False
-        self._write_last_settings_path(path)  # also sets self._settings_path
-        self._clear_pending_settings_snapshot()
-        self._refresh_settings_name_label()
-
-#######################################################################
-# Settings_Load
-# Purpose:              Loads a previously saved .settings.ini JSON file,
-#                           applying its axis scales/PID gains/comments/
-#                           notes. Stops all motion and disables every
-#                           axis first (docs/settings_file.md, Decision 3).
-# Updated:              ver 1.0, 1 August 2026, Claude
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Tab_Settings_v1
-#   Button:              Settings_Load  (GtkButton)
-#   Signal:              GtkButton/clicked
-#######################################################################
-    def Settings_Load(self, widget):
-        if self.builder.get_object("X_Set_Scale") is None:
-            return
-
-        print("=================================================")
-        print("FUNCTION Settings_Load")
-
-        os.makedirs(REBSET_DEFAULT_DIR, exist_ok=True)
-
-        dialog = Gtk.FileChooserDialog(
-            title="Load Settings",
-            transient_for=widget.get_toplevel(),
-            action=Gtk.FileChooserAction.OPEN,
-        )
-        dialog.add_buttons(
-            "_Cancel", Gtk.ResponseType.CANCEL,
-            "_Open", Gtk.ResponseType.OK,
-        )
-        dialog.set_current_folder(REBSET_DEFAULT_DIR)
-
-        file_filter = Gtk.FileFilter()
-        file_filter.set_name("Rose Engine Butler Settings (*" + REBSET_EXTENSION + ")")
-        file_filter.add_pattern("*" + REBSET_EXTENSION)
-        dialog.add_filter(file_filter)
-
-        response = dialog.run()
-        path = dialog.get_filename() if response == Gtk.ResponseType.OK else None
-        dialog.destroy()
-
-        if not path:
-            print("Settings_Load cancelled")
-            return
-
-        if self._load_settings_file(widget, path):
-            self._write_last_settings_path(path)
-
-    def _load_settings_file(self, widget, path, apply_comments=True):
-        '''
-        Parses and applies a single .settings.ini file: validates it, stops
-        motion and disables every axis (Decision 3), then applies its
-        scale/PID/comment/notes/name. Shared by the Settings_Load button and
-        _prompt_initial_settings_load (the startup prompt) so both go
-        through identical validation. Returns True on success, False if
-        the file was rejected (an error dialog has already been shown in
-        that case) - callers that need to react to failure check this.
-
-        apply_comments=False (used only by _prompt_initial_settings_load's
-        silent, unattended reload) skips patching REB_Settings_v1.ini's
-        <usercomment> values from this file's "comment" fields. Every
-        .settings.ini ever saved before axis comments actually persisted
-        (see _save_axis_comment) has "comment": "" baked in for every
-        axis, and the automatic reload used to push that blank value into
-        REB_Settings_v1.ini on every single startup - silently erasing
-        whatever the operator had typed into the main panel's comment
-        fields in the previous session (confirmed live: comment survived
-        a whole session but was gone after quitting and reopening).
-        Comments are live, main-panel-owned text, not really "part of a
-        profile" the way scale/PID are - so only an explicit, operator-
-        initiated Settings_Load (a deliberate choice to load a named
-        file) still carries them over.
-        '''
-        try:
-            with open(path, "r") as f:
-                data = json.load(f)
-        except (OSError, ValueError) as e:
-            _show_settings_error(widget, "Could not read " + path + ":\n" + str(e))
-            return False
-
-        version = data.get("format_version")
-        if version == 1:
-            data = _migrate_settings_v1_to_v2(data)
-            version = data.get("format_version")
-
-        if version != REBSET_FORMAT_VERSION:
-            _show_settings_error(
-                widget,
-                "Unsupported settings file version (" + str(version) + ") in\n" + path +
-                "\nExpected version " + str(REBSET_FORMAT_VERSION) + "."
-            )
-            return False
-
-        axes = data.get("axes")
-        if not isinstance(axes, dict):
-            _show_settings_error(widget, path + " is missing its axes data.")
-            return False
-
-        # Stop any in-progress motion and disable every axis before a
-        # loaded scale value can take effect under it.
-        c.abort()
-        c.wait_complete()
         for axis_id in AXIS_STEPGEN:
-            self._disable_axis(axis_id)
+            axis_match = re.search(
+                r'<axis\s+id="' + re.escape(axis_id) + r'">.*?</axis>',
+                xml_text, re.DOTALL
+            )
+            if not axis_match:
+                print("No <axis id=\"" + axis_id + "\"> entry found in " + SETTINGS_PATH)
+                continue
 
-        self._applying_settings = True
-        try:
-            for axis_id, stepgen_ch in AXIS_STEPGEN.items():
-                entry = axes.get(axis_id)
-                if not isinstance(entry, dict):
-                    print("No stored settings for axis " + axis_id + " in " + path)
-                    continue
+            axis_block = axis_match.group(0)
 
-                if "scale" not in entry:
-                    print("No stored scale for axis " + axis_id + " in " + path)
-                else:
-                    scale = entry["scale"]
+            scale_widget = self.builder.get_object(axis_id + "_Set_Scale")
+            if scale_widget is not None:
+                axis_block = re.sub(
+                    r'(<scale>)-?[\d.]+(</scale>)',
+                    lambda m: m.group(1) + str(scale_widget.get_value()) + m.group(2),
+                    axis_block, count=1
+                )
 
-                    spin = self.builder.get_object(axis_id + "_Set_Scale")
-                    if spin is not None:
-                        spin.set_value(scale)
+            backlash_widget = self.builder.get_object(axis_id + "_Set_Backlash")
+            if backlash_widget is not None:
+                axis_block = re.sub(
+                    r'(<backlash>)-?[\d.]+(</backlash>)',
+                    lambda m: m.group(1) + str(backlash_widget.get_value()) + m.group(2),
+                    axis_block, count=1
+                )
 
-                    hal_pin = "hm2_7i92.0.stepgen." + stepgen_ch + ".position-scale"
-                    try:
-                        subprocess.run(
-                            ["halcmd", "setp", hal_pin, str(scale)],
-                            check=True,
-                            capture_output=True,
-                            text=True
-                        )
-                        print("Loaded " + hal_pin + " = " + str(scale))
-                    except subprocess.CalledProcessError as e:
-                        print("Error setting " + hal_pin + ": " + str(e.stderr))
-                    except FileNotFoundError:
-                        print("halcmd not found - is the LinuxCNC environment sourced?")
-
-                if "backlash" not in entry:
-                    print("No stored backlash for axis " + axis_id + " in " + path)
-                else:
-                    backlash = entry["backlash"]
-
-                    spin = self.builder.get_object(axis_id + "_Set_Backlash")
-                    if spin is not None:
-                        spin.set_value(backlash)
-
-                    hal_pin = "joint." + str(JOINT_NUMBER[axis_id]) + ".backlash"
-                    try:
-                        subprocess.run(
-                            ["halcmd", "setp", hal_pin, str(backlash)],
-                            check=True,
-                            capture_output=True,
-                            text=True
-                        )
-                        print("Loaded " + hal_pin + " = " + str(backlash))
-                    except subprocess.CalledProcessError as e:
-                        print("Error setting " + hal_pin + ": " + str(e.stderr))
-                    except FileNotFoundError:
-                        print("halcmd not found - is the LinuxCNC environment sourced?")
-
-                if apply_comments and axis_id in COMMENT_AXES and "comment" in entry:
-                    # Only patches REB_Settings_v1.ini - the main panel's
-                    # own Comment entries are a different component's
-                    # widgets (see _read_axis_comment) and will pick this
-                    # up next time that component starts, the same way
-                    # _load_axis_comments only runs once at startup today.
-                    self._save_axis_comment(axis_id, entry["comment"])
-
-                # PID gains (v2 - see _migrate_settings_v1_to_v2): scale
-                # and PID are independent, same as Export/Import - a file
-                # missing one shouldn't block the other. Straight to the
-                # widgets via _apply_pid_gains, which pushes to the live
-                # pid.* HAL gain pin the same way a live edit would (no
-                # abort/disable needed - see _pid_set's docstring).
-                if axis_id in PID_AXES and "pid" in entry:
-                    self._apply_pid_gains(
-                        entry["pid"], lambda param, axis_id=axis_id: axis_id + "_Set_" + param
+            if axis_id in PID_AXES:
+                values = self._read_pid_gains(lambda param, axis_id=axis_id: axis_id + "_Set_" + param)
+                axis_block = self._patch_pid_block(axis_block, "pid", values)
+            elif axis_id in PID_SPINDLE_LOOPS:
+                for suffix, block_tag in (("Pos", "pid_pos"), ("Vel", "pid_vel")):
+                    values = self._read_pid_gains(
+                        lambda param, axis_id=axis_id, suffix=suffix: axis_id + "_Set_" + param + "_" + suffix
                     )
-                elif axis_id in PID_SPINDLE_LOOPS:
-                    for suffix, block_tag in (("Pos", "pid_pos"), ("Vel", "pid_vel")):
-                        if block_tag in entry:
-                            self._apply_pid_gains(
-                                entry[block_tag],
-                                lambda param, axis_id=axis_id, suffix=suffix: axis_id + "_Set_" + param + "_" + suffix
-                            )
+                    axis_block = self._patch_pid_block(axis_block, block_tag, values)
 
-            notes_view = self.builder.get_object("Settings_Notes")
-            if notes_view is not None:
-                notes_view.get_buffer().set_text(data.get("notes", "") or "")
-        finally:
-            self._applying_settings = False
+            xml_text = xml_text[:axis_match.start()] + axis_block + xml_text[axis_match.end():]
 
-        # The name always tracks the file's own current filename, not
-        # whatever "name" happens to be baked into its JSON content - so
-        # renaming a .settings.ini outside the app (or hand-editing the file)
-        # can't leave a stale name on screen after reloading it.
-        name = _name_from_settings_path(path)
-        print("Loaded settings '" + name + "' from " + path)
-        self._set_settings_name_display(name)
-        self._set_settings_source_path_display(path)
-        self._settings_dirty = False
-        self._clear_pending_settings_snapshot()
-        self._refresh_settings_name_label()
-        return True
+        try:
+            with open(SETTINGS_PATH, "w") as f:
+                f.write(xml_text)
+            print("Saved live scale/backlash/PID values to " + SETTINGS_PATH)
+        except OSError as e:
+            print("Could not write " + SETTINGS_PATH + ": " + str(e))
 
-    def _prompt_initial_settings_load(self):
-        '''
-        Runs once, shortly after the Settings tab is up (see the
-        idle_add call in __init__). Reloads the last .settings.ini the operator
-        actually opened/saved (LAST_SETTINGS_PATH_FILE, in
-        RoseEngineButlerLocal - per-machine state, not tracked in this
-        repo) with no prompt at all, if one is on record and still
-        readable.
-
-        Failing that - no record, first-ever run with this feature - a
-        machine that's been in use since before .settings.ini files existed
-        still has real, good values sitting in REB_Settings_v1.ini,
-        already restored into HAL/the spin buttons unconditionally
-        earlier in __init__ (_load_scale_settings/_load_axis_comments)
-        regardless of anything here. Recognize that instead of
-        overwriting it with an empty ~/Documents picker: leave those
-        values alone, but flag them dirty so the exit prompt offers to
-        save them as a real, named .settings.ini - migrating them into this
-        feature rather than leaving them stuck as the single anonymous
-        legacy file forever.
-
-        Only when there's neither a usable .settings.ini on record nor any
-        legacy REB_Settings_v1.ini data does this fall back to showing a
-        picker: pick a saved profile from ~/Documents, or fall back
-        further to the generic_example profile shipped in this repo
-        (REB_Display/, not RoseEngineButlerLocal) if they Cancel that too.
-        Both the legacy and generic_example fallbacks are force-marked
-        dirty (and stage a pending snapshot - see PENDING_SETTINGS_PATH)
-        so the shutdown-time exit prompt (REB_Scale_Persist.py) offers to
-        save a real copy into ~/Documents - never overwriting the shipped
-        repo copy of generic_example, since Settings_Save always defaults to
-        REBSET_DEFAULT_DIR. Picking a real file here, unlike either
-        fallback, also updates LAST_SETTINGS_PATH_FILE, same as the Load
-        button does.
-        '''
-        if self.builder.get_object("X_Set_Scale") is None:
-            return False  # idle_add: run once regardless
-
-        widget = self.builder.get_object("X_Set_Scale")
-
-        last_path = self._read_last_settings_path()
-        if last_path and os.path.isfile(last_path):
-            if self._load_settings_file(widget, last_path, apply_comments=False):
-                # _load_settings_file alone doesn't set self._settings_path
-                # (only Save/Save As/the Load button do, via
-                # _write_last_settings_path) - without this, a plain Save
-                # would always fall through to Settings_Save_As's file
-                # picker for the rest of the session, since it looked
-                # exactly like "no file active yet".
-                self._write_last_settings_path(last_path)
-                print("Reloaded last-used settings from " + last_path)
-                return False
-            print("Could not reload last-used settings (" + last_path
-                  + ") - falling back to the startup picker")
-
-        if self._legacy_settings_available():
-            print("No " + REBSET_EXTENSION + " file on record - keeping the "
-                  "existing " + SETTINGS_PATH + " values as the starting point")
-            self._set_settings_name_display(DEFAULT_LEGACY_SETTINGS_NAME)
-            self._set_settings_source_path_display(SETTINGS_PATH)
-            self._settings_dirty = True
-            self._write_pending_snapshot()
-            self._refresh_settings_name_label()
-            return False
-
-        os.makedirs(REBSET_DEFAULT_DIR, exist_ok=True)
-
-        dialog = Gtk.FileChooserDialog(
-            title="Load Settings",
-            transient_for=widget.get_toplevel(),
-            action=Gtk.FileChooserAction.OPEN,
-        )
-        dialog.add_buttons(
-            "_Cancel", Gtk.ResponseType.CANCEL,
-            "_Open", Gtk.ResponseType.OK,
-        )
-        dialog.set_current_folder(REBSET_DEFAULT_DIR)
-
-        file_filter = Gtk.FileFilter()
-        file_filter.set_name("Rose Engine Butler Settings (*" + REBSET_EXTENSION + ")")
-        file_filter.add_pattern("*" + REBSET_EXTENSION)
-        dialog.add_filter(file_filter)
-
-        instructions = Gtk.Label(
-            label="No previously used settings file found. Select a saved"
-                  " Rose Engine Butler settings file (" + REBSET_EXTENSION +
-                  ") to load.\nCancel to start from the generic_example"
-                  " starter profile instead."
-        )
-        instructions.set_line_wrap(True)
-        instructions.set_max_width_chars(60)
-        instructions.set_xalign(0)
-        instructions.show()
-        dialog.set_extra_widget(instructions)
-
-        response = dialog.run()
-        path = dialog.get_filename() if response == Gtk.ResponseType.OK else None
-        dialog.destroy()
-
-        if path:
-            if self._load_settings_file(widget, path):
-                self._write_last_settings_path(path)
-        else:
-            print("No settings file selected at startup - falling back to "
-                  + REBSET_GENERIC_EXAMPLE_PATH)
-            if self._load_settings_file(widget, REBSET_GENERIC_EXAMPLE_PATH):
-                # Unlike a normal load, this isn't a file the operator
-                # actually has saved anywhere themselves yet - force it
-                # dirty so they're offered a chance to save their own
-                # copy (to ~/Documents) once they exit or make changes.
-                # _load_settings_file just cleared the pending snapshot
-                # on its way to a clean return - re-stage it now that
-                # dirty is being forced back on. It also already set the
-                # name/path displays to REBSET_GENERIC_EXAMPLE_PATH.
-                self._settings_dirty = True
-                self._write_pending_snapshot()
-                self._refresh_settings_name_label()
-
-        return False  # idle_add: run once
 
 #######################################################################
 # Export_Settings
 # Purpose:              Lets the operator pick a subset of what's on the
 #                           Settings tab (each axis's Scale, and/or
 #                           Measurement System) and export just that
-#                           subset to a small .export.ini file - for
-#                           quick, ad hoc sharing (e.g. "just my B-axis
-#                           calibration"), distinct from a full .settings.ini
-#                           snapshot. See docs/settings_file.md.
-# Updated:              ver 1.0, 30 July 2026, Claude
+#                           subset to a small <comment>.REBset_v1.ini
+#                           file, named after the single device name
+#                           comment picked for the export - for quick,
+#                           ad hoc sharing (e.g. "just my B-axis
+#                           calibration"), distinct from the full
+#                           REBset_v1.ini snapshot. See
+#                           docs/settings_file.md.
+# Updated:              ver 1.1, 3 August 2026, Claude
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Tab_Settings_v1
@@ -2018,6 +1421,25 @@ class HandlerClass:
             print("Export_Settings cancelled")
             return
 
+        comments = set(selected.get("comments", {}).values())
+        if not comments:
+            _show_settings_error(
+                widget,
+                "Pick a device name for at least one exported axis - it's "
+                "used to name the exported file."
+            )
+            return
+        if len(comments) > 1:
+            _show_settings_error(
+                widget,
+                "More than one different device name was selected "
+                "(" + ", ".join(sorted(comments)) + "). Pick a single "
+                "device name to use as the exported file's name."
+            )
+            return
+        comment = comments.pop()
+        file_name = re.sub(r'[\\/]', '-', comment) + EXPORT_EXTENSION
+
         os.makedirs(REBSET_DEFAULT_DIR, exist_ok=True)
 
         dialog = Gtk.FileChooserDialog(
@@ -2031,9 +1453,7 @@ class HandlerClass:
         )
         dialog.set_current_folder(REBSET_DEFAULT_DIR)
         dialog.set_do_overwrite_confirmation(True)
-        dialog.set_current_name(
-            (self._settings_name or "settings") + EXPORT_EXTENSION
-        )
+        dialog.set_current_name(file_name)
 
         file_filter = Gtk.FileFilter()
         file_filter.set_name("Rose Engine Butler Export (*" + EXPORT_EXTENSION + ")")
@@ -2088,6 +1508,10 @@ class HandlerClass:
                     )
                 exported.append(axis_id + " PID")
 
+        for axis_id, comment in selected.get("comments", {}).items():
+            ET.SubElement(get_axis_el(axis_id), "comment").text = comment
+            exported.append(axis_id + " Comment (" + comment + ")")
+
         if selected.get("measurement_system"):
             combo = self.builder.get_object("Measurement_System")
             system = combo.get_active_text() if combo is not None else None
@@ -2133,10 +1557,16 @@ class HandlerClass:
         position and velocity loops together, matching the coarse
         per-axis granularity already used for Scale/Backlash rather
         than exposing every individual gain), plus Measurement System -
-        all pre-checked, with Select All/None convenience buttons.
-        Returns {"axes": [...ids...], "backlash_axes": [...ids...],
-        "pid_axes": [...ids...], "measurement_system": bool} on Export,
-        or None if cancelled/nothing was selected.
+        all pre-checked, with Select All/None convenience buttons. Each
+        axis's Scale row also gets a dropdown (populated from the
+        General tab's maintained Device Names list) to optionally label
+        that axis's export with which physical device it belongs to
+        (e.g. "Rosette Phaser/Multiplier (Sp1)") - axis-to-device isn't
+        fixed, so this is a per-export choice rather than something
+        inferred from the axis id. Returns {"axes": [...ids...],
+        "backlash_axes": [...ids...], "pid_axes": [...ids...],
+        "comments": {axis_id: name, ...}, "measurement_system": bool}
+        on Export, or None if cancelled/nothing was selected.
         '''
         dialog = Gtk.Dialog(
             title="Export Settings - Choose What to Include",
@@ -2180,13 +1610,31 @@ class HandlerClass:
             label.set_xalign(0)
             return label
 
+        device_names = self._read_device_names()
+
         scale_col.pack_start(section_label("Axis Scales"), False, False, 0)
         checks = {}
+        comment_combos = {}
         for axis_id in AXIS_STEPGEN:
+            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
             check = Gtk.CheckButton(label=axis_id + " Scale")
             check.set_active(True)
-            scale_col.pack_start(check, False, False, 0)
+            row.pack_start(check, False, False, 0)
+
+            combo = Gtk.ComboBoxText()
+            combo.append_text("")
+            for name in device_names:
+                combo.append_text(name)
+            combo.set_active(0)
+            combo.set_tooltip_text(
+                "Optional: label this axis's export with one of the "
+                "device names maintained on the General tab."
+            )
+            row.pack_start(combo, False, False, 0)
+
+            scale_col.pack_start(row, False, False, 0)
             checks[axis_id] = check
+            comment_combos[axis_id] = combo
 
         backlash_col.pack_start(section_label("Backlash"), False, False, 0)
         backlash_checks = {}
@@ -2228,8 +1676,14 @@ class HandlerClass:
             axes = [axis_id for axis_id, c in checks.items() if c.get_active()]
             backlash_axes = [axis_id for axis_id, c in backlash_checks.items() if c.get_active()]
             pid_axes = [axis_id for axis_id, c in pid_checks.items() if c.get_active()]
+            comments = {
+                axis_id: text
+                for axis_id, combo in comment_combos.items()
+                for text in [combo.get_active_text()]
+                if text
+            }
             measurement_system = measurement_check.get_active()
-            if not axes and not backlash_axes and not pid_axes and not measurement_system:
+            if not axes and not backlash_axes and not pid_axes and not comments and not measurement_system:
                 _show_settings_error(widget, "Select at least one item to export.")
                 continue
 
@@ -2237,6 +1691,7 @@ class HandlerClass:
                 "axes": axes,
                 "backlash_axes": backlash_axes,
                 "pid_axes": pid_axes,
+                "comments": comments,
                 "measurement_system": measurement_system,
             }
             break
@@ -2246,7 +1701,8 @@ class HandlerClass:
 
 #######################################################################
 # Import_Settings
-# Purpose:              Reads a .export.ini file and applies whatever
+# Purpose:              Reads a <comment>.REBset_v1.ini export file and
+#                           applies whatever
 #                           subset of axis Scale/Backlash/PID/
 #                           Measurement System values it contains to the
 #                           current settings - everything else on the
@@ -2309,6 +1765,7 @@ class HandlerClass:
             return
 
         imported = []
+        comment_imported = False
         for axis_el in root.findall("axis"):
             axis_id = axis_el.get("id")
             if axis_id not in AXIS_STEPGEN:
@@ -2344,6 +1801,26 @@ class HandlerClass:
                         spin.set_value(backlash)  # fires <Axis>_Set_Backlash: halcmd setp/mark dirty
                         imported.append(axis_id + " Backlash")
 
+            # Comment (device name - see Export_Settings/the General
+            # tab's Device Names list): only COMMENT_AXES have a live
+            # comment field to apply it to (Sp0/Sp1 don't - the main
+            # panel has no spindle comment entries), so an export's
+            # comment for a spindle is informational-only and doesn't
+            # round-trip back into anything on Import. _save_axis_comment
+            # only patches REBset_v1.ini on disk - it can't reach into
+            # the X_Comment/etc. Entry widget itself, because that widget
+            # lives on REB_Panel_v1.ui, a separate `loadusr gladevcp`
+            # process from this Settings-tab one (see EMBED_TAB_COMMAND
+            # in REB.ini) - not just a different builder in the same
+            # process. There is no live IPC between them for this, so the
+            # panel only picks up the new text from _load_axis_comments()
+            # at its own next startup - hence comment_imported below.
+            comment_el = axis_el.find("comment")
+            if comment_el is not None and comment_el.text is not None and axis_id in COMMENT_AXES:
+                self._save_axis_comment(axis_id, comment_el.text)
+                imported.append(axis_id + " Comment")
+                comment_imported = True
+
             pid_applied = False
             if axis_id in PID_AXES:
                 pid_applied = self._import_pid_block(
@@ -2376,6 +1853,12 @@ class HandlerClass:
                 buttons=Gtk.ButtonsType.OK,
                 text="Imported: " + ", ".join(imported),
             )
+            if comment_imported:
+                dialog.format_secondary_text(
+                    "The imported comment(s) are saved, but the main "
+                    "panel's Comment field runs as a separate program and "
+                    "won't show the new text until you restart LinuxCNC."
+                )
             dialog.run()
             dialog.destroy()
         else:
@@ -2716,8 +2199,6 @@ class HandlerClass:
             print("Error setting " + hal_pin + ": " + e.stderr)
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
-
-        self._mark_settings_dirty()
 
 #######################################################################
 # B_Set_Ena
@@ -3707,10 +3188,9 @@ class HandlerClass:
         # effect (see conversation).
         #
         # Only if the machine is actually ON: this handler also fires
-        # from _load_settings_file's programmatic spin.set_value() (the
-        # startup auto-reload of the last-used .rebset, via
-        # _prompt_initial_settings_load) - which runs before the
-        # operator has powered on/reset E-stop, when there's no
+        # from _load_scale_settings's programmatic spin.set_value() (the
+        # startup auto-restore from REBset_v1.ini), which runs before
+        # the operator has powered on/reset E-stop, when there's no
         # spinning spindle to stop anyway. Sending M5 unconditionally
         # there popped an "EMC_TASK_PLAN_EXECUTE cannot be executed
         # until the machine is out of E-stop and turned on" error dialog
@@ -3770,8 +3250,6 @@ class HandlerClass:
             print("Error setting " + hal_pin + ": " + e.stderr)
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
-
-        self._mark_settings_dirty()
 
 #######################################################################
 # Sp0_Set_Ena
@@ -3998,8 +3476,6 @@ class HandlerClass:
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
 
-        self._mark_settings_dirty()
-
 #######################################################################
 # Sp1_Set_Ena
 # Purpose:              See B_Set_Ena - same pattern, for Sp1.
@@ -4030,23 +3506,17 @@ class HandlerClass:
         self.builder        = builder
         self.nhits          = 0
 
-        # .settings.ini save/load state (Settings_Save/Settings_Load, see
-        # docs/settings_file.md). _applying_settings suppresses
-        # _mark_settings_dirty while Settings_Load is itself the one
-        # driving widget values, so re-applying a loaded scale doesn't
-        # immediately re-dirty the settings just loaded.
-        self._applying_settings   = False
-        self._settings_dirty      = False
-        self._settings_name       = None
-        self._settings_path       = None  # current file for plain Settings_Save; None -> behaves like Save As
-        self._settings_source_path = None  # full path shown on Settings_File_Path - see _set_settings_source_path_display
-
         # Suppresses Measurement_System_Changed's save/patch/popup while
         # _load_measurement_system is itself the one driving the combo box
         # at startup (see combo.set_active there) - a startup load should
         # not re-save REB_Settings_v1.ini, re-patch REB.ini, or pop up the
         # restart notice.
         self._applying_measurement_system = False
+
+        # Same suppression as _applying_measurement_system above, for
+        # _load_device_names driving the Device Names text buffer at
+        # startup.
+        self._applying_device_names = False
 
         # Same suppression as _applying_measurement_system above, for
         # _load_max_jog_speed driving the Max Jog Speed spin button at
@@ -4171,6 +3641,11 @@ class HandlerClass:
         # the main panel or the Settings tab.
         self._load_measurement_system()
 
+        # Restore the persisted device-name list (REBset_v1.ini) into
+        # the General tab's Device Names text box (if owned by this
+        # component).
+        self._load_device_names()
+
         # Restore the persisted Max Jog Speed (REB_Settings_v1.ini) into
         # the Settings tab's spin button (if owned by this component).
         self._load_max_jog_speed()
@@ -4179,16 +3654,6 @@ class HandlerClass:
         # (REB_Settings_v1.ini) into the Settings tab's jog-speed spin
         # buttons (if owned by this component).
         self._load_velocity_settings()
-
-        # There's no stored "last loaded .settings.ini" carried across restarts
-        # (only the auto-persisted REB_Settings_v1.ini values, already
-        # applied above regardless of what happens here) - so every
-        # session starts with nothing named. Prompt once, after the tab
-        # is actually up, to pick a saved profile; deferred via idle_add
-        # since __init__ runs before the toplevel is realized. Only in
-        # the component that owns these widgets.
-        if self.builder.get_object("X_Set_Scale") is not None:
-            GLib.idle_add(self._prompt_initial_settings_load)
 
         # Let the mouse wheel scroll the page even when the cursor is
         # over one of its many spin buttons/combo boxes, rather than only
@@ -4409,8 +3874,6 @@ def _axis_set_scale(axis):
             print("Error setting " + hal_pin + ": " + e.stderr)
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
-
-        self._mark_settings_dirty()
     handler.__name__ = axis + "_Set_Scale"
     return handler
 
@@ -4459,7 +3922,6 @@ def _axis_set_backlash(axis):
             print("Error setting " + hal_pin + ": " + e.stderr)
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
-        self._mark_settings_dirty()
     handler.__name__ = axis + "_Set_Backlash"
     return handler
 
@@ -4476,17 +3938,9 @@ def _pid_set(hal_pin):
     invalidate an in-progress move the way a scale change can.
 
     REB_Settings_v1.ini itself is not written here - same as scale,
-    that only happens at shutdown (REB_Scale_Persist.py reading the
-    live HAL pins), not on every keystroke/spin-click.
-
-    Also marks the active .settings.ini dirty (_mark_settings_dirty),
-    now that PID gains are part of that format (v2 - see
-    _migrate_settings_v1_to_v2) instead of being excluded from it. Safe
-    to call unconditionally: _mark_settings_dirty already no-ops during
-    a programmatic load (self._applying_settings), the same guard that
-    already covers set_value() calls on the Scale/comment/notes widgets
-    from _load_settings_file - so this only fires for a real live edit
-    or an Import_Settings PID import, not a Load.
+    that only happens when the operator clicks Save Settings, or
+    automatically at shutdown (REB_Scale_Persist.py reading the live
+    HAL pins), not on every keystroke/spin-click.
     '''
     def handler(self, widget):
         value = widget.get_value()
@@ -4502,7 +3956,6 @@ def _pid_set(hal_pin):
             print("Error setting " + hal_pin + ": " + e.stderr)
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
-        self._mark_settings_dirty()
     return handler
 
 for _axis_id, _component in PID_AXES.items():

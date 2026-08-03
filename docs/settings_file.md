@@ -1,5 +1,20 @@
 # Named Settings Files (.settings.ini) — Design Plan
 
+> **RETIRED (2 August 2026):** The named `.settings.ini` Save As/Load
+> mechanism this document designs - `Settings_Save_As`, `Settings_Load`,
+> the dirty-tracking/exit-time save prompt, the startup auto-reload of
+> the last-used file - has been removed from `REB_main.py`/
+> `REB_Scale_Persist.py`/`REB_Tab_Settings_v1.ui`, per Rich's request.
+> "Save Settings" now writes straight to `REBset_v1.ini` (see
+> `_write_rebset_snapshot` in `REB_main.py`), and `REB_Scale_Persist.py`
+> does the same automatically at shutdown, with no prompt. **Export/
+> Import (`.export.ini`) are unaffected and still work exactly as
+> documented below** - they're a separate, independent mechanism (see
+> "Export/Import" section) that never depended on any of the removed
+> code. This document is kept as a historical record of the original
+> design and its bug-fix history; see "Settings_Save_As/Load and the
+> exit prompt removed" near the end for what changed and why.
+
 ## Purpose of this document
 
 This is a plan, not a finished feature. It records the design for letting an
@@ -13,8 +28,10 @@ and any future contributor can see why it's shaped this way before any
 ## How settings are persisted today
 
 Today there is exactly one settings file, at a fixed path:
-`RoseEngineButlerLocal/REB_Settings_v1.ini` (actually XML despite the
-extension). It holds, per axis (`X`, `Z`, `B`, `U`, `V`, `W`, `Sp0`, `Sp1`),
+`/home/reuben/Documents/REBset_v1.ini` (actually XML despite the
+extension - see "Settings file moved to ~/Documents" below for why it
+no longer lives in `RoseEngineButlerLocal`). It holds, per axis (`X`,
+`Z`, `B`, `U`, `V`, `W`, `Sp0`, `Sp1`),
 a `<scale>` value, and for the six linear/angular axes (not the spindles) a
 free-text `<usercomment>`. It is:
 
@@ -822,6 +839,170 @@ one live-tunable).
   described above ("Stepper Motor Tuning tab reading all zero"): a
   live HAL parameter with nothing ever seeded into the persisted file
   it's restored from at startup.
+
+### Settings file moved to ~/Documents (2 August 2026)
+
+`SETTINGS_PATH` (`REB_main.py`, `REB_Scale_Persist.py`,
+`REB_Generate_Local_Ini.py` - duplicated across all three, same as
+`AXIS_STEPGEN`/`JOINT_NUMBER`) moved from
+`RoseEngineButlerLocal/REB_Settings_v1.ini` to
+`/home/reuben/Documents/REBset_v1.ini`, per Rich's request. Now sits
+alongside the operator-facing `.settings.ini`/`.export.ini` files
+(`REBSET_DEFAULT_DIR` is already `~/Documents`) instead of in the
+repo's per-machine-state sibling directory - nothing else about the
+file's format or read/write logic changed. The existing file's content
+was copied (not moved) to the new path so live scale/backlash/PID/
+Measurement System/jog-speed values already on this machine weren't
+lost; the old `RoseEngineButlerLocal/REB_Settings_v1.ini` copy was left
+in place, now unread by anything, rather than deleted outright.
+
+### Settings_Save_As/Load and the exit prompt removed (2 August 2026)
+
+Rich asked for "Save Settings" to write straight into `REBset_v1.ini`
+(see above), then, once that landed, for the whole rest of the named
+`.settings.ini` mechanism to go: auto-run the equivalent of "Save
+Settings" at LinuxCNC exit with no prompt, remove "Save Settings
+As..."/"Load Settings...", keep Export/Import.
+
+Turned out the "auto-run at exit" half was already true and had been
+all along: `REB_Scale_Persist.py`'s `main()` already persists live
+scale/PID/backlash into `REBset_v1.ini` unconditionally, every
+shutdown, with no prompt - that's a different code path from the
+`.settings.ini` exit prompt this document designs. The only "asking"
+was `prompt_save_pending_settings()`, a separate step tacked onto the
+end of `main()` for the *named*-profile mechanism. Removing that one
+function (and the dirty-tracking that fed it) satisfied "no need to
+ask" directly, with no new automatic-save logic required.
+
+Removed, once the audit below confirmed nothing else (in particular,
+Export/Import) depended on any of it:
+
+- **`REB_main.py`:** `Settings_Save_As`, `Settings_Load`,
+  `_load_settings_file`, `_save_to_path`, `_prompt_initial_settings_load`
+  (the startup auto-reload-last-file), `_gather_current_settings`,
+  `_apply_pid_gains`, `_read_axis_comment`, `_mark_settings_dirty`,
+  `_write_pending_snapshot`, `_clear_pending_settings_snapshot`,
+  `_set_settings_name_display`, `_refresh_settings_name_label`,
+  `_set_settings_source_path_display`, `_read_last_settings_path`,
+  `_write_last_settings_path`, `_legacy_settings_available`,
+  `_name_from_settings_path`, `_migrate_settings_v1_to_v2`, and the
+  `REBSET_FORMAT_VERSION`/`REBSET_EXTENSION`/`REBSET_GENERIC_EXAMPLE_PATH`/
+  `DEFAULT_LEGACY_SETTINGS_NAME`/`LAST_SETTINGS_PATH_FILE`/
+  `PENDING_SETTINGS_PATH` constants. `_disable_axis` also went, once
+  removing `_load_settings_file` left it with no remaining caller.
+  `_read_pid_gains` was kept - `_write_rebset_snapshot` (the new "Save
+  Settings" logic) uses it too. `_settings_name` was kept as an
+  always-`None` state var, since `Export_Settings` reads
+  `self._settings_name or "settings"` for its suggested filename; every
+  `self._mark_settings_dirty()` call site left behind by the handlers
+  above (8 of them, scattered through the scale/PID/backlash change
+  handlers) was deleted along with it. `Settings_Notes_Changed` was
+  reduced to a no-op - the Notes `GtkTextView` stays as free-text
+  scratch space with nowhere left to persist it (`REBset_v1.ini`, XML,
+  has no notes field).
+- **`REB_Tab_Settings_v1.ui`:** the "Save Settings As..."/"Load
+  Settings..." buttons, the `Settings_Name` label, and the
+  `Settings_File_Path` label all removed from the Axis Tuning tab's
+  toolbar - "Save Settings"/"Export Settings..."/"Import Settings..."
+  are what's left. No packing `position` renumbering needed: GtkBox
+  packing only needs ascending order, not contiguous values, so the
+  gaps left behind are harmless.
+- **`REB_Scale_Persist.py`:** `prompt_save_pending_settings()` and its
+  now-solely-owned `PENDING_SETTINGS_PATH`/`LAST_SETTINGS_PATH_FILE`/
+  `REBSET_DEFAULT_DIR`/`REBSET_EXTENSION`/`_name_from_settings_path`/
+  `import json` all removed; the scale/PID/backlash persist loops in
+  `main()` are untouched.
+
+**Kept, confirmed independent:** `Export_Settings`, `Import_Settings`,
+`_export_pid_block`, `_import_pid_block`, `_run_export_selection_dialog`,
+`REBSET_DEFAULT_DIR` (Export/Import's file-chooser directory - kept,
+just no longer named after the retired format), `EXPORT_EXTENSION`,
+`COMMENT_AXES` (still used by the live main-panel comment-autosave
+feature, unrelated to any of this).
+
+### Device Names list and per-axis export comments (3 August 2026)
+
+Rich wanted a way to label which physical device (Spindle, Rosette
+Phaser/Multiplier, Retractor, etc. - "currently 9 values, could expand")
+each exported axis's values belong to, for use as the comment on an
+export.
+
+Added a free-text, multi-line `Device_Names` `GtkTextView` on the new
+"General" tab (one name per line), persisted to `REBset_v1.ini` as a
+`<device_names><name>...</name>...</device_names>` block via
+`_save_device_names`/`_load_device_names` (whole-block replace, same
+regex-patch style as the rest of this file), with `_read_device_names`
+reading the live buffer for immediate use. `_run_export_selection_dialog`
+gained a `Gtk.ComboBoxText` next to each axis's Scale checkbox, populated
+from that list, feeding a `{axis_id: comment}` dict (`selected["comments"]`)
+back to `Export_Settings`/into a `<comment>` element per axis in the
+export XML. `Import_Settings` reads `<comment>` back for `COMMENT_AXES`
+via `_save_axis_comment` (Sp0/Sp1 excluded - no live comment field to
+round-trip into).
+
+### Export filename derived from the device name comment (3 August 2026)
+
+Rich asked for Export's saved filename to follow `<comment>.REBset_v1.ini`,
+where `<comment>` is the device name entered by the operator - instead
+of the old generic `settings.export.ini` default.
+
+Since the export dialog now allows a *different* comment per axis (see
+above), "the comment" is ambiguous whenever more than one axis is
+selected. Resolved by requiring exactly one **distinct** comment value
+across whatever's selected: `Export_Settings` collects
+`set(selected["comments"].values())` and refuses to proceed (via
+`_show_settings_error`, same as the existing "select at least one item"
+guard) unless that set has exactly one member - zero means "pick a
+device name for something you're exporting," more than one lists the
+conflicting names and asks for a single choice. The surviving name has
+`/`/`\` swapped for `-` (device names are free text and can contain `/`,
+e.g. "Rosette Phaser/Multiplier (Sp1)", which isn't valid inside a single
+filename component) and is set as the file chooser's suggested name -
+the operator can still retype it before saving, same as always.
+
+`EXPORT_EXTENSION` itself changed from `.export.ini` to `.REBset_v1.ini`
+to match the requested format; `Import_Settings` shares the same
+constant for its file filter, so both stayed in sync automatically. Note
+this is just a filename convention collision with `REBset_v1.ini`
+(`SETTINGS_PATH`) in appearance only - an export is always named
+`<comment>.REBset_v1.ini` with a non-empty prefix, never the bare
+`REBset_v1.ini` name, so it can't collide with the real settings file on
+disk.
+
+`_settings_name` (the always-`None` state var `Export_Settings` used to
+fall back to `"settings"` with) had no other reader left once the
+filename logic changed to use the selected comment instead, so it was
+removed along with its declaration in `__init__`.
+
+### Bug found live: imported comments don't appear on the main panel until restart (3 August 2026)
+
+Rich reported that after Import Settings, an axis's imported comment
+never shows up in that axis's Comment field on `REB_Panel_v1.ui`.
+
+Root cause is more fundamental than a missed widget update: `Import_Settings`
+runs inside the Settings tab's own `gladevcp` process (`EMBED_TAB_COMMAND`
+in REB.ini launches Help/Settings/License each via their own `halcmd
+loadusr gladevcp ...`), which is a **separate OS process** from the one
+running the main `REB_Panel_v1.ui` side panel (`[DISPLAY]GLADEVCP`, which
+loads in-process with AXIS itself) - not just a different `Gtk.Builder`
+in the same process, as most of the other `self.builder.get_object(...)
+is None: return` guards throughout this file assume. `_save_axis_comment`
+only ever patches `REBset_v1.ini` on disk; it has no way to reach across
+processes into the other program's live `X_Comment`/etc. `Gtk.Entry`.
+The main panel only ever loads that file into the Entry once, at its own
+startup (`_load_axis_comments`, called from `__init__`).
+
+There's no existing IPC for this (comments aren't HAL pins, unlike
+Scale/Backlash/PID, which is why those already applied live even across
+this same process boundary). Rather than build one for a rarely-used
+Import path, added a `comment_imported` flag alongside the existing
+`imported` list in `Import_Settings`; when set, the "Imported: ..." info
+dialog gets a secondary line telling the operator the comment(s) are
+saved but won't appear on the main panel until they restart LinuxCNC -
+matching the existing `_show_restart_required_popup` pattern already
+used for Measurement System/velocity settings (a different root cause -
+those are read once at LinuxCNC process startup - but the same
+operator-facing fix: restart to see it).
 
 ## Testing plan
 

@@ -23,7 +23,7 @@
 #   whatever local Max Jog Speed / the five VELOCITY_SETTINGS jog-speed
 #   values (Default/Max/Min Angular, Default/Min Linear) / Measurement
 #   System choices are currently persisted in
-#   RoseEngineButlerLocal/REB_Settings_v1.ini.
+#   /home/reuben/Documents/REBset_v1.ini.
 #
 #   REB.ini's [TRAJ]/[DISPLAY] MAX_LINEAR_VELOCITY (and its four
 #   VELOCITY_SETTINGS siblings) and [TRAJ]LINEAR_UNITS / [JOINT_n]UNITS
@@ -114,7 +114,7 @@ import sys
 REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REB_INI_PATH = os.path.join(REPO_DIR, "REB.ini")
 
-SETTINGS_PATH = "/home/reuben/linuxcnc/configs/RoseEngineButlerLocal/REB_Settings_v1.ini"
+SETTINGS_PATH = "/home/reuben/Documents/REBset_v1.ini"
 
 # Must sit next to REB.ini (not in RoseEngineButlerLocal) - see the file
 # header above for why: LinuxCNC resolves every relative path in the
