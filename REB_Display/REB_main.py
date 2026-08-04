@@ -353,7 +353,11 @@ def _save_device_names(names):
     lines.append("    </device_names>")
     block = "\n".join(lines)
 
-    pattern = re.compile(r'<device_names>.*?</device_names>', re.DOTALL)
+    # [ \t]* eats any pre-existing indentation on the <device_names> line
+    # itself - otherwise each rewrite stacks the block's own 4-space
+    # indent onto whatever whitespace was already sitting there,
+    # growing a little further out every time this runs.
+    pattern = re.compile(r'[ \t]*<device_names>.*?</device_names>', re.DOTALL)
     if pattern.search(xml_text):
         new_text, count = pattern.subn(lambda m: block, xml_text, count=1)
     else:
