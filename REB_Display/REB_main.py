@@ -1202,14 +1202,17 @@ class HandlerClass:
 #                           tab's "Other" section. Updates this
 #                           component's own unit-of-measure labels for
 #                           immediate feedback, persists the choice to
-#                           REB_Settings_v1.ini, and warns that a restart
+#                           REBset_v1.ini, and warns that a restart
 #                           is needed for the new units to actually take
 #                           effect. REB.ini itself is never patched here
 #                           any more - REB_Setup/REB_Launch.sh overlays
 #                           this persisted choice onto a fresh copy of
-#                           REB.ini (RoseEngineButlerLocal/REB.local.ini)
-#                           on every LinuxCNC launch, so a `git pull` of
-#                           REB.ini can never clobber it (see
+#                           REB.ini (REB.local.ini, written next to
+#                           REB.ini in this repo's own directory - see
+#                           REB_Generate_Local_Ini.py for why it can't
+#                           live in RoseEngineButlerLocal) on every
+#                           LinuxCNC launch, so a `git pull` of REB.ini
+#                           can never clobber it (see
 #                           REB_Setup/REB_Generate_Local_Ini.py).
 # Updated:              ver 1.1, 1 August 2026, Claude
 # ---------------------------------------------------------------------
@@ -1245,14 +1248,17 @@ class HandlerClass:
 # Max_Jog_Speed_Changed
 # Purpose:              User changed the Max Jog Speed on the Settings
 #                           tab's "General" section. Persists the value
-#                           to REB_Settings_v1.ini and warns that a
+#                           to REBset_v1.ini and warns that a
 #                           restart is needed. REB.ini itself is never
 #                           patched here any more - REB_Setup/REB_Launch.sh
 #                           overlays this persisted value onto a fresh
-#                           copy of REB.ini (RoseEngineButlerLocal/
-#                           REB.local.ini) on every LinuxCNC launch, so a
-#                           `git pull` of REB.ini can never clobber it
-#                           (see REB_Setup/REB_Generate_Local_Ini.py).
+#                           copy of REB.ini (REB.local.ini, written next
+#                           to REB.ini in this repo's own directory - see
+#                           REB_Generate_Local_Ini.py for why it can't
+#                           live in RoseEngineButlerLocal) on every
+#                           LinuxCNC launch, so a `git pull` of REB.ini
+#                           can never clobber it (see
+#                           REB_Setup/REB_Generate_Local_Ini.py).
 # Updated:              ver 1.1, 1 August 2026, Claude
 # ---------------------------------------------------------------------
 # Called from:

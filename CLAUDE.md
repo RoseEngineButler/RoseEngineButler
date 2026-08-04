@@ -10,13 +10,13 @@ There is no build/compile/test step. "Testing" a change means loading the config
 
 ## Repo vs. local machine state — read this before editing
 
-This repo (`RoseEngineButler`) is the **shared/distributable** config. A sibling directory, `RoseEngineButlerLocal` (NOT part of this git repo, lives at `/home/reuben/linuxcnc/configs/RoseEngineButlerLocal`), holds **per-machine local state** that REB.ini/REB.hal reference by absolute path:
+This repo (`RoseEngineButler`) is the **shared/distributable** config. A sibling directory, `RoseEngineButlerLocal` (NOT part of this git repo, lives at `/home/reuben/linuxcnc/configs/RoseEngineButlerLocal`), used to hold **per-machine local state** that REB.ini/REB.hal referenced by absolute path — as of 4 August 2026 this no longer applies to the HAL customization/tool table files (see below); check before assuming a given per-machine concern still lives there.
 
-- `RoseEngineButlerLocal/REB_Custom/REB_Custom.hal` — end-user HAL customizations (`[HAL]HALFILE` in REB.ini)
-- `RoseEngineButlerLocal/REB_Custom/REB_Tool.tbl` — the tool table (`[EMCIO]TOOL_TABLE`)
+- `REB_Custom/REB_Custom.hal` (repo-tracked, relative `[HAL]HALFILE = REB_Custom/REB_Custom.hal` in REB.ini) — end-user HAL customizations.
+- `REB_Custom/REB_Tool.tbl` (repo-tracked, relative `[EMCIO]TOOL_TABLE = REB_Custom/REB_Tool.tbl` in REB.ini) — the tool table.
+
+  These two used to live in `RoseEngineButlerLocal/REB_Custom/` (loaded by absolute path) with this repo's own `REB_Custom/` copies serving only as templates/fallback. Rich asked for REB.ini to point at the repo's own copies instead, so as of 4 August 2026 the `RoseEngineButlerLocal` copies (along with the stale `REB_Settings_v1.ini`/`REB_Last_Settings_Path.txt` left over from earlier, already-retired persistence designs, and an unused, never-wired-up `REB_Custom/REB_Shutdown.hal` template) were deleted; `RoseEngineButlerLocal` now holds nothing referenced by REB.ini/REB.hal at all. This does mean end-user HAL additions and the tool table are tracked in git now (a deliberate trade of the old repo/local separation for simplicity) - keep that in mind before committing either file on someone else's behalf.
 - `/home/reuben/Documents/REBset_v1.ini` — persisted per-axis stepgen scale, backlash, and PID gain values, plus Measurement System/Max Jog Speed/jog-speed-defaults choices (an XML file despite the `.ini` extension). Written automatically by `REB_Display/REB_Scale_Persist.py` at shutdown, and on demand by the Settings tab's "Save Settings" button (`_write_rebset_snapshot` in `REB_main.py`); read back by `REB_main.py` at Settings-tab load. Lives in `~/Documents`, not `RoseEngineButlerLocal`, so it sits alongside the operator-facing `.export.ini` files (Export/Import - see `docs/settings_file.md`) rather than in the repo's per-machine-state sibling directory. (The named `.settings.ini` Save As/Load mechanism `docs/settings_file.md` originally designed has since been retired — see that doc's "RETIRED" notice.)
-
-The repo also ships its own `REB_Custom/REB_Custom.hal` and `REB_Custom/REB_Tool.tbl` as templates/fallback copies — don't confuse the two when tracing which file is actually loaded at runtime (check the absolute paths in REB.ini's `[HAL]` and `[EMCIO]` sections).
 
 `sim.var` / `sim.var.bak`, `REB.local.ini`, and `REB_Display/__pycache__/` appearing in `git status` are runtime artifacts (all gitignored), not tracked source — don't commit them.
 
@@ -32,7 +32,7 @@ Why it must live next to REB.ini and NOT in `RoseEngineButlerLocal`: LinuxCNC tr
 0. `REB_Setup/REB_Launch.sh` — the actual desktop-launcher entry point (not `linuxcnc REB.ini` directly). Runs `REB_Generate_Local_Ini.py` to regenerate `REB.local.ini` (next to REB.ini) from the tracked REB.ini, then execs `linuxcnc` against that generated file.
 1. `REB.ini` — the master config: `[EMC]`/`[DISPLAY]`/`[KINS]`/`[TRAJ]` sections plus one `[AXIS_*]`/`[JOINT_n]` section per axis and one `[SPINDLE_n]` per spindle. All axis tuning (PID gains, STEPGEN_MAXVEL/MAXACCEL, step timing) lives here now — the old per-axis `REB_Axes/*.inc` files were merged into REB.ini's `[JOINT_n]`/`[SPINDLE_n]` sections (see git history) and no longer exist.
 2. `REB.hal` — loads realtime components (`hostmot2`, `hm2_eth`, `pid`, `orient`, `sum2`) and wires each joint's stepgen ↔ PID ↔ HAL pins. **Not meant to be user-edited.**
-3. `RoseEngineButlerLocal/REB_Custom/REB_Custom.hal` — user HAL additions, loaded after REB.hal.
+3. `REB_Custom/REB_Custom.hal` — user HAL additions, loaded after REB.hal.
 4. `REB_Display/REB_PostGUI_v1.hal` — runs after the GUI loads; wires the gladevcp panel's per-axis ENA buttons through a flipflop-based toggle, ANDed with a Settings-tab override pin (`REBCnfg.<Axis>_Ena_Override`), into each axis's actual enable net.
 5. `REB_Shutdown.hal` — runs `REB_Display/REB_Scale_Persist.py` to persist live stepgen position-scale values back into `/home/reuben/Documents/REBset_v1.ini`.
 
