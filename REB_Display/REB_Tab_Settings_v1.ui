@@ -1451,7 +1451,7 @@ For the spindles, 360° is a good starting point.  For rotary axes, 10° is a go
                           <packing>
                             <property name="expand">False</property>
                             <property name="fill">False</property>
-                            <property name="position">4</property>
+                            <property name="position">3</property>
                           </packing>
                         </child>
                         <child>
@@ -1506,7 +1506,7 @@ For the spindles, 360° is a good starting point.  For rotary axes, 10° is a go
                           <packing>
                             <property name="expand">False</property>
                             <property name="fill">False</property>
-                            <property name="position">5</property>
+                            <property name="position">4</property>
                           </packing>
                         </child>
                         <child>
@@ -1522,7 +1522,7 @@ For the spindles, 360° is a good starting point.  For rotary axes, 10° is a go
                           <packing>
                             <property name="expand">False</property>
                             <property name="fill">False</property>
-                            <property name="position">6</property>
+                            <property name="position">5</property>
                           </packing>
                         </child>
                         <child>
@@ -1543,7 +1543,7 @@ For the spindles, 360° is a good starting point.  For rotary axes, 10° is a go
                           <packing>
                             <property name="expand">False</property>
                             <property name="fill">False</property>
-                            <property name="position">7</property>
+                            <property name="position">6</property>
                           </packing>
                         </child>
                         <child>
@@ -1554,7 +1554,8 @@ For the spindles, 360° is a good starting point.  For rotary axes, 10° is a go
                             <property name="valign">start</property>
                             <property name="margin-start">4</property>
                             <property name="margin-end">4</property>
-                            <property name="label" translatable="yes">There is far more descriptive help  in the Rose Engine Butler's User Manual, in the entry, "Axis Settings for a Device".  You can get to the User Manual via the ℛ Help tab.</property>
+                            <property name="margin-bottom">10</property>
+                            <property name="label" translatable="yes">There is far more descriptive help  in the Rose Engine Butler's User Manual, in the entry, "Axis Settings for a Device".  The button below will take you to that page. </property>
                             <property name="wrap">True</property>
                             <attributes>
                               <attribute name="font-desc" value="DejaVu Serif 10"/>
@@ -1563,6 +1564,26 @@ For the spindles, 360° is a good starting point.  For rotary axes, 10° is a go
                           <packing>
                             <property name="expand">False</property>
                             <property name="fill">False</property>
+                            <property name="position">7</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="HAL_Button" id="Open User Manual">
+                            <property name="label" translatable="yes">User Manual</property>
+                            <property name="visible">True</property>
+                            <property name="can-focus">True</property>
+                            <property name="receives-default">True</property>
+                            <property name="halign">start</property>
+                            <property name="valign">end</property>
+                            <property name="vexpand">True</property>
+                            <property name="use-underline">True</property>
+                            <property name="image-position">top</property>
+                            <property name="always-show-image">True</property>
+                            <signal name="pressed" handler="Open_User_Manual" swapped="no"/>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
                             <property name="position">8</property>
                           </packing>
                         </child>

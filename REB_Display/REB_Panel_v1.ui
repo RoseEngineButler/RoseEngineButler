@@ -2102,10 +2102,11 @@ feed rate</property>
                 <property name="halign">start</property>
                 <property name="valign">end</property>
                 <property name="vexpand">True</property>
-                <property name="relief">none</property>
+                <property name="relief">half</property>
                 <property name="use-underline">True</property>
                 <property name="image-position">top</property>
                 <property name="always-show-image">True</property>
+                <signal name="pressed" handler="OpenRoseEngineButlerWebsite" swapped="no"/>
               </object>
               <packing>
                 <property name="left-attach">0</property>

@@ -1283,6 +1283,29 @@ class HandlerClass:
         )
 
 #######################################################################
+# Open_User_Manual
+# Purpose:              Opens the Rose Engine Butler User Manual's Axis
+#                           Configuration File page in the default web
+#                           browser.
+# Updated:              ver 1.0, 6 August 2026, Claude
+# ---------------------------------------------------------------------
+# Called from:
+#   UI:                 REB_Tab_Settings_v1
+#   Button:              Open User Manual  (HAL_Button)
+#   Signal:              GtkButton/pressed
+#######################################################################
+    def Open_User_Manual(self, widget):
+
+        print("=================================================")
+        print("FUNCTION Open_User_Manual")
+
+        url = "https://roseenginebutler.com/UserManual/index.php?n=Main.AxisConfigurationFile"
+        webbrowser.open(url)
+
+        Prt1 = "Opening website " + url
+        print(Prt1)
+
+#######################################################################
 # Settings_Save
 # Purpose:              Writes the live scale/backlash/PID values -
 #                           read straight from this tab's own widgets,
@@ -2332,6 +2355,37 @@ class HandlerClass:
 # AA    AA  LL       LL           AA    AA  XX  XX  EE       SS    SS
 # AA    AA  LLLLLLLL LLLLLLLL     AA    AA XX    XX EEEEEEEE  SSSSSS  
 # ********************************************************************
+
+#######################################################################
+# OpenRoseEngineButlerWebsite
+# Purpose:              This is used to open the Rose Engine Butler
+#                       website.
+# Updated:              ver 1.0, 6 August 2026, Claude
+# ---------------------------------------------------------------------
+# Called from:
+#   UI:                 REB_Panel_v1
+#   Button:             Open Library  (HAL_Button)
+#   Signal:             GtkButton/pressed
+# ---------------------------------------------------------------------
+# Data
+#   Read from UI:       (none)
+#   Program Variables
+#       Referenced:     (none)
+#       Set:            (none)
+#   Written to UI:      (none)
+# ---------------------------------------------------------------------
+# Gcodes Called:        (none)
+#######################################################################
+    def OpenRoseEngineButlerWebsite(self,widget):
+
+        print("=================================================")
+        print("FUNCTION OpenRoseEngineButlerWebsite")
+
+        url = "https://roseenginebutler.com/"
+        webbrowser.open(url)
+
+        Prt1 = "Opening website " + url
+        print(Prt1)
 
 #######################################################################
 # OpenGcodeLibrary
