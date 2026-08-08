@@ -160,15 +160,35 @@ REBSET_DEFAULT_DIR = os.path.expanduser("~/Documents")
 # panel, persisted to REB_Settings_v1.ini as each <axis>'s <usercomment>.
 COMMENT_AXES = ("X", "Z", "U", "V", "W", "B")
 
+# Leading entry (index 0) in every device-name GtkComboBoxText - the main
+# panel's per-axis Comment/Device combos and the Export Settings dialog's
+# per-axis Device combos alike - standing in for "nothing chosen yet"
+# instead of a blank-looking row. Never treated as a real device name -
+# see _combo_selected_device.
+DEVICE_COMBO_PLACEHOLDER = "(nothing selected yet)"
+
+# Sp0/Sp1 have no main-panel comment field (see COMMENT_AXES) to default
+# the Export Settings dialog's Device combo from, unlike X/Z/U/V/W/B -
+# these are the ones Rich actually has, so use them as each spindle's
+# default there instead of falling back to DEVICE_COMBO_PLACEHOLDER.
+# Only applied if the name is still present in the maintained Device
+# Names list at export time - see _run_export_selection_dialog.
+SPINDLE_DEFAULT_DEVICE_NAME = {
+    "Sp0": "Spindle (Sp0)",
+    "Sp1": "Rosette Phaser/Multiplier (Sp1)",
+}
+
 # Export_Settings/Import_Settings (see docs/settings_file.md): a
 # hand-picked subset of just what's literally on the Settings tab itself
 # (each axis's Scale, plus Measurement System), for quick, ad hoc sharing
 # of a few values (e.g. "just my B-axis calibration") rather than a full
 # profile. Plain XML (matching REB_Settings_v1.ini's own shape). The
-# filename itself is "<comment>.REBset_v1.ini", where <comment> is the
-# single device name the operator picked in the export selection dialog
-# (see Export_Settings) - not related to SETTINGS_PATH, which is always
-# the fixed "REBset_v1.ini" name with no comment prefix.
+# filename itself defaults to "<comment>.REBset_v1.ini", where <comment>
+# is the single device name the operator picked in the export selection
+# dialog - or, when the selected axes' Device combos name more than one
+# distinct device, today's date instead (see Export_Settings) - not
+# related to SETTINGS_PATH, which is always the fixed "REBset_v1.ini"
+# name with no comment prefix.
 EXPORT_EXTENSION = ".REBset_v1.ini"
 
 # Establish connection to command and status channels
@@ -403,6 +423,38 @@ def _read_persisted_device_names():
     if not match:
         return []
     return [unescape(n) for n in re.findall(r'<name>(.*?)</name>', match.group(1), re.DOTALL)]
+
+def _read_persisted_axis_comment(axis_id, xml_text):
+    '''
+    Extracts one axis's persisted <usercomment> value out of an
+    already-read SETTINGS_PATH xml_text. Shared by _load_axis_comments
+    (main panel, restoring its own Device combos at startup) and
+    _run_export_selection_dialog (Settings tab, defaulting each axis's
+    Export dialog Device combo to whatever's currently set on the main
+    panel) - REBset_v1.ini's <usercomment> is the only channel between
+    those two separate gladevcp processes (see CLAUDE.md). Returns ""
+    if the axis or its <usercomment> isn't found.
+    '''
+    match = re.search(
+        r'<axis\s+id="' + re.escape(axis_id) + r'">\s*<scale>-?[\d.]+</scale>\s*'
+        r'<usercomment>(.*?)</usercomment>',
+        xml_text,
+        re.DOTALL
+    )
+    return unescape(match.group(1)) if match else ""
+
+def _combo_selected_device(combo):
+    '''
+    Returns the real selected value of a device-name GtkComboBoxText
+    (empty string if the leading DEVICE_COMBO_PLACEHOLDER entry - index
+    0 - is what's active), rather than combo.get_active_text() directly,
+    which would return the placeholder's own display text. Index-based
+    rather than a string comparison against DEVICE_COMBO_PLACEHOLDER so
+    this keeps working even if that text is ever changed - index 0 is
+    always the placeholder, in both places these combos get built
+    (_load_axis_comments, _run_export_selection_dialog).
+    '''
+    return combo.get_active_text() if combo.get_active() > 0 else ""
 
 def _save_max_jog_speed(value):
     '''
@@ -942,8 +994,9 @@ class HandlerClass:
         (_read_persisted_device_names - the on-disk counterpart to the
         General tab's live Device Names widget, which this component
         doesn't have access to, being a separate gladevcp process - see
-        CLAUDE.md) plus a leading blank entry for "nothing chosen yet",
-        then selects whichever entry matches that axis's persisted
+        CLAUDE.md) plus a leading DEVICE_COMBO_PLACEHOLDER entry for
+        "nothing chosen yet", then selects whichever entry matches that
+        axis's persisted
         comment from REB_Settings_v1.ini. This is what constrains a
         comment to one of the maintained device names rather than free
         text - GtkComboBoxText (no entry) only ever offers what's been
@@ -978,18 +1031,12 @@ class HandlerClass:
                     continue
 
                 widget.remove_all()
-                widget.append_text("")
+                widget.append_text(DEVICE_COMBO_PLACEHOLDER)
                 for name in device_names:
                     widget.append_text(name)
 
-                match = re.search(
-                    r'<axis\s+id="' + re.escape(axis_id) + r'">\s*<scale>-?[\d.]+</scale>\s*'
-                    r'<usercomment>(.*?)</usercomment>',
-                    xml_text,
-                    re.DOTALL
-                )
-                stored = unescape(match.group(1)) if match else ""
-                if match is None:
+                stored = _read_persisted_axis_comment(axis_id, xml_text)
+                if not stored:
                     print("No stored comment found for axis " + axis_id
                           + " in " + SETTINGS_PATH)
 
@@ -1000,7 +1047,7 @@ class HandlerClass:
                     # name (e.g. free text from before this became a
                     # constrained dropdown, or the device-name list
                     # changed since it was picked) - fall back to the
-                    # blank entry rather than silently keeping an
+                    # placeholder entry rather than silently keeping an
                     # invalid value selected.
                     print(axis_id + " comment \"" + stored
                           + "\" doesn't match any device name - leaving blank")
@@ -1026,7 +1073,7 @@ class HandlerClass:
             if widget is None:
                 continue
 
-            text = widget.get_active_text() or ""
+            text = _combo_selected_device(widget)
             if text != self._last_saved_axis_comment.get(axis_id):
                 self._save_axis_comment(axis_id, text)
                 self._last_saved_axis_comment[axis_id] = text
@@ -1486,16 +1533,19 @@ class HandlerClass:
 # Purpose:              Same live-value snapshot as Settings_Save, but
 #                           written to a file the operator picks instead
 #                           of always overwriting SETTINGS_PATH - e.g.
-#                           for a dated backup before a retune. Refreshes
-#                           SETTINGS_PATH first (via _write_rebset_snapshot,
-#                           the same call Settings_Save makes) so the copy
-#                           reflects the current live values, then copies
-#                           that file byte-for-byte to the chosen path.
-#                           This does not change which file Settings_Save/
+#                           for a dated backup before a retune (hence the
+#                           dialog's default filename of today's date,
+#                           not SETTINGS_PATH's own name - see below).
+#                           Refreshes SETTINGS_PATH first (via
+#                           _write_rebset_snapshot, the same call
+#                           Settings_Save makes) so the copy reflects the
+#                           current live values, then copies that file
+#                           byte-for-byte to the chosen path. This does
+#                           not change which file Settings_Save/
 #                           Settings_Load use afterward - unlike the
 #                           retired named-.settings.ini mechanism, there is
 #                           no "current file" to switch to.
-# Updated:              ver 1.0, 8 August 2026, Claude
+# Updated:              ver 1.1, 8 August 2026, Claude
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Tab_Settings_v1
@@ -1524,7 +1574,13 @@ class HandlerClass:
         )
         dialog.set_current_folder(REBSET_DEFAULT_DIR)
         dialog.set_do_overwrite_confirmation(True)
-        dialog.set_current_name(os.path.basename(SETTINGS_PATH))
+        # Today's date, not SETTINGS_PATH's own fixed "REBset_v1.ini"
+        # name - this is a copy going somewhere else, so defaulting to
+        # the exact name of the file it's copied from just invites
+        # confusing the two; a dated name reads as "a snapshot from
+        # this day" and is still just a default the operator can
+        # rename on this same dialog.
+        dialog.set_current_name(time.strftime("%Y-%m-%d") + ".REBset_v1.ini")
 
         file_filter = Gtk.FileFilter()
         file_filter.set_name("Rose Engine Butler Settings (*.ini)")
@@ -1623,17 +1679,20 @@ class HandlerClass:
 
 #######################################################################
 # Export_Settings
-# Purpose:              Lets the operator pick a subset of what's on the
-#                           Settings tab (each axis's Scale, and/or
-#                           Measurement System) and export just that
+# Purpose:              Lets the operator pick which axes to export (each
+#                           selected axis's Scale, Backlash, and Stepper
+#                           Motor Tuning/PID all go together as one unit -
+#                           see _run_export_selection_dialog), and/or
+#                           Measurement System, and export just that
 #                           subset to a small <comment>.REBset_v1.ini
 #                           file, named after the single device name
-#                           comment picked for the export - for quick,
-#                           ad hoc sharing (e.g. "just my B-axis
-#                           calibration"), distinct from the full
-#                           REBset_v1.ini snapshot. See
+#                           comment picked for the export - or today's
+#                           date if the selected axes name more than one
+#                           distinct device - for quick, ad hoc sharing
+#                           (e.g. "just my B-axis calibration"), distinct
+#                           from the full REBset_v1.ini snapshot. See
 #                           docs/settings_file.md.
-# Updated:              ver 1.1, 3 August 2026, Claude
+# Updated:              ver 1.3, 8 August 2026, Claude
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Tab_Settings_v1
@@ -1660,16 +1719,16 @@ class HandlerClass:
                 "used to name the exported file."
             )
             return
-        if len(comments) > 1:
-            _show_settings_error(
-                widget,
-                "More than one different device name was selected "
-                "(" + ", ".join(sorted(comments)) + "). Pick a single "
-                "device name to use as the exported file's name."
-            )
-            return
-        comment = comments.pop()
-        file_name = re.sub(r'[\\/]', '-', comment) + EXPORT_EXTENSION
+        if len(comments) == 1:
+            file_name = re.sub(r'[\\/]', '-', comments.pop()) + EXPORT_EXTENSION
+        else:
+            # More than one different device name was selected (e.g.
+            # exporting several axes belonging to different physical
+            # devices at once) - no single name to build the file's
+            # default name from, so fall back to today's date instead of
+            # refusing to export. Still just a default: the operator can
+            # rename it on the save dialog that comes up next.
+            file_name = time.strftime("%Y-%m-%d") + EXPORT_EXTENSION
 
         os.makedirs(REBSET_DEFAULT_DIR, exist_ok=True)
 
@@ -1710,22 +1769,21 @@ class HandlerClass:
                 axis_els[axis_id] = ET.SubElement(root, "axis", {"id": axis_id})
             return axis_els[axis_id]
 
+        # Each selected axis exports Scale, Backlash, and Stepper Motor
+        # Tuning/PID together as one unit - see _run_export_selection_dialog
+        # for why these three no longer get independent checkboxes.
         exported = []
         for axis_id in selected.get("axes", ()):
             spin = self.builder.get_object(axis_id + "_Set_Scale")
-            if spin is None:
-                continue
-            ET.SubElement(get_axis_el(axis_id), "scale").text = str(spin.get_value())
-            exported.append(axis_id + " Scale")
+            if spin is not None:
+                ET.SubElement(get_axis_el(axis_id), "scale").text = str(spin.get_value())
+                exported.append(axis_id + " Scale")
 
-        for axis_id in selected.get("backlash_axes", ()):
-            spin = self.builder.get_object(axis_id + "_Set_Backlash")
-            if spin is None:
-                continue
-            ET.SubElement(get_axis_el(axis_id), "backlash").text = str(spin.get_value())
-            exported.append(axis_id + " Backlash")
+            backlash_spin = self.builder.get_object(axis_id + "_Set_Backlash")
+            if backlash_spin is not None:
+                ET.SubElement(get_axis_el(axis_id), "backlash").text = str(backlash_spin.get_value())
+                exported.append(axis_id + " Backlash")
 
-        for axis_id in selected.get("pid_axes", ()):
             if axis_id in PID_AXES:
                 self._export_pid_block(get_axis_el(axis_id), axis_id, "pid",
                                         lambda param, axis_id=axis_id: axis_id + "_Set_" + param)
@@ -1782,22 +1840,39 @@ class HandlerClass:
 
     def _run_export_selection_dialog(self, widget):
         '''
-        Modal checklist: one row per axis's Scale, one row per axis's
-        Backlash, one row per axis's/spindle loop's PID gains (P/I/D/
-        FF0/FF1/FF2 as a single unit - Sp0/Sp1 each cover both their
-        position and velocity loops together, matching the coarse
-        per-axis granularity already used for Scale/Backlash rather
-        than exposing every individual gain), plus Measurement System -
-        all pre-checked, with Select All/None convenience buttons. Each
-        axis's Scale row also gets a dropdown (populated from the
-        General tab's maintained Device Names list) to optionally label
-        that axis's export with which physical device it belongs to
-        (e.g. "Rosette Phaser/Multiplier (Sp1)") - axis-to-device isn't
-        fixed, so this is a per-export choice rather than something
-        inferred from the axis id. Returns {"axes": [...ids...],
-        "backlash_axes": [...ids...], "pid_axes": [...ids...],
-        "comments": {axis_id: name, ...}, "measurement_system": bool}
-        on Export, or None if cancelled/nothing was selected.
+        Modal checklist: one row per axis, each with a single checkbox
+        covering that axis's Scale, Backlash, and Stepper Motor Tuning/
+        PID together (P/I/D/FF0/FF1/FF2 - Sp0/Sp1 each cover both their
+        position and velocity loops as part of the same unit), plus a
+        Device dropdown (populated from the General tab's maintained
+        Device Names list) to optionally label that axis's export with
+        which physical device it belongs to (e.g. "Rosette Phaser/
+        Multiplier (Sp1)") - axis-to-device isn't fixed, so this is a
+        per-export choice rather than something inferred from the axis
+        id. Two entries per axis, nothing more - these three used to be
+        independent checkboxes in separate columns, which was more
+        precision than this dialog needs; a device's Scale/Backlash/
+        tuning are always exported or skipped together in practice.
+        Measurement System stays a separate, independent checkbox below
+        the axis list. All pre-checked, with Select All/None convenience
+        buttons.
+
+        Each Device combo defaults to whatever's currently set on the
+        main panel's own comment field for that axis (X/Z/U/V/W/B - see
+        COMMENT_AXES), via _read_persisted_axis_comment against
+        SETTINGS_PATH - the main panel is a separate gladevcp process
+        from this one, so its live widget isn't reachable directly (see
+        CLAUDE.md), but its own "changed" handler saves every edit
+        straight to REBset_v1.ini's <usercomment>, which is what's read
+        here instead. Sp0/Sp1 have no such field, so they default to
+        SPINDLE_DEFAULT_DEVICE_NAME instead. Either way, falls back to
+        the placeholder if that value doesn't match any currently
+        maintained device name, same as _load_axis_comments does for the
+        main panel's own combos.
+
+        Returns {"axes": [...ids...], "comments":
+        {axis_id: name, ...}, "measurement_system": bool} on Export, or
+        None if cancelled/nothing was selected.
         '''
         dialog = Gtk.Dialog(
             title="Export Settings - Choose What to Include",
@@ -1822,19 +1897,6 @@ class HandlerClass:
 
         content.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0)
 
-        # Three columns side by side (Scale, Backlash, PID) so the
-        # checkboxes stay a manageable dialog height instead of one long
-        # list.
-        columns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
-        content.pack_start(columns, False, False, 0)
-
-        scale_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        backlash_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        pid_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        columns.pack_start(scale_col, False, False, 0)
-        columns.pack_start(backlash_col, False, False, 0)
-        columns.pack_start(pid_col, False, False, 0)
-
         def section_label(text):
             label = Gtk.Label()
             label.set_markup("<b>" + text + "</b>")
@@ -1843,58 +1905,66 @@ class HandlerClass:
 
         device_names = self._read_device_names()
 
-        # Sized so the "Device" header lines up with the combo boxes
-        # below it, not just with wherever "Axis Scales" happens to end -
-        # axis labels are different widths (e.g. "X Scale" vs.
-        # "Sp0 Scale"), so without this the combos (and this header)
-        # would drift depending on which axis's row is widest.
-        scale_label_group = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
+        try:
+            with open(SETTINGS_PATH, "r") as f:
+                comments_xml_text = f.read()
+        except OSError as e:
+            print("Could not read " + SETTINGS_PATH + ": " + str(e))
+            comments_xml_text = ""
 
-        scale_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        axis_scales_label = section_label("Axis Scales")
-        scale_label_group.add_widget(axis_scales_label)
-        scale_header.pack_start(axis_scales_label, False, False, 0)
-        scale_header.pack_start(section_label("Device"), False, False, 0)
-        scale_col.pack_start(scale_header, False, False, 0)
+        axis_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        content.pack_start(axis_col, False, False, 0)
+
+        # Sized so the "Device" header lines up with the combo boxes
+        # below it, not just with wherever the widest axis checkbox
+        # happens to end - axis labels are different widths (e.g. "X"
+        # vs. "Sp0"), so without this the combos (and this header) would
+        # drift depending on which axis's row is widest.
+        axis_label_group = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
+
+        axis_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        axis_label = section_label("Axis")
+        axis_label_group.add_widget(axis_label)
+        axis_header.pack_start(axis_label, False, False, 0)
+        axis_header.pack_start(section_label("Device"), False, False, 0)
+        axis_col.pack_start(axis_header, False, False, 0)
+
         checks = {}
         comment_combos = {}
         for axis_id in AXIS_STEPGEN:
             row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-            check = Gtk.CheckButton(label=axis_id + " Scale")
+            check = Gtk.CheckButton(label=axis_id)
             check.set_active(True)
-            scale_label_group.add_widget(check)
+            check.set_tooltip_text(
+                "Exports this axis's Scale, Backlash, and Stepper Motor "
+                "Tuning together."
+            )
+            axis_label_group.add_widget(check)
             row.pack_start(check, False, False, 0)
 
             combo = Gtk.ComboBoxText()
-            combo.append_text("")
+            combo.append_text(DEVICE_COMBO_PLACEHOLDER)
             for name in device_names:
                 combo.append_text(name)
-            combo.set_active(0)
+
+            stored = (_read_persisted_axis_comment(axis_id, comments_xml_text)
+                      or SPINDLE_DEFAULT_DEVICE_NAME.get(axis_id, ""))
+            try:
+                combo.set_active(device_names.index(stored) + 1 if stored else 0)
+            except ValueError:
+                # Doesn't match any currently maintained device name -
+                # see _load_axis_comments' matching fallback.
+                combo.set_active(0)
+
             combo.set_tooltip_text(
                 "Optional: label this axis's export with one of the "
                 "device names maintained on the General tab."
             )
             row.pack_start(combo, False, False, 0)
 
-            scale_col.pack_start(row, False, False, 0)
+            axis_col.pack_start(row, False, False, 0)
             checks[axis_id] = check
             comment_combos[axis_id] = combo
-
-        backlash_col.pack_start(section_label("\nBacklash"), False, False, 0)
-        backlash_checks = {}
-        for axis_id in AXIS_STEPGEN:
-            check = Gtk.CheckButton(label=axis_id + " Backlash")
-            check.set_active(True)
-            backlash_col.pack_start(check, False, False, 0)
-            backlash_checks[axis_id] = check
-
-        pid_col.pack_start(section_label("Stepper Motor\nTuning"), False, False, 0)
-        pid_checks = {}
-        for axis_id in list(PID_AXES) + list(PID_SPINDLE_LOOPS):
-            check = Gtk.CheckButton(label=axis_id + " PID/FFx")
-            check.set_active(True)
-            pid_col.pack_start(check, False, False, 0)
-            pid_checks[axis_id] = check
 
         content.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0)
 
@@ -1913,10 +1983,7 @@ class HandlerClass:
         device_note.set_max_width_chars(60)
         content.pack_start(device_note, False, False, 0)
 
-        all_checks = (
-            list(checks.values()) + list(backlash_checks.values())
-            + list(pid_checks.values()) + [measurement_check]
-        )
+        all_checks = list(checks.values()) + [measurement_check]
         select_all_btn.connect("clicked", lambda b: [c.set_active(True) for c in all_checks])
         select_none_btn.connect("clicked", lambda b: [c.set_active(False) for c in all_checks])
 
@@ -1929,23 +1996,19 @@ class HandlerClass:
                 break
 
             axes = [axis_id for axis_id, c in checks.items() if c.get_active()]
-            backlash_axes = [axis_id for axis_id, c in backlash_checks.items() if c.get_active()]
-            pid_axes = [axis_id for axis_id, c in pid_checks.items() if c.get_active()]
             comments = {
                 axis_id: text
                 for axis_id, combo in comment_combos.items()
-                for text in [combo.get_active_text()]
+                for text in [_combo_selected_device(combo)]
                 if text
             }
             measurement_system = measurement_check.get_active()
-            if not axes and not backlash_axes and not pid_axes and not comments and not measurement_system:
+            if not axes and not comments and not measurement_system:
                 _show_settings_error(widget, "Select at least one item to export.")
                 continue
 
             result = {
                 "axes": axes,
-                "backlash_axes": backlash_axes,
-                "pid_axes": pid_axes,
                 "comments": comments,
                 "measurement_system": measurement_system,
             }
@@ -2201,38 +2264,38 @@ class HandlerClass:
     # _applying_axis_comments first: without that guard, loading the
     # persisted comment at startup would immediately re-save the exact
     # value just read (same pattern as Measurement_System_Changed).
-    # get_active_text() returns "" for the leading blank entry, never
-    # None, since it's a real appended row rather than "nothing
-    # selected" (active index -1).
+    # _combo_selected_device() (not get_active_text() directly) reads
+    # back "" when the leading DEVICE_COMBO_PLACEHOLDER entry is active,
+    # rather than saving that placeholder text itself as the comment.
     def X_Comment(self, widget):
         if self._applying_axis_comments:
             return
-        self._save_axis_comment("X", widget.get_active_text())
+        self._save_axis_comment("X", _combo_selected_device(widget))
 
     def Z_Comment(self, widget):
         if self._applying_axis_comments:
             return
-        self._save_axis_comment("Z", widget.get_active_text())
+        self._save_axis_comment("Z", _combo_selected_device(widget))
 
     def U_Comment(self, widget):
         if self._applying_axis_comments:
             return
-        self._save_axis_comment("U", widget.get_active_text())
+        self._save_axis_comment("U", _combo_selected_device(widget))
 
     def V_Comment(self, widget):
         if self._applying_axis_comments:
             return
-        self._save_axis_comment("V", widget.get_active_text())
+        self._save_axis_comment("V", _combo_selected_device(widget))
 
     def W_Comment(self, widget):
         if self._applying_axis_comments:
             return
-        self._save_axis_comment("W", widget.get_active_text())
+        self._save_axis_comment("W", _combo_selected_device(widget))
 
     def B_Comment(self, widget):
         if self._applying_axis_comments:
             return
-        self._save_axis_comment("B", widget.get_active_text())
+        self._save_axis_comment("B", _combo_selected_device(widget))
 
 # ********************************************************************
 #    AA    XX    XX IIIIIIII  SSSSSS      BBBBBBB
@@ -3990,7 +4053,7 @@ class HandlerClass:
         # so there's nothing to flush until an operator actually changes
         # a field.
         self._last_saved_axis_comment = {
-            axis_id: widget.get_active_text() or ""
+            axis_id: _combo_selected_device(widget)
             for axis_id in COMMENT_AXES
             for widget in [self.builder.get_object(axis_id + "_Comment")]
             if widget is not None
