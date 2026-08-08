@@ -1442,6 +1442,7 @@ from File</property>
                                     <property name="visible">True</property>
                                     <property name="can-focus">True</property>
                                     <property name="receives-default">True</property>
+                                    <property name="tooltip-text" translatable="yes">Load the settings from a file. This file could contain all settings, or a subset of them. If a subset of the settings is in the file, only those values will be loaded; the rest will be left as is.</property>
                                     <signal name="clicked" handler="Settings_Load" swapped="no"/>
                                   </object>
                                   <packing>
