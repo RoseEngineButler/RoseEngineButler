@@ -116,22 +116,22 @@
   <object class="GtkImage" id="Image_U_Left">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
-    <property name="pixbuf">Images/Axis-Xneg.png</property>
+    <property name="pixbuf">Images/Axis-Xpos.png</property>
   </object>
   <object class="GtkImage" id="Image_U_Right">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
-    <property name="pixbuf">Images/Axis-Xpos.png</property>
+    <property name="pixbuf">Images/Axis-Xneg.png</property>
   </object>
   <object class="GtkImage" id="Image_V_Down">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
-    <property name="pixbuf">Images/Axis-Ypos.png</property>
+    <property name="pixbuf">Images/Axis-Yneg.png</property>
   </object>
   <object class="GtkImage" id="Image_V_Up">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
-    <property name="pixbuf">Images/Axis-Yneg.png</property>
+    <property name="pixbuf">Images/Axis-Ypos.png</property>
   </object>
   <object class="GtkImage" id="Image_W_Down">
     <property name="visible">True</property>
@@ -146,12 +146,12 @@
   <object class="GtkImage" id="Image_X_Left">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
-    <property name="pixbuf">Images/Axis-Xneg.png</property>
+    <property name="pixbuf">Images/Axis-Xpos.png</property>
   </object>
   <object class="GtkImage" id="Image_X_Right">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
-    <property name="pixbuf">Images/Axis-Xpos.png</property>
+    <property name="pixbuf">Images/Axis-Xneg.png</property>
   </object>
   <object class="GtkImage" id="Image_Z_Left">
     <property name="visible">True</property>
