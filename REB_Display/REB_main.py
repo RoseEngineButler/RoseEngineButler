@@ -69,6 +69,7 @@ import os
 import linuxcnc
 import webbrowser
 import subprocess
+import shutil
 import re
 import xml.etree.ElementTree as ET
 from gi.repository import Gdk
@@ -678,6 +679,14 @@ class HandlerClass:
         which is built for exactly this but doesn't give a "look
         pressed" visual).
 
+        Fwd is tied to spindle.0.reverse and Rev to spindle.0.forward -
+        backwards-looking, but intentional: Sp0_Move_Fwd/Sp0_Move_Rev
+        send M4/M3 respectively (see those functions' docstrings for why
+        - an empirically-verified swap fixing an unexplained direction
+        flip), so spindle.0.reverse is what actually goes TRUE while Fwd
+        is spinning. This mirrors that same swap so the highlighted
+        button still matches the one physically pressed.
+
         Uses _set_depressed (a plain HAL_Button plus a CSS class), not
         HAL_ToggleButton.set_active() - the theme's native "checked"
         look for a toggle button wasn't visibly different enough to
@@ -693,8 +702,8 @@ class HandlerClass:
         if fwd is None or rev is None:
             return False
 
-        _set_depressed(fwd, bool(hal.get_value('spindle.0.forward')))
-        _set_depressed(rev, bool(hal.get_value('spindle.0.reverse')))
+        _set_depressed(fwd, bool(hal.get_value('spindle.0.reverse')))
+        _set_depressed(rev, bool(hal.get_value('spindle.0.forward')))
         return True
 
     def _load_scale_settings(self):
@@ -1422,6 +1431,145 @@ class HandlerClass:
         except OSError as e:
             print("Could not write " + SETTINGS_PATH + ": " + str(e))
 
+#######################################################################
+# Settings_Save_As
+# Purpose:              Same live-value snapshot as Settings_Save, but
+#                           written to a file the operator picks instead
+#                           of always overwriting SETTINGS_PATH - e.g.
+#                           for a dated backup before a retune. Refreshes
+#                           SETTINGS_PATH first (via _write_rebset_snapshot,
+#                           the same call Settings_Save makes) so the copy
+#                           reflects the current live values, then copies
+#                           that file byte-for-byte to the chosen path.
+#                           This does not change which file Settings_Save/
+#                           Settings_Load use afterward - unlike the
+#                           retired named-.settings.ini mechanism, there is
+#                           no "current file" to switch to.
+# Updated:              ver 1.0, 8 August 2026, Claude
+# ---------------------------------------------------------------------
+# Called from:
+#   UI:                 REB_Tab_Settings_v1
+#   Button:              Settings_Save_As  (GtkButton)
+#   Signal:              GtkButton/clicked
+#######################################################################
+    def Settings_Save_As(self, widget):
+        if self.builder.get_object("X_Set_Scale") is None:
+            return
+
+        print("=================================================")
+        print("FUNCTION Settings_Save_As")
+
+        self._write_rebset_snapshot()
+
+        os.makedirs(REBSET_DEFAULT_DIR, exist_ok=True)
+
+        dialog = Gtk.FileChooserDialog(
+            title="Save Settings As",
+            transient_for=widget.get_toplevel(),
+            action=Gtk.FileChooserAction.SAVE,
+        )
+        dialog.add_buttons(
+            "_Cancel", Gtk.ResponseType.CANCEL,
+            "_Save", Gtk.ResponseType.OK,
+        )
+        dialog.set_current_folder(REBSET_DEFAULT_DIR)
+        dialog.set_do_overwrite_confirmation(True)
+        dialog.set_current_name(os.path.basename(SETTINGS_PATH))
+
+        file_filter = Gtk.FileFilter()
+        file_filter.set_name("Rose Engine Butler Settings (*.ini)")
+        file_filter.add_pattern("*.ini")
+        dialog.add_filter(file_filter)
+
+        response = dialog.run()
+        path = dialog.get_filename() if response == Gtk.ResponseType.OK else None
+        dialog.destroy()
+
+        if not path:
+            print("Settings_Save_As cancelled")
+            return
+
+        if not path.endswith(".ini"):
+            path += ".ini"
+
+        try:
+            shutil.copyfile(SETTINGS_PATH, path)
+        except OSError as e:
+            _show_settings_error(widget, "Could not write " + path + ":\n" + str(e))
+            return
+
+        print("Saved a copy of " + SETTINGS_PATH + " to " + path)
+
+#######################################################################
+# Settings_Load
+# Purpose:              Lets the operator pick a REBset_v1.ini-shaped
+#                           settings file (SETTINGS_PATH itself, or a
+#                           Settings_Save_As backup of it) and applies
+#                           whatever axis Scale/Backlash/PID/comment and
+#                           Measurement System values it contains to the
+#                           live widgets, via the same _apply_settings_root
+#                           helper Import_Settings uses - see that
+#                           function for why each value goes through its
+#                           own widget handler rather than being written
+#                           to disk directly, and for the comment-restart
+#                           caveat. Differs from Import_Settings only in
+#                           the file it expects (a full snapshot, using
+#                           <usercomment> - see docs/settings_file.md -
+#                           rather than Export's smaller <comment>-tagged
+#                           subset) and in not restricting to a hand-picked
+#                           subset of axes.
+# Updated:              ver 1.0, 8 August 2026, Claude
+# ---------------------------------------------------------------------
+# Called from:
+#   UI:                 REB_Tab_Settings_v1
+#   Button:              Settings_Load  (GtkButton)
+#   Signal:              GtkButton/clicked
+#######################################################################
+    def Settings_Load(self, widget):
+        if self.builder.get_object("X_Set_Scale") is None:
+            return
+
+        print("=================================================")
+        print("FUNCTION Settings_Load")
+
+        os.makedirs(REBSET_DEFAULT_DIR, exist_ok=True)
+
+        dialog = Gtk.FileChooserDialog(
+            title="Load Settings",
+            transient_for=widget.get_toplevel(),
+            action=Gtk.FileChooserAction.OPEN,
+        )
+        dialog.add_buttons(
+            "_Cancel", Gtk.ResponseType.CANCEL,
+            "_Load", Gtk.ResponseType.OK,
+        )
+        dialog.set_current_folder(REBSET_DEFAULT_DIR)
+
+        file_filter = Gtk.FileFilter()
+        file_filter.set_name("Rose Engine Butler Settings (*.ini)")
+        file_filter.add_pattern("*.ini")
+        dialog.add_filter(file_filter)
+
+        response = dialog.run()
+        path = dialog.get_filename() if response == Gtk.ResponseType.OK else None
+        dialog.destroy()
+
+        if not path:
+            print("Settings_Load cancelled")
+            return
+
+        try:
+            root = ET.parse(path).getroot()
+        except (OSError, ET.ParseError) as e:
+            _show_settings_error(widget, "Could not read " + path + ":\n" + str(e))
+            return
+
+        if root.tag != "settings":
+            _show_settings_error(widget, path + " is not a Rose Engine Butler settings file.")
+            return
+
+        self._apply_settings_root(widget, root, path, "usercomment")
+
 
 #######################################################################
 # Export_Settings
@@ -1770,8 +1918,10 @@ class HandlerClass:
 #                           so the usual per-axis safety checks (motion
 #                           abort, disable-if-enabled) and dirty-tracking
 #                           all apply exactly as if the operator had
-#                           typed/selected each value themselves.
-# Updated:              ver 1.1, 2 August 2026, Claude
+#                           typed/selected each value themselves. The
+#                           actual per-axis apply loop lives in
+#                           _apply_settings_root, shared with Settings_Load.
+# Updated:              ver 1.2, 8 August 2026, Claude
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Tab_Settings_v1
@@ -1821,6 +1971,26 @@ class HandlerClass:
             _show_settings_error(widget, path + " is not a Rose Engine Butler export file.")
             return
 
+        self._apply_settings_root(widget, root, path, "comment")
+
+    def _apply_settings_root(self, widget, root, path, comment_tag):
+        '''
+        Applies whatever subset of axis Scale/Backlash/PID/comment/
+        Measurement System values a parsed <settings> root contains to
+        the live Settings-tab widgets, then reports what changed. Shared
+        by Import_Settings (small <comment>-tagged Export_Settings
+        subset files) and Settings_Load (full <usercomment>-tagged
+        REBset_v1.ini-shaped snapshots) - comment_tag is the only thing
+        that differs between those two file shapes; everything else
+        (scale/backlash/pid/measurement_system element names) is common
+        to both. See Import_Settings's old docstring history for why
+        each value is applied through its own widget handler
+        (<Axis>_Set_Scale/<Axis>_Set_Backlash/Measurement_System_Changed)
+        rather than written to disk directly - it keeps the usual
+        per-axis safety checks (motion abort, disable-if-enabled) in the
+        loop exactly as if the operator had typed/selected each value
+        themselves.
+        '''
         imported = []
         comment_imported = False
         for axis_el in root.findall("axis"):
@@ -1828,7 +1998,7 @@ class HandlerClass:
             if axis_id not in AXIS_STEPGEN:
                 continue
 
-            # Scale and PID are independent - an export may carry either,
+            # Scale and PID are independent - a file may carry either,
             # both, or neither for a given axis, so check each on its own
             # rather than skipping the whole <axis> element when one is
             # absent.
@@ -1861,18 +2031,18 @@ class HandlerClass:
             # Comment (device name - see Export_Settings/the General
             # tab's Device Names list): only COMMENT_AXES have a live
             # comment field to apply it to (Sp0/Sp1 don't - the main
-            # panel has no spindle comment entries), so an export's
-            # comment for a spindle is informational-only and doesn't
-            # round-trip back into anything on Import. _save_axis_comment
-            # only patches REBset_v1.ini on disk - it can't reach into
-            # the X_Comment/etc. Entry widget itself, because that widget
+            # panel has no spindle comment entries), so a file's comment
+            # for a spindle is informational-only and doesn't round-trip
+            # back into anything here. _save_axis_comment only patches
+            # REBset_v1.ini on disk - it can't reach into the
+            # X_Comment/etc. Entry widget itself, because that widget
             # lives on REB_Panel_v1.ui, a separate `loadusr gladevcp`
             # process from this Settings-tab one (see EMBED_TAB_COMMAND
             # in REB.ini) - not just a different builder in the same
             # process. There is no live IPC between them for this, so the
             # panel only picks up the new text from _load_axis_comments()
             # at its own next startup - hence comment_imported below.
-            comment_el = axis_el.find("comment")
+            comment_el = axis_el.find(comment_tag)
             if comment_el is not None and comment_el.text is not None and axis_id in COMMENT_AXES:
                 self._save_axis_comment(axis_id, comment_el.text)
                 imported.append(axis_id + " Comment")
@@ -2641,7 +2811,10 @@ class HandlerClass:
 # Purpose:              This is used to start the spindles rotating
 #                           forward.
 #                       Note:  this starts both Sp0 and Sp1.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+#                       Note:  sends M4, not M3 - see the Gcode0/Gcode1
+#                           comment below. This is an intentional,
+#                           empirically-verified swap, not a typo.
+# Updated:              ver 1.2, 8 August 2026, Claude
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -2656,15 +2829,25 @@ class HandlerClass:
 #       Set:            (none)
 #   Written to UI:      (none)
 # ---------------------------------------------------------------------
-# Gcodes Called:        S, M3
+# Gcodes Called:        M4 (S combined on the same line - see below)
 #######################################################################
     def Sp0_Move_Fwd(self,widget):
 
         print("=================================================")
         print("FUNCTION Sp0_Move_Fwd")
 
-        # Ensure the system is in MDI mode
-        c.mode(linuxcnc.MODE_MDI)
+        # Ensure the system is in MDI mode - only switch if not already
+        # there (matches _axis_idx_move/B_Move_Idx_Fwd/Sp0_Move_Idx_Fwd
+        # etc.). This used to call c.mode(MODE_MDI) unconditionally on
+        # every press, even when already in MDI mode from the previous
+        # one - a redundant mode-switch no other handler in this file
+        # does, and one a human typing directly into the AXIS MDI box
+        # never triggers either. Re-entering MDI mode while already in
+        # it is exactly the kind of thing that can carry an internal
+        # abort/reset side effect in LinuxCNC's task controller, and was
+        # removed as a suspect once the wait_complete()-between-mdi-calls
+        # fix (see Gcode0/Gcode1 below) alone didn't resolve the spindle
+        # 0 direction flip found via live halcmd pin tracing.
         s.poll()
         if s.task_state != linuxcnc.MODE_MDI:
                 c.mode(linuxcnc.MODE_MDI)
@@ -2673,23 +2856,37 @@ class HandlerClass:
         # Set the feed rates
         Sp1_Feed = self.Sp1_Pct * self.Sp0_Feed / 100
 
-        # Send an MDI command to set the spindles' speed.
-        sSp0_Feed = "S" + str(self.Sp0_Feed) + " $0"
-        sSp1_Feed = "S" + str(Sp1_Feed) + " $1"
+        # Sends M4, not M3, despite this being the Fwd handler - an
+        # empirical workaround, not a mistake. Live halcmd pin tracing
+        # (spindle.0.forward/reverse/speed-out, which are motion-controller
+        # output pins REB.hal/this file cannot influence) proved that
+        # M3 $0 S<speed>, sent via this component's c.mdi(), reliably
+        # commands spindle.0.reverse=TRUE / speed-out negative - i.e.
+        # actual reverse rotation - while the byte-identical line typed
+        # into the AXIS MDI box by hand, in the same live session,
+        # reliably commands forward. Ruled out along the way: the S
+        # value's sign (always positive), the "$-1"/all-spindles form
+        # (replaced with per-spindle $0/$1 addressing), missing
+        # wait_complete() between the two spindles' mdi() calls (fixed -
+        # each now waits before the next is sent), and a redundant
+        # unconditional c.mode(MODE_MDI) call this used to make on every
+        # press (removed - now matches every other MDI-issuing handler's
+        # conditional-only mode switch). None of those changed the
+        # outcome, and manually replaying this exact two-line sequence
+        # by hand did not reproduce the flip either - so whatever
+        # actually causes it remains unexplained. Sending M4 here (and
+        # M3 in Sp0_Move_Rev) is the pragmatic fix: it makes the physical
+        # rotation match the button pressed, at the cost of the M-code
+        # sent no longer matching the function name/button label.
+        Gcode0 = "M4 $0 S" + str(self.Sp0_Feed)
+        Gcode1 = "M4 $1 S" + str(Sp1_Feed)
 
-        print(sSp0_Feed)
-        c.mdi(sSp0_Feed)
+        print(Gcode0)
+        c.mdi(Gcode0)
+        c.wait_complete()
 
-        print(sSp1_Feed)
-        c.mdi(sSp1_Feed)
-
-        # Send an MDI command to start spindles rotating.
-        Gcode = "M3 $-1"
-
-        print(Gcode)
-        c.mdi(Gcode)
-
-        # Wait for the command to complete
+        print(Gcode1)
+        c.mdi(Gcode1)
         c.wait_complete()
 
     def _index_both_spindles_simultaneously(self, sign):
@@ -2953,7 +3150,11 @@ class HandlerClass:
 # Purpose:              This is used to start the spindles rotating in
 #                           reverse.
 #                       Note:  this starts both Sp0 and Sp1.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+#                       Note:  sends M3, not M4 - see the Gcode0/Gcode1
+#                           comment below (and Sp0_Move_Fwd's). This is
+#                           an intentional, empirically-verified swap,
+#                           not a typo.
+# Updated:              ver 1.2, 8 August 2026, Claude
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -2968,15 +3169,16 @@ class HandlerClass:
 #       Set:            (none)
 #   Written to UI:      (none)
 # ---------------------------------------------------------------------
-# Gcodes Called:        S, M4
+# Gcodes Called:        M3 (S combined on the same line - see below)
 #######################################################################
     def Sp0_Move_Rev(self,widget):
 
         print("=================================================")
         print("FUNCTION Sp0_Move_Rev")
 
-        # Ensure the system is in MDI mode
-        c.mode(linuxcnc.MODE_MDI)
+        # Ensure the system is in MDI mode - only switch if not already
+        # there. See Sp0_Move_Fwd for why the previous unconditional
+        # c.mode(MODE_MDI) call was removed.
         s.poll()
         if s.task_state != linuxcnc.MODE_MDI:
                 c.mode(linuxcnc.MODE_MDI)
@@ -2986,23 +3188,22 @@ class HandlerClass:
         # Gcode S values, write them.
         Sp1_Feed = self.Sp1_Pct * self.Sp0_Feed / 100
 
-        # Send an MDI command to set the spindles' speed.
-        sSp0_Feed = "S" + str(self.Sp0_Feed) + " $0"
-        sSp1_Feed = "S" + str(Sp1_Feed) + " $1"
+        # Sends M3, not M4, despite this being the Rev handler - see the
+        # Gcode0/Gcode1 comment in Sp0_Move_Fwd for the full explanation
+        # (live pin tracing showed M4 here reliably commanding forward
+        # rotation instead of reverse, with no root cause found after
+        # ruling out S sign, "$-1" addressing, missing wait_complete()
+        # between the two spindles' mdi() calls, and a redundant
+        # unconditional mode switch). This is the matching pragmatic swap.
+        Gcode0 = "M3 $0 S" + str(self.Sp0_Feed)
+        Gcode1 = "M3 $1 S" + str(Sp1_Feed)
 
-        print(sSp0_Feed)
-        c.mdi(sSp0_Feed)
+        print(Gcode0)
+        c.mdi(Gcode0)
+        c.wait_complete()
 
-        print(sSp1_Feed)
-        c.mdi(sSp1_Feed)
-
-        # Send an MDI command to start spindles rotating.
-        Gcode = "M4 $-1"
-
-        print(Gcode)
-        c.mdi(Gcode)
-
-        # Wait for the command to complete
+        print(Gcode1)
+        c.mdi(Gcode1)
         c.wait_complete()
 
 #######################################################################

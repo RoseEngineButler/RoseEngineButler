@@ -14,6 +14,19 @@
 > code. This document is kept as a historical record of the original
 > design and its bug-fix history; see "Settings_Save_As/Load and the
 > exit prompt removed" near the end for what changed and why.
+>
+> **Note (8 August 2026):** `Settings_Save_As`/`Settings_Load` buttons
+> and handler methods now exist again in `REB_Tab_Settings_v1.ui`/
+> `REB_main.py`, at Rich's request - but as new, much smaller methods
+> built on top of the current `REBset_v1.ini`-snapshot model, not a
+> revival of the named-profile mechanism this document designs. Save As
+> refreshes `SETTINGS_PATH` (`_write_rebset_snapshot`, same as Save
+> Settings) and copies it to a chosen path; Load reads a chosen
+> `REBset_v1.ini`-shaped file and applies it live via
+> `_apply_settings_root`, a helper factored out of `Import_Settings` and
+> shared with it (`comment_tag` is the only difference between the two:
+> `<usercomment>` for a full snapshot vs. Export's `<comment>`). No
+> dirty-tracking, last-file auto-reload, or exit prompt came back.
 
 ## Purpose of this document
 
