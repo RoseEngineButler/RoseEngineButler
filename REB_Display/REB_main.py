@@ -2190,7 +2190,15 @@ class HandlerClass:
 # B_Move_Idx_Fwd
 # Purpose:              This is used to run the B axis forward using
 #                       the G0 Gcode.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+#                       Note:  sends "B-" (negative), not "B" (positive),
+#                           despite being the Fwd handler - empirically-
+#                           verified swap, matching the same fix applied
+#                           to the spindles and the X/Z/U/V/W Idx_Minus/
+#                           Idx_Plus handlers (see Sp0_Move_Fwd's
+#                           docstring for that investigation). B's icons
+#                           are unaffected/still correct - only the
+#                           Gcode sign changes.
+# Updated:              ver 1.1, 8 August 2026, Claude
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -2220,7 +2228,7 @@ class HandlerClass:
                 c.wait_complete() # Wait for mode change to complete
 
         # Send an MDI command to move along the axis.
-        Gcode = "G1 B" + str(self.B_Idx_Deg) + " F" + str(self.B_Feed)
+        Gcode = "G1 B-" + str(self.B_Idx_Deg) + " F" + str(self.B_Feed)
 
         print(Gcode)
         c.mdi(Gcode)
@@ -2240,7 +2248,11 @@ class HandlerClass:
 # B_Move_Idx_Rev
 # Purpose:              This is used to run the B axis in reverse using
 #                       the G0 Gcode.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+#                       Note:  sends "B" (positive), not "B-" (negative),
+#                           despite being the Rev handler - see
+#                           B_Move_Idx_Fwd's docstring for the same
+#                           empirically-verified swap applied here.
+# Updated:              ver 1.1, 8 August 2026, Claude
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -2270,7 +2282,7 @@ class HandlerClass:
                 c.wait_complete() # Wait for mode change to complete
 
         # Send an MDI command to move along the axis.
-        Gcode = "G1 B-" + str(self.B_Idx_Deg) + " F" + str(self.B_Feed)
+        Gcode = "G1 B" + str(self.B_Idx_Deg) + " F" + str(self.B_Feed)
 
         print(Gcode)
         c.mdi(Gcode)
@@ -2912,8 +2924,10 @@ class HandlerClass:
         only microseconds apart - both land well within the same or
         adjacent servo-thread cycle and both spindles move at once.
 
-        sign is +1 for forward, -1 for reverse. Only called when both
-        Sp0_Idx_Bool and Sp1_Idx_Bool are true (see callers).
+        sign is +1 for Sp0_Move_Idx_Rev (the Fwd/Rev handlers pass a
+        swapped sign - see their docstrings), -1 for Sp0_Move_Idx_Fwd.
+        Only called when both Sp0_Idx_Bool and Sp1_Idx_Bool are true
+        (see callers).
         '''
         current_angle_0 = (hal.get_value('spindle.0-position-fb') % 1.0) * 360.0
         target_angle_0 = (current_angle_0 + sign * self.Sp0_Idx_Deg) % 360.0
@@ -2967,7 +2981,11 @@ class HandlerClass:
 # Sp0_Move_Idx_Fwd
 # Purpose:              This is used to index the Sp0 spindle in a
 #                           forward direction.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+#                       Note:  indexes toward a lower angle (sign -1),
+#                           not higher, despite being the Fwd handler -
+#                           see Sp0_Move_Fwd's docstring for the same
+#                           empirically-verified swap applied here.
+# Updated:              ver 1.1, 8 August 2026, Claude
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -3019,8 +3037,9 @@ class HandlerClass:
                 # Both selected - drive both spindles' orient chains
                 # directly and simultaneously (see
                 # _index_both_spindles_simultaneously) instead of two
-                # sequential M19s.
-                self._index_both_spindles_simultaneously(+1)
+                # sequential M19s. sign is -1, not +1 - see this
+                # function's docstring.
+                self._index_both_spindles_simultaneously(-1)
                 return
 
             # M19 orients to an absolute angle, not a relative step, so compute
@@ -3033,7 +3052,7 @@ class HandlerClass:
             # skipped rather than sent a command that can only time out.
             if self.Sp0_Idx_Bool:
                 current_angle = (hal.get_value('spindle.0-position-fb') % 1.0) * 360.0
-                target_angle = (current_angle + self.Sp0_Idx_Deg) % 360.0
+                target_angle = (current_angle - self.Sp0_Idx_Deg) % 360.0
 
                 # NOTE: P0 = shortest path. Forcing a specific CW/CCW direction
                 # (P1/P2) was tried and empirically always took the long ~270
@@ -3049,7 +3068,7 @@ class HandlerClass:
 
             if self.Sp1_Idx_Bool:
                 current_angle_1 = (hal.get_value('spindle.1-position-fb') % 1.0) * 360.0
-                target_angle_1 = (current_angle_1 + self.Sp0_Idx_Deg) % 360.0
+                target_angle_1 = (current_angle_1 - self.Sp0_Idx_Deg) % 360.0
 
                 GcodeStr4 = "M19 R" + str(target_angle_1) + " Q20 P0 $1"
                 idx_log(GcodeStr4)
@@ -3064,7 +3083,12 @@ class HandlerClass:
 # Sp0_Move_Idx_Rev
 # Purpose:              This is used to index the Sp0 spindle in a
 #                           reverse direction.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+#                       Note:  indexes toward a higher angle (sign +1),
+#                           not lower, despite being the Rev handler -
+#                           see Sp0_Move_Idx_Fwd/Sp0_Move_Fwd's
+#                           docstrings for the same empirically-verified
+#                           swap applied here.
+# Updated:              ver 1.1, 8 August 2026, Claude
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -3114,7 +3138,8 @@ class HandlerClass:
 
             if self.Sp0_Idx_Bool and self.Sp1_Idx_Bool:
                 # Both selected - see matching branch in Sp0_Move_Idx_Fwd.
-                self._index_both_spindles_simultaneously(-1)
+                # sign is +1, not -1 - see this function's docstring.
+                self._index_both_spindles_simultaneously(+1)
                 return
 
             # See Sp0_Move_Idx_Fwd for why the target is computed per-spindle
@@ -3122,7 +3147,7 @@ class HandlerClass:
             # one of Sp0_Idx_Bool/Sp1_Idx_Bool can be true past this point).
             if self.Sp0_Idx_Bool:
                 current_angle = (hal.get_value('spindle.0-position-fb') % 1.0) * 360.0
-                target_angle = (current_angle - self.Sp0_Idx_Deg) % 360.0
+                target_angle = (current_angle + self.Sp0_Idx_Deg) % 360.0
 
                 # NOTE: P0 = shortest path - see matching note in Sp0_Move_Idx_Fwd.
                 GcodeStr3 = "M19 R" + str(target_angle) + " Q20 P0 $0"
@@ -3134,7 +3159,7 @@ class HandlerClass:
 
             if self.Sp1_Idx_Bool:
                 current_angle_1 = (hal.get_value('spindle.1-position-fb') % 1.0) * 360.0
-                target_angle_1 = (current_angle_1 - self.Sp0_Idx_Deg) % 360.0
+                target_angle_1 = (current_angle_1 + self.Sp0_Idx_Deg) % 360.0
 
                 GcodeStr4 = "M19 R" + str(target_angle_1) + " Q20 P0 $1"
                 idx_log(GcodeStr4)
@@ -4045,8 +4070,17 @@ class HandlerClass:
 
 LINEAR_AXES = ("X", "Z", "U", "V", "W")  # all five linear axes migrated
 
-def _axis_idx_move(axis, sign):
-    label = "Minus" if sign == "-" else "Plus"
+def _axis_idx_move(axis, label, gcode_sign):
+    '''
+    label ("Minus"/"Plus") names the handler/button/print output;
+    gcode_sign ("+"/"-") is the actual sign sent in the G-code. These
+    are deliberately NOT tied together 1:1 below - see the LINEAR_AXES
+    loop's comment for why (empirically-verified direction swap,
+    mirroring the same fix applied to Sp0_Move_Fwd/Rev and
+    Sp0_Move_Idx_Fwd/Rev). Keeping label driving the printed FUNCTION
+    name and handler.__name__ means the console trace still matches
+    whichever button was physically pressed.
+    '''
     def handler(self, widget):
         print("=================================================")
         print("FUNCTION " + axis + "_Idx_" + label)
@@ -4062,7 +4096,7 @@ def _axis_idx_move(axis, sign):
 
             dist = getattr(self, axis + "_Idx_Dist")
             feed = getattr(self, axis + "_Feed")
-            Gcode = "G1 " + axis + sign + str(dist) + " F" + str(feed)
+            Gcode = "G1 " + axis + gcode_sign + str(dist) + " F" + str(feed)
 
             print(Gcode)
             c.mdi(Gcode)
@@ -4173,8 +4207,16 @@ def _axis_set_ena(axis):
     return handler
 
 for _axis in LINEAR_AXES:
-    setattr(HandlerClass, _axis + "_Idx_Minus", _axis_idx_move(_axis, "-"))
-    setattr(HandlerClass, _axis + "_Idx_Plus",  _axis_idx_move(_axis, "+"))
+    # Idx_Minus sends "+" and Idx_Plus sends "-" - swapped relative to
+    # each button's own name, but NOT relative to its icon (X/U/V/Z/W's
+    # Idx_Minus/Idx_Plus icons are confirmed correct - see the earlier
+    # pixbuf revert). Empirically-verified fix: live testing showed all
+    # five linear axes moving the physically wrong way relative to their
+    # (correct) icons, the same class of bug already found and fixed for
+    # the spindles' Fwd/Rev and Idx_Fwd/Idx_Rev via live halcmd pin
+    # tracing - see Sp0_Move_Fwd's docstring for that investigation.
+    setattr(HandlerClass, _axis + "_Idx_Minus", _axis_idx_move(_axis, "Minus", "+"))
+    setattr(HandlerClass, _axis + "_Idx_Plus",  _axis_idx_move(_axis, "Plus",  "-"))
     setattr(HandlerClass, _axis + "_Set_Feed", _axis_set_feed(_axis))
     setattr(HandlerClass, _axis + "_Set_Ena", _axis_set_ena(_axis))
     setattr(HandlerClass, _axis + "_Set_Idx_Dist", _axis_set_idx_dist(_axis))

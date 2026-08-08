@@ -81,32 +81,32 @@
   <object class="GtkImage" id="Image_B_Idx_Fwd">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
-    <property name="pixbuf">Images/Axis-Bpos.png</property>
+    <property name="pixbuf">Images/Axis-Bneg.png</property>
   </object>
   <object class="GtkImage" id="Image_B_Idx_Rev">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
-    <property name="pixbuf">Images/Axis-Bneg.png</property>
+    <property name="pixbuf">Images/Axis-Bpos.png</property>
   </object>
   <object class="GtkImage" id="Image_Rev">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
-    <property name="pixbuf">Images/Spindleneg.png</property>
+    <property name="pixbuf">Images/Spindlepos.png</property>
   </object>
   <object class="GtkImage" id="Image_Sp0_Fwd">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
-    <property name="pixbuf">Images/Spindlepos.png</property>
+    <property name="pixbuf">Images/Spindleneg.png</property>
   </object>
   <object class="GtkImage" id="Image_Sp0_Idx_Fwd">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
-    <property name="pixbuf">Images/Spindlepos.png</property>
+    <property name="pixbuf">Images/Spindleneg.png</property>
   </object>
   <object class="GtkImage" id="Image_Sp0_Idx_Rev">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
-    <property name="pixbuf">Images/Spindleneg.png</property>
+    <property name="pixbuf">Images/Spindlepos.png</property>
   </object>
   <object class="GtkImage" id="Image_Stop">
     <property name="visible">True</property>
