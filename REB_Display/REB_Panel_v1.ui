@@ -1380,16 +1380,14 @@ feed rate</property>
               </packing>
             </child>
             <child>
-              <object class="GtkEntry" id="X_Comment">
+              <object class="GtkComboBoxText" id="X_Comment">
                 <property name="visible">True</property>
                 <property name="can-focus">True</property>
-                <property name="tooltip-text" translatable="yes">X axis comment (press Enter to save)</property>
+                <property name="tooltip-text" translatable="yes">X axis comment - pick one of the device names maintained on the Settings tab's General tab</property>
                 <property name="valign">center</property>
                 <property name="margin-left">2</property>
                 <property name="margin-right">2</property>
-                <property name="width-chars">10</property>
-                <signal name="activate" handler="X_Comment" swapped="no"/>
-                <signal name="focus-out-event" handler="X_Comment" swapped="no"/>
+                <signal name="changed" handler="X_Comment" swapped="no"/>
               </object>
               <packing>
                 <property name="left-attach">6</property>
@@ -1436,16 +1434,14 @@ feed rate</property>
               </packing>
             </child>
             <child>
-              <object class="GtkEntry" id="Z_Comment">
+              <object class="GtkComboBoxText" id="Z_Comment">
                 <property name="visible">True</property>
                 <property name="can-focus">True</property>
-                <property name="tooltip-text" translatable="yes">Z axis comment (press Enter to save)</property>
+                <property name="tooltip-text" translatable="yes">Z axis comment - pick one of the device names maintained on the Settings tab's General tab</property>
                 <property name="valign">center</property>
                 <property name="margin-left">2</property>
                 <property name="margin-right">2</property>
-                <property name="width-chars">10</property>
-                <signal name="activate" handler="Z_Comment" swapped="no"/>
-                <signal name="focus-out-event" handler="Z_Comment" swapped="no"/>
+                <signal name="changed" handler="Z_Comment" swapped="no"/>
               </object>
               <packing>
                 <property name="left-attach">6</property>
@@ -1478,16 +1474,14 @@ feed rate</property>
               </packing>
             </child>
             <child>
-              <object class="GtkEntry" id="U_Comment">
+              <object class="GtkComboBoxText" id="U_Comment">
                 <property name="visible">True</property>
                 <property name="can-focus">True</property>
-                <property name="tooltip-text" translatable="yes">U axis comment (press Enter to save)</property>
+                <property name="tooltip-text" translatable="yes">U axis comment - pick one of the device names maintained on the Settings tab's General tab</property>
                 <property name="valign">center</property>
                 <property name="margin-left">2</property>
                 <property name="margin-right">2</property>
-                <property name="width-chars">10</property>
-                <signal name="activate" handler="U_Comment" swapped="no"/>
-                <signal name="focus-out-event" handler="U_Comment" swapped="no"/>
+                <signal name="changed" handler="U_Comment" swapped="no"/>
               </object>
               <packing>
                 <property name="left-attach">6</property>
@@ -1520,16 +1514,14 @@ feed rate</property>
               </packing>
             </child>
             <child>
-              <object class="GtkEntry" id="V_Comment">
+              <object class="GtkComboBoxText" id="V_Comment">
                 <property name="visible">True</property>
                 <property name="can-focus">True</property>
-                <property name="tooltip-text" translatable="yes">V axis comment (press Enter to save)</property>
+                <property name="tooltip-text" translatable="yes">V axis comment - pick one of the device names maintained on the Settings tab's General tab</property>
                 <property name="valign">center</property>
                 <property name="margin-left">2</property>
                 <property name="margin-right">2</property>
-                <property name="width-chars">10</property>
-                <signal name="activate" handler="V_Comment" swapped="no"/>
-                <signal name="focus-out-event" handler="V_Comment" swapped="no"/>
+                <signal name="changed" handler="V_Comment" swapped="no"/>
               </object>
               <packing>
                 <property name="left-attach">6</property>
@@ -1562,16 +1554,14 @@ feed rate</property>
               </packing>
             </child>
             <child>
-              <object class="GtkEntry" id="W_Comment">
+              <object class="GtkComboBoxText" id="W_Comment">
                 <property name="visible">True</property>
                 <property name="can-focus">True</property>
-                <property name="tooltip-text" translatable="yes">W axis comment (press Enter to save)</property>
+                <property name="tooltip-text" translatable="yes">W axis comment - pick one of the device names maintained on the Settings tab's General tab</property>
                 <property name="valign">center</property>
                 <property name="margin-left">2</property>
                 <property name="margin-right">2</property>
-                <property name="width-chars">10</property>
-                <signal name="activate" handler="W_Comment" swapped="no"/>
-                <signal name="focus-out-event" handler="W_Comment" swapped="no"/>
+                <signal name="changed" handler="W_Comment" swapped="no"/>
               </object>
               <packing>
                 <property name="left-attach">6</property>
@@ -2025,16 +2015,14 @@ feed rate</property>
               </packing>
             </child>
             <child>
-              <object class="GtkEntry" id="B_Comment">
+              <object class="GtkComboBoxText" id="B_Comment">
                 <property name="visible">True</property>
                 <property name="can-focus">True</property>
-                <property name="tooltip-text" translatable="yes">B axis comment (press Enter to save)</property>
+                <property name="tooltip-text" translatable="yes">B axis comment - pick one of the device names maintained on the Settings tab's General tab</property>
                 <property name="valign">center</property>
                 <property name="margin-left">2</property>
                 <property name="margin-right">2</property>
-                <property name="width-chars">10</property>
-                <signal name="activate" handler="B_Comment" swapped="no"/>
-                <signal name="focus-out-event" handler="B_Comment" swapped="no"/>
+                <signal name="changed" handler="B_Comment" swapped="no"/>
               </object>
               <packing>
                 <property name="left-attach">6</property>
@@ -2142,7 +2130,7 @@ W is parallel to Z</property>
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
                 <property name="valign">end</property>
-                <property name="label" translatable="yes">Comments</property>
+                <property name="label" translatable="yes">Device</property>
                 <attributes>
                   <attribute name="font-desc" value="DejaVu Serif 12"/>
                   <attribute name="weight" value="bold"/>

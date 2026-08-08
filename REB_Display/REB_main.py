@@ -380,6 +380,30 @@ def _save_device_names(names):
     except OSError as e:
         print("Could not write " + SETTINGS_PATH + ": " + str(e))
 
+def _read_persisted_device_names():
+    '''
+    Reads the persisted device-name list straight from SETTINGS_PATH
+    (REBset_v1.ini's <device_names> block) - the on-disk counterpart to
+    HandlerClass._read_device_names, which reads the live Settings tab's
+    Device_Names GtkTextView instead. Used wherever a component needs
+    this list but doesn't own that widget - e.g. the main panel
+    populating each axis's Comment combo box at startup, since the main
+    panel and Settings tab are separate gladevcp processes with no live
+    IPC between them (see CLAUDE.md). Returns [] if the file can't be
+    read or has no <device_names> block.
+    '''
+    try:
+        with open(SETTINGS_PATH, "r") as f:
+            xml_text = f.read()
+    except OSError as e:
+        print("Could not read " + SETTINGS_PATH + ": " + str(e))
+        return []
+
+    match = re.search(r'<device_names>(.*?)</device_names>', xml_text, re.DOTALL)
+    if not match:
+        return []
+    return [unescape(n) for n in re.findall(r'<name>(.*?)</name>', match.group(1), re.DOTALL)]
+
 def _save_max_jog_speed(value):
     '''
     Persists the Max Jog Speed choice into REB_Settings_v1.ini, the same
@@ -913,12 +937,25 @@ class HandlerClass:
 
     def _load_axis_comments(self):
         '''
-        Reads each axis's persisted user comment from REB_Settings_v1.ini
-        and applies it to that axis's comment field on the main panel.
+        Populates each axis's comment combo box (X_Comment etc., on the
+        main REB_Panel) with the persisted device-name list
+        (_read_persisted_device_names - the on-disk counterpart to the
+        General tab's live Device Names widget, which this component
+        doesn't have access to, being a separate gladevcp process - see
+        CLAUDE.md) plus a leading blank entry for "nothing chosen yet",
+        then selects whichever entry matches that axis's persisted
+        comment from REB_Settings_v1.ini. This is what constrains a
+        comment to one of the maintained device names rather than free
+        text - GtkComboBoxText (no entry) only ever offers what's been
+        appended to it.
 
-        Only runs in the component that actually owns these Entry
-        widgets (X_Comment etc., on the main REB_Panel) - every other
-        tab/panel also using REB_main.py will find that widget
+        Guarded by _applying_axis_comments so combo.set_active() below
+        doesn't trigger X_Comment/etc.'s own "changed" handler and
+        immediately re-save the value being loaded (same pattern as
+        _load_measurement_system's _applying_measurement_system).
+
+        Only runs in the component that actually owns these widgets -
+        every other tab/panel also using REB_main.py will find them
         missing and return immediately.
         '''
         if self.builder.get_object("X_Comment") is None:
@@ -931,30 +968,51 @@ class HandlerClass:
             print("Could not read " + SETTINGS_PATH + ": " + str(e))
             return
 
-        for axis_id in COMMENT_AXES:
-            widget = self.builder.get_object(axis_id + "_Comment")
-            if widget is None:
-                continue
+        device_names = _read_persisted_device_names()
 
-            match = re.search(
-                r'<axis\s+id="' + re.escape(axis_id) + r'">\s*<scale>-?[\d.]+</scale>\s*'
-                r'<usercomment>(.*?)</usercomment>',
-                xml_text,
-                re.DOTALL
-            )
-            if not match:
-                print("No stored comment found for axis " + axis_id
-                      + " in " + SETTINGS_PATH)
-                continue
+        self._applying_axis_comments = True
+        try:
+            for axis_id in COMMENT_AXES:
+                widget = self.builder.get_object(axis_id + "_Comment")
+                if widget is None:
+                    continue
 
-            widget.set_text(unescape(match.group(1)))
+                widget.remove_all()
+                widget.append_text("")
+                for name in device_names:
+                    widget.append_text(name)
+
+                match = re.search(
+                    r'<axis\s+id="' + re.escape(axis_id) + r'">\s*<scale>-?[\d.]+</scale>\s*'
+                    r'<usercomment>(.*?)</usercomment>',
+                    xml_text,
+                    re.DOTALL
+                )
+                stored = unescape(match.group(1)) if match else ""
+                if match is None:
+                    print("No stored comment found for axis " + axis_id
+                          + " in " + SETTINGS_PATH)
+
+                try:
+                    widget.set_active(device_names.index(stored) + 1 if stored else 0)
+                except ValueError:
+                    # Stored comment doesn't match any current device
+                    # name (e.g. free text from before this became a
+                    # constrained dropdown, or the device-name list
+                    # changed since it was picked) - fall back to the
+                    # blank entry rather than silently keeping an
+                    # invalid value selected.
+                    print(axis_id + " comment \"" + stored
+                          + "\" doesn't match any device name - leaving blank")
+                    widget.set_active(0)
+        finally:
+            self._applying_axis_comments = False
 
     def _autosave_axis_comments(self):
         '''
-        Polling backstop for the comment Entry widgets - see the
+        Polling backstop for the comment combo boxes - see the
         GLib.timeout_add call in __init__ for why this exists alongside
-        (not instead of) X_Comment/Z_Comment/etc.'s "activate"/
-        "focus-out-event" signals.
+        (not instead of) X_Comment/Z_Comment/etc.'s "changed" signal.
 
         Only the main panel component has these widgets; every other
         tab/panel finds them missing and returning False here cancels
@@ -968,7 +1026,7 @@ class HandlerClass:
             if widget is None:
                 continue
 
-            text = widget.get_text()
+            text = widget.get_active_text() or ""
             if text != self._last_saved_axis_comment.get(axis_id):
                 self._save_axis_comment(axis_id, text)
                 self._last_saved_axis_comment[axis_id] = text
@@ -1041,15 +1099,7 @@ class HandlerClass:
         if view is None:
             return
 
-        names = []
-        try:
-            with open(SETTINGS_PATH, "r") as f:
-                xml_text = f.read()
-            match = re.search(r'<device_names>(.*?)</device_names>', xml_text, re.DOTALL)
-            if match:
-                names = [unescape(n) for n in re.findall(r'<name>(.*?)</name>', match.group(1), re.DOTALL)]
-        except OSError as e:
-            print("Could not read " + SETTINGS_PATH + ": " + str(e))
+        names = _read_persisted_device_names()
 
         self._applying_device_names = True
         view.get_buffer().set_text("\n".join(names))
@@ -2144,38 +2194,45 @@ class HandlerClass:
             return
         grid.set_sensitive(bool(hal_pin.get()))
 
-    # Each of these is wired to both the Entry's "activate" signal (Enter
-    # key - passes just widget) and "focus-out-event" (clicking or
-    # tabbing to another widget - passes widget, event, and expects a
-    # bool back) - see REB_Panel_v1.ui. Enter-only used to be the sole
-    # trigger, which silently lost the comment the moment an operator
-    # typed one and then clicked straight over to the Settings tab
-    # instead of pressing Enter first (confirmed live: no "Saved X
-    # comment" ever printed for that flow). *args/return False makes one
-    # method satisfy both signal signatures.
-    def X_Comment(self, widget, *args):
-        self._save_axis_comment("X", widget.get_text())
-        return False
+    # Each of these is wired to its GtkComboBoxText's "changed" signal
+    # (see REB_Panel_v1.ui) - fired the instant the operator picks a
+    # different entry, and also by combo.set_active() in
+    # _load_axis_comments itself, which is why each checks
+    # _applying_axis_comments first: without that guard, loading the
+    # persisted comment at startup would immediately re-save the exact
+    # value just read (same pattern as Measurement_System_Changed).
+    # get_active_text() returns "" for the leading blank entry, never
+    # None, since it's a real appended row rather than "nothing
+    # selected" (active index -1).
+    def X_Comment(self, widget):
+        if self._applying_axis_comments:
+            return
+        self._save_axis_comment("X", widget.get_active_text())
 
-    def Z_Comment(self, widget, *args):
-        self._save_axis_comment("Z", widget.get_text())
-        return False
+    def Z_Comment(self, widget):
+        if self._applying_axis_comments:
+            return
+        self._save_axis_comment("Z", widget.get_active_text())
 
-    def U_Comment(self, widget, *args):
-        self._save_axis_comment("U", widget.get_text())
-        return False
+    def U_Comment(self, widget):
+        if self._applying_axis_comments:
+            return
+        self._save_axis_comment("U", widget.get_active_text())
 
-    def V_Comment(self, widget, *args):
-        self._save_axis_comment("V", widget.get_text())
-        return False
+    def V_Comment(self, widget):
+        if self._applying_axis_comments:
+            return
+        self._save_axis_comment("V", widget.get_active_text())
 
-    def W_Comment(self, widget, *args):
-        self._save_axis_comment("W", widget.get_text())
-        return False
+    def W_Comment(self, widget):
+        if self._applying_axis_comments:
+            return
+        self._save_axis_comment("W", widget.get_active_text())
 
-    def B_Comment(self, widget, *args):
-        self._save_axis_comment("B", widget.get_text())
-        return False
+    def B_Comment(self, widget):
+        if self._applying_axis_comments:
+            return
+        self._save_axis_comment("B", widget.get_active_text())
 
 # ********************************************************************
 #    AA    XX    XX IIIIIIII  SSSSSS      BBBBBBB
@@ -3841,6 +3898,10 @@ class HandlerClass:
         # the five VELOCITY_SETTINGS spin buttons at startup.
         self._applying_velocity_settings = False
 
+        # Same suppression as above, for _load_axis_comments driving each
+        # axis's comment combo box at startup.
+        self._applying_axis_comments = False
+
         _install_depress_css()
 
         # Independent pins this component owns, used to force each
@@ -3929,24 +3990,20 @@ class HandlerClass:
         # so there's nothing to flush until an operator actually changes
         # a field.
         self._last_saved_axis_comment = {
-            axis_id: widget.get_text()
+            axis_id: widget.get_active_text() or ""
             for axis_id in COMMENT_AXES
             for widget in [self.builder.get_object(axis_id + "_Comment")]
             if widget is not None
         }
 
-        # Backstop for X_Comment/Z_Comment/etc.'s "activate"/
-        # "focus-out-event" signals: focus-out-event firing reliably when
-        # focus moves from the main panel to a widget in a DIFFERENT
-        # gladevcp process (e.g. clicking straight from a comment field
-        # over to the Settings tab) turned out not to be guaranteed in
-        # this embedded environment (confirmed live: a typed comment,
-        # followed by clicking over to Settings and saving, still wasn't
-        # in REB_Settings_v1.ini). Polling every second and only writing
-        # a field whose text actually changed since the last flush costs
-        # nothing while idle and guarantees a comment is captured within
-        # about a second of being typed, regardless of which signal (if
-        # any) actually fired - see _autosave_axis_comments.
+        # Backstop for X_Comment/Z_Comment/etc.'s "changed" signal -
+        # cheap insurance alongside it, on the same reasoning as the old
+        # Entry-based "activate"/"focus-out-event" backstop this
+        # replaced (a GtkComboBoxText's "changed" signal is a plain
+        # same-process GTK signal with none of that focus-out-event's
+        # cross-process reliability concerns, but polling every second
+        # and only writing a field that actually changed since the last
+        # flush costs nothing while idle). See _autosave_axis_comments.
         GLib.timeout_add(1000, self._autosave_axis_comments)
 
         # Restore the persisted Measurement System (REB_Settings_v1.ini)
