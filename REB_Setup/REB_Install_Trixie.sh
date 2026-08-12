@@ -31,6 +31,7 @@
 #   1.1 - 23 Dec 2025, R. Colvin - Changed text from "upgrade" to
 #         "update".
 #   1.2 - 22 Jan 2026, R. Colvin - Updated for the Trixie install.
+#   1.3 - 12 Aug 2026, R. Colvin - Added creation of gcode folder.
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #
@@ -196,7 +197,7 @@ sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/axisrc .
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: copy of axisrc                                                ${NOCOLOR}"
    echo -e "${KEYNOTE}    from /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup    ${NOCOLOR}"
-   echo -e "${KEYNOTE}    to /home/reuben/                                                    ${NOCOLOR}"
+   echo -e "${KEYNOTE}    to /home/reuben/                                                 ${NOCOLOR}"
    echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
    exit $?
@@ -212,8 +213,16 @@ sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/REB_Update.sh .
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: copy of REB_Update.sh                                        ${NOCOLOR}"
    echo -e "${KEYNOTE}    from /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup    ${NOCOLOR}"
-   echo -e "${KEYNOTE}    to /home/reuben/                                                    ${NOCOLOR}"
+   echo -e "${KEYNOTE}    to /home/reuben/                                                 ${NOCOLOR}"
    echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
+   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+   exit $?
+fi
+echo -e "${CMNTTEXT}    gcode library                                                  ${NOCOLOR}"
+cd /home/reuben/linuxcnc/configs/RoseEngineButler
+mkdir gcode
+if [ $? != 0 ]; then
+   echo -e "${KEYNOTE}ERROR: creation of gcode library failed.                             ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
    exit $?
 fi
@@ -226,14 +235,14 @@ echo -e "${TITLE}                                                               
 cd /home/reuben
 mkdir ClamAv
 if [ $? != 0 ]; then
-   echo -e "${KEYNOTE}ERROR: Could not create /home/reuben/ClamAV                             ${NOCOLOR}"
+   echo -e "${KEYNOTE}ERROR: Could not create /home/reuben/ClamAV                          ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
    exit $?
 fi
 cd ClamAv
 mkdir SuspiciousFiles
 if [ $? != 0 ]; then
-   echo -e "${KEYNOTE}ERROR: Could not create /home/reuben/ClamAV/SuspiciousFiles             ${NOCOLOR}"
+   echo -e "${KEYNOTE}ERROR: Could not create /home/reuben/ClamAV/SuspiciousFiles          ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
    exit $?
 fi
