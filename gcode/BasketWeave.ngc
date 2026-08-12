@@ -1,0 +1,107 @@
+%
+(=======================================================================)
+(  BASKET WEAVE PATTERN                                                 )
+( Designed to run on the Rose Engine Butler system which runs on        )
+( LinuxCNC. The gcode format is rs274ngc and uses O-word loops.         )
+(=======================================================================)
+(  Version 1.0, 11 August 2026                                          )
+(=======================================================================)
+(  *** OPERATOR NOTE ***                                                )
+(  This machine has no dedicated C axis. The B axis letter is used here )
+(  to stand in for Spindle0 -- the physical spindle motor must be       )
+(  plugged into the B-axis driver jack before running this program.     )
+(                                                                       )
+(  ASSUMPTIONS -- CHECK THESE BEFORE RUNNING:                           )
+(   1. X- moves the cutter INTO the work as a plunge. If your           )
+(      cross-slide's polarity is opposite, swap the signs on the X      )
+(      moves marked [X SIGN].                                           )
+(   2. Be sure to check that the following are good values for your     )
+(      machine:                                                         ) 
+(      X Axis                                                           )
+(         #30 X axis plunge/withdraw feed rate                          )
+(         #40 Distance to plunge/retract                                )
+(                                                                       )
+(      B & Z Axes - synchronized movement                               )
+(         #31 feed rate for cutting                                     )
+(         #32 feed rate for repositioning                               )
+(         #40 Z axis starting position - usually 0                      )
+(=======================================================================)
+
+(-- USER PARAMETERS ----------------------------------------------------)
+#1 = 1.2500     (P1  Diameter of piece, in.)
+#2 = 24         (P2  Waves - number of boxes around perimeter)
+#3 = 4          (P3  CutsPerWave, typ. 3 or 4)
+#4 = 90         (P4  CutterEdgeAngle, deg - reference only, see note 4)
+#5 = 0.0300     (P5  DepthOfCut, in. per plunge)
+#6 = 8          (P6  RowsOfPatterns - should be an even number)
+
+(-- FEEDS / SAFE POSITION ----------------------------------------------)
+#30 = 20.00     (Feed, X plunge/withdraw, in/min)
+#31 = 00.50     (Feed, synchronized B+Z cutting move, in/min)
+#32 = 02.00     (Feed, B/Z reposition moves, in/min)
+#40 = 0.5000    (Safe/retract X position, absolute, in.)
+#41 = 0.0000    (Start Z position, absolute, in.)
+
+(-- CALCULATED VALUES --------------------------------------------------)
+#7 = [360 / #2]                      (C1  SpindleAmplitude, deg)
+#8 = [#1 * 3.14159265 / [#2 * 2]]    (C2  ZAmplitude, in.)
+
+(-- STATE / LOOP VARIABLES ---------------------------------------------)
+#13 = -1        (Spindle0Direction                                      )
+                (   -1=negative = starting value                        )
+                (    1=positive                                         )
+#14 = -1        (AxisZDirection                                         )
+                (   -1=negative = starting value                        )
+                (    1=positive                                         )
+#9  = [#6 / 2]  (Loop1 repeat count                                     )
+                (     = RowsOfPatterns / 2                              )
+
+(-- MACHINE / MODE SETUP -----------------------------------------------)
+G20             (Imperial mode / G21 is metric mode                     )
+G90             (absolute mode for setup moves                          )
+G0 X#40 Z#41    (move to safe/start position - based on #40/#41 above   )
+G91             (incremental mode for all pattern moves below           )
+
+(-- Loop1: repeat RowsOfPatterns/2 times -------------------------------)
+#10 = 1
+O100 WHILE [#10 LE #9]
+
+  (-- Loop2: repeat CutsPerWave times ----------------------------------)
+  #11 = 1
+  O200 WHILE [#11 LE #3]
+
+    #15 = [#7 / 2]    (Spindle0Distance = SpindleAmplitude/2            )
+    #16 = #8          (ZAxisDistance    = ZAmplitude                    )
+    #17 = [#15 / #3]  (per-step reposition rotate                       )
+                      (     = Spindle0Distance/CutsPerWave              )
+
+    (-- Loop3: repeat Waves times --------------------------------------)
+    #12 = 1
+    O300 WHILE [#12 LE #2]
+
+      G1 X[-#5] F#30                          (plunger cutter           )
+      G1 B[#15 * #13] Z[#16 * #14] F#31       (synchronized B/Z move    )
+      G1 X[#5] F#30                           (withdraw cutter          )
+      G1 B[#17 * #13] F#32                    (reposition B for next cut)
+      G1 Z[#8 * #14] F#32                     (reposition Z for next cut)
+
+      #12 = [#12 + 1]
+    O300 ENDWHILE
+
+    #13 = [-#13]            (flip B/Sp0 direction                       )
+
+    #11 = [#11 + 1]
+  O200 ENDWHILE
+
+  #13 = [-#13]              (flip B/Sp0 direction                       )
+  #14 = [-#14]              (flip Z direction                           )
+
+  #10 = [#10 + 1]
+O100 ENDWHILE
+
+(-- PROGRAM END --------------------------------------------------------)
+G90
+G0 X#40 Z#41
+M9
+M2
+%
