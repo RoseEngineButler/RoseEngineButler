@@ -5,6 +5,9 @@ __pycache__/
 *.pyc
 *~
 
+# G-code files - not shared/distributed via this repo
+/gcode/
+
 # Generated/runtime files
 /REB.ini.expanded
 /REB.local.ini
