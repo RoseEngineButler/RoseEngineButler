@@ -68,17 +68,71 @@ JOINT_NUMBER = {
 
 SETTINGS_PATH = "/home/reuben/Documents/REBset_v1.ini"
 
-# Mirrors PID_AXES/PID_SPINDLE_LOOPS/PID_PARAM_PIN/PID_PARAMS in
-# REB_main.py (see AXIS_STEPGEN above for why these small constants are
-# duplicated across the two scripts rather than imported).
-PID_AXES = {
-    "X": "pid.x",
-    "Z": "pid.z",
-    "B": "pid.b",
-    "U": "pid.u",
-    "V": "pid.v",
-    "W": "pid.w",
+# Mirrors CHANNEL_DEFAULT_LETTER/AXIS_SELECTION_LETTERS/
+# _read_persisted_channel_assignments in REB_main.py (see AXIS_STEPGEN
+# above for why these are duplicated across scripts rather than
+# imported). Channel id -> the axis letter REB.ini/REB.hal ship with by
+# default - AXIS_STEPGEN/JOINT_NUMBER's *keys* above are these same
+# default/internal ids and never change even if the operator reassigns
+# a channel's axis letter via the Axis Selection tab.
+CHANNEL_DEFAULT_LETTER = {
+    "00": "W",
+    "01": "Z",
+    "02": "U",
+    "03": "V",
+    "04": "X",
+    "05": "B",
 }
+DEFAULT_LETTER_CHANNEL = {v: k for k, v in CHANNEL_DEFAULT_LETTER.items()}
+# Y removed - not used on this machine - see REB_main.py's AXIS_SELECTION_LETTERS.
+AXIS_SELECTION_LETTERS = ("X", "Z", "U", "V", "W", "A", "B", "C")
+
+def _read_persisted_channel_assignments():
+    '''
+    Mirrors REB_main.py's function of the same name - reads the
+    persisted channel -> axis letter map from SETTINGS_PATH, falling
+    back to CHANNEL_DEFAULT_LETTER for anything missing/unrecognized/
+    duplicated. See that function's docstring for the full reasoning.
+    '''
+    assignments = dict(CHANNEL_DEFAULT_LETTER)
+    try:
+        with open(SETTINGS_PATH, "r") as f:
+            xml_text = f.read()
+    except OSError as e:
+        print("Could not read " + SETTINGS_PATH + ": " + str(e))
+        return assignments
+
+    match = re.search(r'<channel_assignments>(.*?)</channel_assignments>', xml_text, re.DOTALL)
+    if not match:
+        return assignments
+
+    for channel_id, letter in re.findall(r'<channel id="(\d\d)">([A-Z])</channel>', match.group(1)):
+        if channel_id in assignments and letter in AXIS_SELECTION_LETTERS:
+            assignments[channel_id] = letter
+
+    if len(set(assignments.values())) != len(assignments):
+        print("Duplicate letter(s) in persisted channel_assignments - using shipped defaults")
+        return dict(CHANNEL_DEFAULT_LETTER)
+
+    return assignments
+
+# Internal id -> this session's actual current axis letter (lowercase).
+# Read once at process startup (this script only ever runs once, at
+# shutdown, so there's no "session" to worry about staying in sync with
+# beyond this single run) - mirrors REB_main.py's CURRENT_LETTER; see
+# that module's comment for why a channel's PID component name can't be
+# a static "pid.<default letter>" once REB.local.hal is regenerated per
+# the current assignment (REB_Setup/REB_Generate_Local_Ini.py).
+_CHANNEL_ASSIGNMENTS = _read_persisted_channel_assignments()
+CURRENT_LETTER = {
+    internal_id: _CHANNEL_ASSIGNMENTS.get(channel_id, internal_id).lower()
+    for internal_id, channel_id in DEFAULT_LETTER_CHANNEL.items()
+}
+
+# Internal id -> HAL `pid` component instance driving that axis's PID
+# loop right now (see CURRENT_LETTER above for why this can't be a
+# static dict).
+PID_AXES = {internal_id: "pid." + letter for internal_id, letter in CURRENT_LETTER.items()}
 PID_SPINDLE_LOOPS = {
     "Sp0": {"Pos": "pid.p0", "Vel": "pid.s0"},
     "Sp1": {"Pos": "pid.p1", "Vel": "pid.s1"},

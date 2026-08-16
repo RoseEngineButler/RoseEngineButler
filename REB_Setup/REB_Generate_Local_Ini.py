@@ -135,6 +135,195 @@ def _read_settings_xml():
         return ""
 
 
+# Channel id ("00".."05", the hm2_7i92.0.stepgen.NN suffix) -> the axis
+# letter REB.ini/REB.hal ship with by default. Duplicated from
+# REB_Display/REB_main.py's CHANNEL_DEFAULT_LETTER (and again in
+# REB_Display/REB_Scale_Persist.py) - see AXIS_STEPGEN there for why
+# small maps like this are duplicated across scripts rather than
+# imported (three separate processes/scripts, none of which import from
+# each other).
+CHANNEL_DEFAULT_LETTER = {
+    "00": "W",
+    "01": "Z",
+    "02": "U",
+    "03": "V",
+    "04": "X",
+    "05": "B",
+}
+
+# Channel id -> LinuxCNC joint number. Fixed regardless of axis
+# assignment - only which [AXIS_<letter>] section is paired with a given
+# [JOINT_n] (by COORDINATES order) ever changes, never the joint numbers
+# themselves. See CLAUDE.md's axis/joint/plug map and REB_Display/
+# REB_main.py's JOINT_NUMBER (keyed by letter there; keyed by channel
+# here since that's what this script starts from).
+CHANNEL_JOINT_NUMBER = {
+    "00": 5,
+    "01": 1,
+    "02": 3,
+    "03": 4,
+    "04": 0,
+    "05": 2,
+}
+
+# Y removed - not used on this machine - see REB_Display/REB_main.py's
+# AXIS_SELECTION_LETTERS.
+AXIS_SELECTION_LETTERS = ("X", "Z", "U", "V", "W", "A", "B", "C")
+
+
+def _axis_type_for_letter(letter):
+    return "ANGULAR" if letter in ("A", "B", "C") else "LINEAR"
+
+
+def _read_channel_assignments(xml_text):
+    '''
+    Parses REBset_v1.ini's <channel_assignments> block (written by the
+    Axis Selection tab - REB_Display/REB_main.py's
+    _save_channel_assignments), falling back to CHANNEL_DEFAULT_LETTER
+    for any channel that's missing, unrecognized, or - defensively,
+    since REBset_v1.ini's own header says it should not be hand-edited -
+    duplicated onto more than one channel.
+    '''
+    assignments = dict(CHANNEL_DEFAULT_LETTER)
+
+    match = re.search(r'<channel_assignments>(.*?)</channel_assignments>', xml_text, re.DOTALL)
+    if not match:
+        return assignments
+
+    for channel_id, letter in re.findall(r'<channel id="(\d\d)">([A-Z])</channel>', match.group(1)):
+        if channel_id in assignments and letter in AXIS_SELECTION_LETTERS:
+            assignments[channel_id] = letter
+
+    if len(set(assignments.values())) != len(assignments):
+        print("Duplicate letter(s) in persisted channel_assignments - using shipped defaults")
+        return dict(CHANNEL_DEFAULT_LETTER)
+
+    return assignments
+
+
+def _set_key_in_section(text, section_name, key, value):
+    '''
+    Replaces `key = ...` with `key = value`, scoped to the named INI
+    section only (from its `[section_name]` header up to the next line
+    starting with `[`, or end of file) - so this can't touch a
+    same-named key in a different section (TYPE, for instance, appears
+    in every [AXIS_*] and [JOINT_n] section).
+    '''
+    section_pattern = re.compile(
+        r'(\[' + re.escape(section_name) + r'\].*?)(?=\n\[|\Z)',
+        re.DOTALL,
+    )
+    match = section_pattern.search(text)
+    if not match:
+        print("Could not find [" + section_name + "] in REB.ini")
+        return text
+
+    section_text = match.group(1)
+    new_section_text, n = re.subn(
+        r'(?m)^(' + re.escape(key) + r'\s*= )\S+',
+        lambda m: m.group(1) + value,
+        section_text,
+        count=1,
+    )
+    if n == 0:
+        print("Could not find " + key + " in [" + section_name + "]")
+        return text
+
+    return text[:match.start(1)] + new_section_text + text[match.end(1):]
+
+
+def _overlay_axis_assignment(text, assignments):
+    '''
+    Rewrites REB.ini's [AXIS_<letter>] section headers, TYPE/UNITS keys,
+    and [KINS]/[TRAJ]/[DISPLAY] coordinate-order keys to match the
+    persisted channel -> axis letter assignment (REBset_v1.ini's
+    <channel_assignments>, written by the Axis Selection tab - see
+    _read_channel_assignments). Must run BEFORE _overlay_measurement_
+    system below: a channel whose type just changed to/from ANGULAR
+    needs its UNITS key set to DEGREE/a linear placeholder here FIRST,
+    so that overlay's INCH/MM-only regex (which deliberately never
+    touches DEGREE) can then correct the placeholder to the machine's
+    actual current measurement system on the same pass.
+
+    Leaves MIN_LIMIT/MAX_LIMIT/MAX_VELOCITY/MAX_ACCELERATION/
+    STEPGEN_MAXVEL/STEPGEN_MAXACCEL/PID gains/backlash untouched - those
+    are physical-channel tuning values the operator retunes via the
+    Settings tab after physically reconfiguring hardware; this only
+    fixes labeling/typing/kinematics, not motion tuning.
+
+    Safe against channels swapping letters with each other: every
+    section-header rename below searches for that channel's *default*
+    letter (unique per channel, and never itself the target of an
+    earlier rename in this same loop, since renames only ever produce
+    the *new*, not the *default*, letters) against the pristine text
+    read at the top of main() - so which channel is processed first
+    never matters.
+    '''
+    if assignments == CHANNEL_DEFAULT_LETTER:
+        return text, None
+
+    changes = []
+    for channel_id, default_letter in CHANNEL_DEFAULT_LETTER.items():
+        new_letter = assignments[channel_id]
+        if new_letter == default_letter:
+            continue
+
+        joint_num = CHANNEL_JOINT_NUMBER[channel_id]
+        new_type = _axis_type_for_letter(new_letter)
+
+        text, n = re.subn(
+            r'(?m)^\[AXIS_' + re.escape(default_letter) + r'\]',
+            '[AXIS_' + new_letter + ']',
+            text,
+            count=1,
+        )
+        if n == 0:
+            print("Could not find [AXIS_" + default_letter + "] in REB.ini")
+            continue
+
+        text = _set_key_in_section(text, "AXIS_" + new_letter, "TYPE", new_type)
+        text = _set_key_in_section(text, "JOINT_" + str(joint_num), "TYPE", new_type)
+
+        # UNITS lives only in [JOINT_n]. DEGREE if now angular; otherwise
+        # a linear placeholder ("INCH") that _overlay_measurement_system
+        # (run right after this function, in main()) will correct to the
+        # machine's actual current measurement system - see this
+        # function's own docstring.
+        units = "DEGREE" if new_type == "ANGULAR" else "INCH"
+        text = _set_key_in_section(text, "JOINT_" + str(joint_num), "UNITS", units)
+
+        changes.append(channel_id + ": " + default_letter + " -> " + new_letter)
+
+    # Rebuild the [KINS]/[TRAJ]/[DISPLAY] coordinate-order keys: the Nth
+    # letter is whichever channel is joint N (fixed - CHANNEL_JOINT_NUMBER),
+    # regardless of what letter that channel is assigned today.
+    letters_by_joint = [None] * len(CHANNEL_JOINT_NUMBER)
+    for channel_id, joint_num in CHANNEL_JOINT_NUMBER.items():
+        letters_by_joint[joint_num] = assignments[channel_id]
+    coordinates = "".join(letters_by_joint)
+
+    text, n1 = re.subn(
+        r'(?m)^(KINEMATICS\s*= trivkins coordinates=)\S+',
+        lambda m: m.group(1) + coordinates,
+        text,
+        count=1,
+    )
+    text, n2 = re.subn(
+        r'(?m)^(COORDINATES\s*= )\S+',
+        lambda m: m.group(1) + coordinates,
+        text,
+        count=1,
+    )
+    text, n3 = re.subn(
+        r'(?m)^(GEOMETRY\s*= )\S+',
+        lambda m: m.group(1) + coordinates,
+        text,
+        count=1,
+    )
+
+    return text, (changes, coordinates, n1, n2, n3)
+
+
 def _overlay_max_jog_speed(text, xml_text):
     match = re.search(r'<max_jog_speed>([0-9.eE+-]+)</max_jog_speed>', xml_text)
     if not match:
@@ -211,6 +400,307 @@ def _overlay_measurement_system(text, xml_text):
     return text, (match.group(1), n1, n2)
 
 
+# ----------------------------------------------------------------------
+# REB.hal / REB_PostGUI_v1.hal regeneration.
+#
+# Unlike REB.ini's overlay above (small, independent key=value patches),
+# a channel's axis letter is woven through many HAL net names and
+# component-instance names across both files, so this works by direct
+# text substitution of every affected token, per channel, rather than
+# scoped key patches. See generate_local_hal_files' docstring for the
+# overall approach and CLAUDE.md for why REB.hal itself is never edited
+# (only read as a template) - Rich asked for REB.hal's net names to
+# always literally match the current assignment, so unlike REB.hal's
+# axis letters being purely cosmetic net-name choices with no functional
+# meaning to REB.ini/kinematics, this repo's *tracked* REB.hal/
+# REB_PostGUI_v1.hal remain the "no reassignment made yet" case.
+
+HAL_PATH = os.path.join(REPO_DIR, "REB.hal")
+LOCAL_HAL_PATH = os.path.join(REPO_DIR, "REB.local.hal")
+POSTGUI_HAL_PATH = os.path.join(REPO_DIR, "REB_Display", "REB_PostGUI_v1.hal")
+LOCAL_POSTGUI_HAL_PATH = os.path.join(REPO_DIR, "REB_Display", "REB_PostGUI_v1.local.hal")
+
+# Every fixed suffix, across both REB.hal and REB_PostGUI_v1.hal, that a
+# HAL net name or component-instance name embedding an axis letter as
+# its LEADING character can end in - the letter starts the token, one of
+# these strings ends it (verified against every actual net/addf/loadrt
+# line in both files - not the header comment tables, which are
+# decorative and not regenerated, matching the "trust the net lines, not
+# the ASCII-art tables" precedent CLAUDE.md already documents for these
+# files).
+_AXIS_TOKEN_SUFFIXES = (
+    "-enable", "-home-sw", "-index-enable", "-is-homed", "-neg-limit",
+    "-output", "-pos-cmd", "-pos-fb", "-pos-limit", "-vel-cmd",
+    "-ena-flip", "-ena-not", "-ena-and", "-estop-and", "-ena-btn",
+    "-ena-panel-inv", "-ena-panel-allow", "-ena-settings-allow",
+    "-ena-panel",
+)
+
+
+def _bounded(pattern_body, suffix_boundary=True):
+    '''
+    Wraps a regex fragment with boundary guards so it only matches a
+    genuine standalone HAL token, never a substring embedded in a longer
+    identifier. This matters concretely: without the prefix guard,
+    searching for the literal text "x-enable" would wrongly match inside
+    "...index-enable" too (the word "index" ends in "x", immediately
+    followed by "-enable" - a real collision, hit on every REB.hal
+    regeneration where channel 4 is still assigned its default letter X,
+    since every axis's own "<letter>-index-enable" net exists in the
+    file). suffix_boundary=False is for the one token shape where the
+    letter sits in the middle of a longer word (jog-<letter>-analog/neg/
+    pos) rather than at the end.
+    '''
+    prefix = r'(?<![\w.-])'
+    suffix = r'(?![\w-])' if suffix_boundary else ''
+    return prefix + pattern_body + suffix
+
+
+def _rename_hal_axis_tokens(text, old_letter, new_letter):
+    '''
+    Renames every HAL net/component-instance token in REB.hal or
+    REB_PostGUI_v1.hal that embeds an axis letter, from old_letter to
+    new_letter. Deliberately does NOT touch:
+    - hm2_7i92.0.outm.00.out-NN / stepgen.NN.* (channel-number based,
+      never letter-based)
+    - [JOINT_n] ini key references inside setp lines (joint-number
+      based)
+    - gladevcp.*/REBCnfg.* pin names in REB_PostGUI_v1.hal (tied to the
+      fixed internal id forever - see CHANNEL_DEFAULT_LETTER in
+      REB_Display/REB_main.py, and the comment above the call site in
+      generate_local_hal_files)
+    - the `loadrt pid names=...` / `loadrt flipflop|not|and2 names=...`
+      lines - these ARE renamed, by the same substitution as everything
+      else below (the boundary-safe regex correctly matches a
+      comma-separated "pid.x," entry too, since "," isn't excluded by
+      the suffix guard), not by any special-cased whole-line rebuild
+    - decorative ASCII-art banners and the per-axis documentation
+      comment table (cosmetic only, left showing the shipped default
+      letter - not read by LinuxCNC, and regenerating them reliably via
+      regex isn't worth the risk for a cosmetic-only outcome)
+
+    old_letter/new_letter are single uppercase letters; every token
+    shape below uses the lowercase HAL-identifier convention.
+    '''
+    old = old_letter.lower()
+    new = new_letter.lower()
+
+    text = re.sub(_bounded(r'pid\.' + re.escape(old)), 'pid.' + new, text)
+    text = re.sub(_bounded(r'halui\.axis\.' + re.escape(old)), 'halui.axis.' + new, text)
+    text = re.sub(_bounded(r'axis-select-' + re.escape(old)), 'axis-select-' + new, text)
+    text = re.sub(_bounded(r'jog-' + re.escape(old) + '-', suffix_boundary=False), 'jog-' + new + '-', text)
+
+    for suffix in _AXIS_TOKEN_SUFFIXES:
+        text = re.sub(_bounded(re.escape(old) + re.escape(suffix)), new + suffix, text)
+
+    return text
+
+
+def _verify_hal_generation(hal_text, postgui_text, assignments):
+    '''
+    Verifies the regenerated files by tracing the one definitive,
+    channel-NUMBER-anchored net line for each of the 6 channels (the
+    stepgen channel number in these lines is never renamed, so it's a
+    fixed anchor letters can be checked against).
+
+    Deliberately NOT "no leftover old-letter token anywhere in the
+    file" - that check is WRONG whenever two channels swap letters with
+    each other: a later channel's legitimate newly-written letter can
+    equal an earlier channel's default letter (e.g. channel 5 newly
+    assigned X right after channel 4 stops being X), which a leftover-
+    token search can't tell apart from an actual missed rename. Anchoring
+    on the stepgen channel number instead sidesteps that ambiguity
+    entirely - it doesn't matter what order channels were processed in,
+    only whether the right letter ended up on the right channel number.
+
+    Returns a list of problem descriptions (empty list = all good).
+    '''
+    problems = []
+
+    loadrt_pid_match = re.search(r'(?m)^loadrt pid names=.*$', hal_text)
+    loadrt_pid_line = loadrt_pid_match.group(0) if loadrt_pid_match else ""
+
+    for channel_id, letter in assignments.items():
+        letter = letter.lower()
+        default_letter = CHANNEL_DEFAULT_LETTER[channel_id].lower()
+
+        if not re.search(
+            r'net ' + re.escape(letter) + r'-enable\s*=>\s*hm2_7i92\.0\.stepgen\.'
+            + re.escape(channel_id) + r'\.enable',
+            hal_text,
+        ):
+            problems.append(
+                "REB.local.hal: no 'net " + letter + "-enable => hm2_7i92.0."
+                "stepgen." + channel_id + ".enable' line found (channel "
+                + channel_id + " should be assigned " + letter.upper() + ")"
+            )
+
+        # Channel 00 (W) is open-loop - no PID enable net or loadrt pid
+        # entry for it (see REB.hal's W block) - see CLAUDE.md/the Axis
+        # Selection tab's own tooltip for this hardware asymmetry.
+        if channel_id != "00":
+            if not re.search(
+                r'net ' + re.escape(letter) + r'-enable\s*=>\s*pid\.' + re.escape(letter) + r'\.enable',
+                hal_text,
+            ):
+                problems.append(
+                    "REB.local.hal: no 'net " + letter + "-enable => pid."
+                    + letter + ".enable' line found"
+                )
+            if not re.search(r'(?<![\w.-])pid\.' + re.escape(letter) + r'(?![\w-])', loadrt_pid_line):
+                problems.append(
+                    "REB.local.hal: pid." + letter + " missing from the "
+                    "loadrt pid names= line"
+                )
+
+        if not re.search(
+            r'net ' + re.escape(letter) + r'-enable\s*<=\s*' + re.escape(letter) + r'-estop-and\.out',
+            postgui_text,
+        ):
+            problems.append(
+                "REB_PostGUI_v1.local.hal: no 'net " + letter + "-enable <= "
+                + letter + "-estop-and.out' line found"
+            )
+
+        # The gladevcp status-light pin is tied to the fixed internal id
+        # forever (REB_Panel_v1.ui's widget id never changes) - it must
+        # stay at default_letter even though the net feeding it is now
+        # named after the current letter. Getting this backwards (or
+        # renaming it) would silently break the main panel's ENA light
+        # for this channel.
+        if not re.search(
+            r'net ' + re.escape(letter) + r'-enable\s*=>\s*gladevcp\.'
+            + re.escape(default_letter.upper()) + r'_ENA-light',
+            postgui_text,
+        ):
+            problems.append(
+                "REB_PostGUI_v1.local.hal: no 'net " + letter + "-enable => "
+                "gladevcp." + default_letter.upper() + "_ENA-light' line found "
+                "(the gladevcp pin must stay named after the internal id, "
+                + default_letter.upper() + ", not the assigned letter)"
+            )
+
+    return problems
+
+
+def generate_local_hal_files(assignments):
+    '''
+    Regenerates REB.local.hal and REB_Display/REB_PostGUI_v1.local.hal
+    from the tracked REB.hal/REB_PostGUI_v1.hal, renaming every HAL net/
+    component-instance token that embeds an axis letter to match the
+    current channel assignment. Always writes both files, even with no
+    reassignment made (an unchanged copy) - see _overlay_hal_files,
+    which always points REB.local.ini's HALFILE/POSTGUI_HALFILE at these
+    generated files regardless, so behavior doesn't depend on whether
+    the operator has ever touched the Axis Selection tab.
+
+    Renames through a per-channel placeholder rather than default_letter
+    -> new_letter directly, so channels swapping letters with each other
+    (or any larger reassignment cycle) can't have one channel's freshly-
+    written new tokens wrongly re-matched and re-renamed by a later
+    channel's own rename pass - see the inline comment where the
+    placeholder is built for the full reasoning.
+
+    Returns True on success (both files written). Returns False, writing
+    NEITHER file, if _verify_hal_generation finds a problem - refuses to
+    leave a broken, half-generated .local.hal for LinuxCNC to load in
+    that case; the caller should treat False as fatal.
+    '''
+    try:
+        with open(HAL_PATH, "r") as f:
+            hal_text = f.read()
+    except OSError as e:
+        print("Could not read " + HAL_PATH + ": " + str(e))
+        return False
+
+    try:
+        with open(POSTGUI_HAL_PATH, "r") as f:
+            postgui_text = f.read()
+    except OSError as e:
+        print("Could not read " + POSTGUI_HAL_PATH + ": " + str(e))
+        return False
+
+    changed_channels = [
+        (channel_id, default_letter, assignments[channel_id])
+        for channel_id, default_letter in CHANNEL_DEFAULT_LETTER.items()
+        if assignments[channel_id] != default_letter
+    ]
+
+    # Two-phase rename through a per-channel placeholder rather than
+    # renaming default_letter -> new_letter directly in one pass: with
+    # two (or more) channels swapping letters with each other, a direct
+    # rename is NOT safe the way _overlay_axis_assignment's section-
+    # header rename is - here, letter tokens are free-floating text
+    # scattered across many lines, not anchored to one unique bracketed
+    # header each. If channel 4 (X) is renamed to B first, its brand new
+    # "b-enable" text is then indistinguishable from channel 5's own
+    # original "b-enable" text - channel 5's subsequent "rename every
+    # default-B token to X" pass would wrongly re-rename channel 4's
+    # freshly-written tokens too, corrupting them. Routing every channel
+    # through a placeholder that can never collide with a real single-
+    # letter axis token (or with another channel's placeholder) makes
+    # this safe for any permutation, not just simple two-way swaps.
+    for channel_id, default_letter, new_letter in changed_channels:
+        placeholder = "zzch" + channel_id
+        hal_text = _rename_hal_axis_tokens(hal_text, default_letter, placeholder)
+        postgui_text = _rename_hal_axis_tokens(postgui_text, default_letter, placeholder)
+    for channel_id, default_letter, new_letter in changed_channels:
+        placeholder = "zzch" + channel_id
+        hal_text = _rename_hal_axis_tokens(hal_text, placeholder, new_letter)
+        postgui_text = _rename_hal_axis_tokens(postgui_text, placeholder, new_letter)
+
+    problems = _verify_hal_generation(hal_text, postgui_text, assignments)
+    if problems:
+        print("REFUSING to write REB.local.hal/REB_PostGUI_v1.local.hal - "
+              "generation verification failed:")
+        for problem in problems:
+            print("  " + problem)
+        return False
+
+    try:
+        with open(LOCAL_HAL_PATH, "w") as f:
+            f.write(hal_text)
+        with open(LOCAL_POSTGUI_HAL_PATH, "w") as f:
+            f.write(postgui_text)
+    except OSError as e:
+        print("Could not write generated .local.hal file: " + str(e))
+        return False
+
+    if changed_channels:
+        print("Regenerated REB.local.hal / REB_PostGUI_v1.local.hal for: "
+              + ", ".join(c + " (" + d + " -> " + n + ")" for c, d, n in changed_channels))
+    print("Wrote " + LOCAL_HAL_PATH + " and " + LOCAL_POSTGUI_HAL_PATH)
+    return True
+
+
+def _overlay_hal_files(text):
+    '''
+    Points REB.local.ini's HALFILE/POSTGUI_HALFILE at the freshly
+    generated REB.local.hal/REB_PostGUI_v1.local.hal (written by
+    generate_local_hal_files, which must run first - see main()) instead
+    of the tracked REB.hal/REB_PostGUI_v1.hal - always, even with no
+    reassignment made, so REB.local.ini's behavior doesn't depend on
+    whether the operator has ever touched the Axis Selection tab. Only
+    touches the one active `HALFILE = REB.hal` line (REB.ini also has a
+    second, different `HALFILE = REB_Custom/REB_Custom.hal` line, and a
+    commented-out `# HALFILE = REB_Spindle.hal` line - neither matches
+    this pattern's exact anchored value).
+    '''
+    text, n1 = re.subn(
+        r'(?m)^(HALFILE\s*= )REB\.hal$',
+        r'\1REB.local.hal',
+        text,
+        count=1,
+    )
+    text, n2 = re.subn(
+        r'(?m)^(POSTGUI_HALFILE\s*= )REB_Display/REB_PostGUI_v1\.hal$',
+        r'\1REB_Display/REB_PostGUI_v1.local.hal',
+        text,
+        count=1,
+    )
+    return text, (n1, n2)
+
+
 def main():
     try:
         with open(REB_INI_PATH, "r") as f:
@@ -220,6 +710,29 @@ def main():
         sys.exit(1)
 
     xml_text = _read_settings_xml()
+    assignments = _read_channel_assignments(xml_text)
+
+    # Regenerate REB.local.hal/REB_PostGUI_v1.local.hal FIRST and abort
+    # immediately if it fails (see generate_local_hal_files) - if the
+    # realtime wiring can't be regenerated safely, don't write a
+    # REB.local.ini that would point at it (or at a stale previous
+    # .local.hal left over from a different assignment) anyway.
+    if not generate_local_hal_files(assignments):
+        sys.exit(1)
+
+    text, hal_files_result = _overlay_hal_files(text)
+    n1, n2 = hal_files_result
+    print("Overlaid HALFILE (" + str(n1) + ") / POSTGUI_HALFILE (" + str(n2)
+          + " line(s)) -> generated .local.hal files")
+
+    # Must run before _overlay_measurement_system below - see
+    # _overlay_axis_assignment's docstring for why.
+    text, axis_result = _overlay_axis_assignment(text, assignments)
+    if axis_result:
+        changes, coordinates, n1, n2, n3 = axis_result
+        print("Overlaid axis assignment: " + ", ".join(changes))
+        print("Overlaid coordinates = " + coordinates + " (" + str(n1) + " KINEMATICS, "
+              + str(n2) + " COORDINATES, " + str(n3) + " GEOMETRY line(s))")
 
     text, jog_result = _overlay_max_jog_speed(text, xml_text)
     if jog_result:

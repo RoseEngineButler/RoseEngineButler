@@ -77,10 +77,132 @@ from xml.sax.saxutils import escape, unescape
 from gi.repository import Gtk
 from gi.repository import GLib
 
+SETTINGS_PATH = "/home/reuben/Documents/REBset_v1.ini"
+
+# Channel id ("00".."05", matching the hm2_7i92.0.stepgen.NN suffix - see
+# AXIS_STEPGEN below) -> the axis letter REB.ini/REB.hal ship with by
+# default. This is the seed value for a channel's <channel_assignments>
+# entry in REBset_v1.ini when the operator has never touched the Axis
+# Selection tab - same "absent -> shipped default" convention as every
+# other REBset_v1.ini-backed setting (see _load_measurement_system).
+# Internal ids (AXIS_STEPGEN/JOINT_NUMBER/PID_AXES keys, Settings-tab
+# widget-id prefixes) always stay these default letters, regardless of
+# what the operator later assigns a channel to - see CLAUDE.md.
+CHANNEL_DEFAULT_LETTER = {
+    "00": "W",
+    "01": "Z",
+    "02": "U",
+    "03": "V",
+    "04": "X",
+    "05": "B",
+}
+
+# Reverse of CHANNEL_DEFAULT_LETTER - internal id -> channel id. Used to
+# resolve an internal id's *current* assigned letter (see _compute_pid_axes
+# below and _clear_ena_override).
+DEFAULT_LETTER_CHANNEL = {v: k for k, v in CHANNEL_DEFAULT_LETTER.items()}
+
+# The 8 letters selectable on the Axis Selection tab (Y removed - not
+# used on this machine). A/B/C are angular, the rest linear - see
+# _axis_type_for_letter and REB_Setup/REB_Generate_Local_Ini.py's
+# _overlay_axis_assignment.
+AXIS_SELECTION_LETTERS = ("X", "Z", "U", "V", "W", "A", "B", "C")
+
+def _axis_type_for_letter(letter):
+    return "ANGULAR" if letter in ("A", "B", "C") else "LINEAR"
+
+def _save_channel_assignments(assignments):
+    '''
+    Persists the Axis Selection tab's channel -> axis letter choices into
+    REBset_v1.ini as a <channel_assignments><channel id="00">W</channel>...
+    block, replacing the whole block each time - same reasoning as
+    _save_device_names (simpler than patching individual <channel> entries,
+    and the block is small enough a full rewrite costs nothing). assignments
+    is a dict of channel id ("00".."05") -> letter; any channel missing from
+    it falls back to CHANNEL_DEFAULT_LETTER.
+    '''
+    try:
+        with open(SETTINGS_PATH, "r") as f:
+            xml_text = f.read()
+    except OSError as e:
+        print("Could not read " + SETTINGS_PATH + ": " + str(e))
+        return
+
+    lines = ["    <channel_assignments>"]
+    for channel_id in sorted(CHANNEL_DEFAULT_LETTER):
+        letter = assignments.get(channel_id, CHANNEL_DEFAULT_LETTER[channel_id])
+        lines.append('        <channel id="' + channel_id + '">' + letter + '</channel>')
+    lines.append("    </channel_assignments>")
+    block = "\n".join(lines)
+
+    # [ \t]* eats any pre-existing indentation on the <channel_assignments>
+    # line itself - see _save_device_names for why.
+    pattern = re.compile(r'[ \t]*<channel_assignments>.*?</channel_assignments>', re.DOTALL)
+    if pattern.search(xml_text):
+        new_text, count = pattern.subn(lambda m: block, xml_text, count=1)
+    else:
+        new_text, count = re.subn(
+            r'(<settings>)',
+            lambda m: m.group(1) + "\n" + block,
+            xml_text,
+            count=1
+        )
+
+    if count == 0:
+        print("Could not find a place to store <channel_assignments> in " + SETTINGS_PATH)
+        return
+
+    try:
+        with open(SETTINGS_PATH, "w") as f:
+            f.write(new_text)
+        print("Saved channel assignments: " + str(assignments))
+    except OSError as e:
+        print("Could not write " + SETTINGS_PATH + ": " + str(e))
+
+def _read_persisted_channel_assignments():
+    '''
+    Reads the persisted channel -> axis letter map straight from
+    SETTINGS_PATH, falling back to CHANNEL_DEFAULT_LETTER for any channel
+    whose <channel> entry is missing or unrecognized - same "absent ->
+    shipped default" convention as _load_measurement_system. Used by the
+    Settings tab to populate the 6 Axis Selection combos at startup, by
+    _compute_pid_axes below (module load time), and duplicated (rather
+    than imported - see AXIS_STEPGEN below for why) in
+    REB_Scale_Persist.py and REB_Setup/REB_Generate_Local_Ini.py.
+    '''
+    assignments = dict(CHANNEL_DEFAULT_LETTER)
+    try:
+        with open(SETTINGS_PATH, "r") as f:
+            xml_text = f.read()
+    except OSError as e:
+        print("Could not read " + SETTINGS_PATH + ": " + str(e))
+        return assignments
+
+    match = re.search(r'<channel_assignments>(.*?)</channel_assignments>', xml_text, re.DOTALL)
+    if not match:
+        return assignments
+
+    for channel_id, letter in re.findall(r'<channel id="(\d\d)">([A-Z])</channel>', match.group(1)):
+        if channel_id in assignments and letter in AXIS_SELECTION_LETTERS:
+            assignments[channel_id] = letter
+
+    # Defensive against a hand-edited or corrupted file (REBset_v1.ini's
+    # own header says "should not be modified directly"): if the same
+    # letter somehow ended up on two channels, ignore the persisted data
+    # entirely rather than regenerating REB.ini/REB.hal with a duplicate
+    # axis letter.
+    if len(set(assignments.values())) != len(assignments):
+        print("Duplicate letter(s) in persisted channel_assignments - using shipped defaults")
+        return dict(CHANNEL_DEFAULT_LETTER)
+
+    return assignments
+
 # Axis id (as used in REB_Settings_v1.ini and the Settings tab spin
 # buttons) -> hm2_7i92.0 stepgen channel. Verified against the actual
 # "net <axis>-enable => hm2_7i92.0.stepgen.NN.enable" lines in REB.hal
-# - NOT the documentation table in REB.ini, which does not match.
+# - NOT the documentation table in REB.ini, which does not match. This
+# key is the internal id (see CHANNEL_DEFAULT_LETTER above) - it never
+# changes even if the operator reassigns this channel's axis letter.
 AXIS_STEPGEN = {
     "X":   "04",
     "Z":   "01",
@@ -109,19 +231,40 @@ JOINT_NUMBER = {
     "Sp0": 7,
 }
 
-# Axis id -> HAL `pid` component instance driving that axis's PID loop
-# (see the `loadrt pid names=...` line and each axis's `setp pid.<x>.*`
-# block in REB.hal). Sp0/Sp1 each have two loops instead of one - a
-# position/orient loop (pid.p0/pid.p1) and a velocity loop
-# (pid.s0/pid.s1) - handled separately by PID_SPINDLE_LOOPS below.
-PID_AXES = {
-    "X": "pid.x",
-    "Z": "pid.z",
-    "B": "pid.b",
-    "U": "pid.u",
-    "V": "pid.v",
-    "W": "pid.w",
+# This session's channel -> axis letter assignment, as persisted at the
+# time REB_Generate_Local_Ini.py generated REB.local.hal/REB.local.ini for
+# this LinuxCNC launch (see CLAUDE.md). Read once at module import: a
+# running session's assignment can't change without a restart anyway (the
+# Axis Selection tab shows the same "restart required" popup Measurement
+# System/Max Jog Speed already use), so re-reading it later would only
+# ever see the same value or a value that doesn't match what's actually
+# wired into this session's HAL - re-reading live would be worse, not
+# better.
+_CHANNEL_ASSIGNMENTS_AT_STARTUP = _read_persisted_channel_assignments()
+
+# Internal id -> this session's actual current axis letter (lowercase).
+# Needed anywhere a HAL net/component name in REB.local.hal/
+# REB_PostGUI_v1.local.hal embeds the assigned letter (PID_AXES below;
+# _clear_ena_override's <letter>-ena-settings-allow/<letter>-ena-flip.set)
+# - those two files are regenerated per assignment (see REB_Setup/
+# REB_Generate_Local_Ini.py), so e.g. channel 4's PID component is only
+# literally "pid.x" while channel 4 is still assigned to X; if the
+# operator reassigns it to "A" the live component becomes "pid.a", and a
+# halcmd call built from a stale "pid.x" would fail ("no such pin").
+# Does NOT apply to gladevcp.*/REBCnfg.* pin names or any Settings-tab/
+# main-panel widget id - those stay the internal id forever, see
+# CHANNEL_DEFAULT_LETTER above. Sp0/Sp1 aren't reassignable (channels
+# 06/07, out of scope for the Axis Selection tab) so they're absent here;
+# callers needing a spindle's pid component use PID_SPINDLE_LOOPS instead.
+CURRENT_LETTER = {
+    internal_id: _CHANNEL_ASSIGNMENTS_AT_STARTUP.get(channel_id, internal_id).lower()
+    for internal_id, channel_id in DEFAULT_LETTER_CHANNEL.items()
 }
+
+# Internal id -> HAL `pid` component instance driving that axis's PID
+# loop right now (see CURRENT_LETTER above for why this can't be a
+# static dict, and PID_SPINDLE_LOOPS below for Sp0/Sp1's own loops).
+PID_AXES = {internal_id: "pid." + letter for internal_id, letter in CURRENT_LETTER.items()}
 
 # Spindle id -> {"Pos": position-loop component, "Vel": velocity-loop
 # component}. The suffix ("Pos"/"Vel") matches the Settings tab widget
@@ -150,8 +293,6 @@ PID_PARAMS = ("P", "I", "D", "FF0", "FF1", "FF2")
 # _index_both_spindles_simultaneously) - matches the "Q20" timeout
 # already used for the single-spindle M19 path elsewhere in this file.
 SIMULTANEOUS_INDEX_TIMEOUT = 20.0
-
-SETTINGS_PATH = "/home/reuben/Documents/REBset_v1.ini"
 
 # Default directory Export/Import's file choosers start in.
 REBSET_DEFAULT_DIR = os.path.expanduser("~/Documents")
@@ -223,8 +364,15 @@ def _clear_ena_override(axis_id):
     # Once a pin is netted to a signal, halcmd can't "setp" the pin
     # directly ("pin is connected to a signal") - the signal itself has
     # to be set instead, via "halcmd sets". The signal name follows the
-    # <axis>-ena-settings-allow convention in REB_PostGUI_v1.hal.
-    hal_signal = axis_id.lower() + "-ena-settings-allow"
+    # <letter>-ena-settings-allow convention in REB_PostGUI_v1.hal, where
+    # <letter> is the CURRENT axis letter assigned to axis_id's channel
+    # (CURRENT_LETTER) - not axis_id itself, which is the fixed internal
+    # id and may no longer match the live net name if this channel has
+    # been reassigned (see CURRENT_LETTER's own comment). Sp0/Sp1 aren't
+    # in CURRENT_LETTER (not reassignable), so they fall back to
+    # axis_id.lower(), same as before this feature existed.
+    current_letter = CURRENT_LETTER.get(axis_id, axis_id.lower())
+    hal_signal = current_letter + "-ena-settings-allow"
     idx_log("_clear_ena_override(" + axis_id + ") -> " + hal_signal)
 
     # Was the override actually blocking anything? Only true right after
@@ -259,11 +407,11 @@ def _clear_ena_override(axis_id):
         # second press" behavior from live testing). Force the panel bit
         # on deterministically via the flipflop's own set/reset override
         # pins instead of leaving it to toggle-parity guesswork.
-        flip_set_pin = axis_id.lower() + "-ena-flip.set"
+        flip_set_pin = current_letter + "-ena-flip.set"
         try:
             subprocess.run(["halcmd", "setp", flip_set_pin, "TRUE"], check=True, capture_output=True, text=True)
             subprocess.run(["halcmd", "setp", flip_set_pin, "FALSE"], check=True, capture_output=True, text=True)
-            idx_log("Forced " + axis_id.lower() + "-ena-panel ON (override had been blocking)")
+            idx_log("Forced " + current_letter + "-ena-panel ON (override had been blocking)")
         except subprocess.CalledProcessError as e:
             idx_log("Error pulsing " + flip_set_pin + ": " + str(e.stderr))
         except FileNotFoundError:
@@ -1167,6 +1315,107 @@ class HandlerClass:
         buf = view.get_buffer()
         text = buf.get_text(buf.get_start_iter(), buf.get_end_iter(), False)
         return [line.strip() for line in text.splitlines() if line.strip()]
+
+    def _rebuild_all_channel_combo_items(self):
+        '''
+        Populates every Channel_0N_Axis combo with the full letter pool
+        (AXIS_SELECTION_LETTERS) and reselects that combo's own current
+        letter. Every letter is always offered here - this used to
+        filter out whatever letter another channel already held
+        (uniqueness by construction), but Rich asked for that removed:
+        any channel should be freely selectable to any letter, with
+        duplicates flagged live instead (see _update_duplicate_warnings)
+        and only actually blocked from being persisted, not from being
+        picked in the first place.
+
+        Called both by _load_channel_assignments (startup) and by
+        Channel_0N_Axis_Changed itself (every time one combo's choice
+        changes). Also refreshes each row's Type label (Channel_0N_Type)
+        to match its combo's current letter - Type is a property of
+        whichever letter is assigned right now, not of the channel, so
+        it has to be recomputed here rather than set once. No-ops
+        outside the component that owns these widgets.
+        '''
+        if self.builder.get_object("Channel_00_Axis") is None:
+            return
+
+        for channel_id in CHANNEL_DEFAULT_LETTER:
+            combo = self.builder.get_object("Channel_" + channel_id + "_Axis")
+            if combo is None:
+                continue
+
+            current = self._channel_assignments[channel_id]
+
+            combo.remove_all()
+            for letter in AXIS_SELECTION_LETTERS:
+                combo.append_text(letter)
+            combo.set_active(AXIS_SELECTION_LETTERS.index(current))
+
+            type_label = self.builder.get_object("Channel_" + channel_id + "_Type")
+            if type_label is not None:
+                type_label.set_text(_axis_type_for_letter(current).capitalize())
+
+    def _update_duplicate_warnings(self):
+        '''
+        Flags every channel whose currently-selected letter is also
+        selected by at least one other channel, by setting its
+        Channel_0N_Warning label to a red "Duplicate!" notice (cleared
+        for channels with no conflict). This is the live feedback that
+        replaced uniqueness-by-construction (see
+        _rebuild_all_channel_combo_items) - a duplicate can now be
+        picked freely, it's just flagged immediately rather than
+        rejected. Channel_0N_Axis_Changed uses this method's return
+        value to decide whether the assignment is safe to persist -
+        actually saving/showing the restart notice is refused for as
+        long as any duplicate remains, resuming automatically on
+        whichever change clears it.
+
+        Returns True if at least one duplicate exists (False, and every
+        warning cleared, if the assignment is fully valid). No-ops
+        (returns False) outside the component that owns these widgets.
+        '''
+        if self.builder.get_object("Channel_00_Axis") is None:
+            return False
+
+        letter_counts = {}
+        for letter in self._channel_assignments.values():
+            letter_counts[letter] = letter_counts.get(letter, 0) + 1
+
+        any_duplicate = False
+        for channel_id, letter in self._channel_assignments.items():
+            warning = self.builder.get_object("Channel_" + channel_id + "_Warning")
+            if warning is None:
+                continue
+            if letter_counts[letter] > 1:
+                warning.set_markup('<span foreground="red" weight="bold">Duplicate!</span>')
+                any_duplicate = True
+            else:
+                warning.set_text("")
+
+        return any_duplicate
+
+    def _load_channel_assignments(self):
+        '''
+        Reads the persisted channel -> axis letter assignment
+        (REBset_v1.ini's <channel_assignments> block) and populates the
+        Axis Selection tab's six combos, if this component owns them.
+        No-ops outside that component, same pattern as
+        _load_measurement_system.
+        '''
+        if self.builder.get_object("Channel_00_Axis") is None:
+            return
+
+        self._channel_assignments = _read_persisted_channel_assignments()
+
+        self._applying_channel_assignments = True
+        self._rebuild_all_channel_combo_items()
+        self._applying_channel_assignments = False
+
+        # _read_persisted_channel_assignments already falls back to the
+        # shipped defaults rather than ever returning a duplicate, so
+        # this should always clear every warning - called anyway so the
+        # tab's own state stays consistent if that ever changes.
+        self._update_duplicate_warnings()
 
     def _load_max_jog_speed(self):
         '''
@@ -2347,8 +2596,11 @@ class HandlerClass:
                 c.mode(linuxcnc.MODE_MDI)
                 c.wait_complete() # Wait for mode change to complete
 
-        # Send an MDI command to move along the axis.
-        Gcode = "G1 B-" + str(self.B_Idx_Deg) + " F" + str(self.B_Feed)
+        # Send an MDI command to move along the axis. The G-code axis
+        # word must be the CURRENTLY assigned letter for this channel
+        # (CURRENT_LETTER), not the hardcoded "B" - see _axis_idx_move's
+        # gcode_axis comment for why.
+        Gcode = "G1 " + CURRENT_LETTER["B"].upper() + "-" + str(self.B_Idx_Deg) + " F" + str(self.B_Feed)
 
         print(Gcode)
         c.mdi(Gcode)
@@ -2401,8 +2653,9 @@ class HandlerClass:
                 c.mode(linuxcnc.MODE_MDI)
                 c.wait_complete() # Wait for mode change to complete
 
-        # Send an MDI command to move along the axis.
-        Gcode = "G1 B" + str(self.B_Idx_Deg) + " F" + str(self.B_Feed)
+        # Send an MDI command to move along the axis. See B_Move_Idx_Fwd
+        # for why the G-code axis word comes from CURRENT_LETTER.
+        Gcode = "G1 " + CURRENT_LETTER["B"].upper() + str(self.B_Idx_Deg) + " F" + str(self.B_Feed)
 
         print(Gcode)
         c.mdi(Gcode)
@@ -3965,6 +4218,12 @@ class HandlerClass:
         # axis's comment combo box at startup.
         self._applying_axis_comments = False
 
+        # Same suppression as above, for _load_channel_assignments (and
+        # Channel_0N_Axis_Changed's own re-filtering rebuild - see
+        # _rebuild_all_channel_combo_items) driving the six Axis Selection
+        # combos.
+        self._applying_channel_assignments = False
+
         _install_depress_css()
 
         # Independent pins this component owns, used to force each
@@ -4079,6 +4338,11 @@ class HandlerClass:
         # the General tab's Device Names text box (if owned by this
         # component).
         self._load_device_names()
+
+        # Restore the persisted channel -> axis letter assignment
+        # (REBset_v1.ini) into the Axis Selection tab's six combos (if
+        # owned by this component).
+        self._load_channel_assignments()
 
         # Restore the persisted Max Jog Speed (REB_Settings_v1.ini) into
         # the Settings tab's spin button (if owned by this component).
@@ -4216,7 +4480,15 @@ def _axis_idx_move(axis, label, gcode_sign):
 
             dist = getattr(self, axis + "_Idx_Dist")
             feed = getattr(self, axis + "_Feed")
-            Gcode = "G1 " + axis + gcode_sign + str(dist) + " F" + str(feed)
+            # The G-code axis word must be the CURRENTLY assigned letter
+            # for this channel (CURRENT_LETTER), not the fixed internal
+            # id "axis" - LinuxCNC only recognizes whatever letter is
+            # actually in [TRAJ]COORDINATES right now (see REB_Setup/
+            # REB_Generate_Local_Ini.py's _overlay_axis_assignment). All
+            # other uses of "axis" in this function (attribute names,
+            # handler naming) correctly stay the internal id.
+            gcode_axis = CURRENT_LETTER.get(axis, axis.lower()).upper()
+            Gcode = "G1 " + gcode_axis + gcode_sign + str(dist) + " F" + str(feed)
 
             print(Gcode)
             c.mdi(Gcode)
@@ -4379,6 +4651,54 @@ def _axis_set_backlash(axis):
 for _axis_id in JOINT_NUMBER:
     setattr(HandlerClass, _axis_id + "_Set_Backlash", _axis_set_backlash(_axis_id))
 del _axis_id
+
+def _channel_axis_changed(channel_id):
+    '''
+    Generic "changed" handler for one Axis Selection combo. Records the
+    new choice and refreshes every combo/Type label
+    (_rebuild_all_channel_combo_items) - every letter is always
+    selectable now, duplicates are no longer prevented at the dropdown.
+    Instead, _update_duplicate_warnings flags every channel currently
+    sharing a letter; as long as any duplicate remains, this handler
+    deliberately does NOT persist the assignment or show the restart
+    notice - both only happen once the whole assignment is duplicate-
+    free, at which point they fire on that clearing change, matching
+    Measurement_System_Changed's save-immediately/apply-on-restart
+    pattern (since [TRAJ]COORDINATES/[AXIS_*]TYPE are read once at
+    LinuxCNC startup the same way LINEAR_UNITS is - see REB_Setup/
+    REB_Generate_Local_Ini.py).
+    '''
+    def handler(self, widget):
+        if self._applying_channel_assignments:
+            return
+
+        letter = widget.get_active_text()
+        if letter not in AXIS_SELECTION_LETTERS:
+            return
+
+        self._channel_assignments[channel_id] = letter
+
+        self._applying_channel_assignments = True
+        self._rebuild_all_channel_combo_items()
+        self._applying_channel_assignments = False
+
+        if self._update_duplicate_warnings():
+            return
+
+        _save_channel_assignments(self._channel_assignments)
+        _show_restart_required_popup(
+            widget,
+            "The axis assignment change will not take effect until you "
+            "exit and restart LinuxCNC. Make sure the physical motor "
+            "cable for this channel actually matches the letter you just "
+            "assigned before restarting."
+        )
+    handler.__name__ = "Channel_" + channel_id + "_Axis_Changed"
+    return handler
+
+for _channel_id in CHANNEL_DEFAULT_LETTER:
+    setattr(HandlerClass, "Channel_" + _channel_id + "_Axis_Changed", _channel_axis_changed(_channel_id))
+del _channel_id
 
 def _pid_set(hal_pin):
     '''

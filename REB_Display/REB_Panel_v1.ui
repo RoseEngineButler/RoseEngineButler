@@ -929,7 +929,7 @@
                 <property name="can-focus">False</property>
                 <property name="halign">start</property>
                 <property name="hexpand">True</property>
-                <property name="label" translatable="yes">REB O/S 1.0 - alpha 08 August 2026</property>
+                <property name="label" translatable="yes">REB O/S 1.0 - alpha 16 August 2026</property>
                 <property name="justify">right</property>
                 <property name="width-chars">9</property>
                 <attributes>
@@ -2110,8 +2110,9 @@ feed rate</property>
                 <property name="valign">start</property>
                 <property name="margin-start">2</property>
                 <property name="vexpand">True</property>
-                <property name="label" translatable="yes">AXIS NOTES
+                <property name="label" translatable="yes">AXIS CONVENTIONS
 B is rotation around Y
+C is rotation around Z
 U is parallel to X
 V is parallel to Y
 W is parallel to Z</property>

@@ -8,6 +8,8 @@ __pycache__/
 # Generated/runtime files
 /REB.ini.expanded
 /REB.local.ini
+/REB.local.hal
+/REB_Display/REB_PostGUI_v1.local.hal
 /sim.var
 /sim.var.bak
 REB_Display/idx_debug.log
