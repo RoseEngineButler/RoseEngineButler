@@ -131,6 +131,58 @@ AXIS_LETTER_COLOR = {
     "C": "#1a1a5f5fb4b4",
 }
 
+# Internal id -> the two jog button widget ids REB_Panel_v1.ui actually
+# has for that channel (fixed forever - widgets are never renamed).
+# Column 12 always sends G-code sign "-", column 13 always sends "+" -
+# see JOG_NEG_HANDLER/JOG_POS_HANDLER's comment for why one factory can
+# serve both naming patterns. Only B's widget ids (B_Idx_Fwd/B_Idx_Rev)
+# differ from the rest's <letter>_Idx_Plus/<letter>_Idx_Minus pattern -
+# note these are the WIDGET ids, not the handler method names
+# (JOG_NEG_HANDLER["B"] is "B_Move_Idx_Fwd", the method the B_Idx_Fwd
+# widget's "pressed" signal is wired to).
+JOG_NEG_WIDGET = {
+    "X": "X_Idx_Plus", "Z": "Z_Idx_Plus", "U": "U_Idx_Plus",
+    "V": "V_Idx_Plus", "W": "W_Idx_Plus", "B": "B_Idx_Fwd",
+}
+JOG_POS_WIDGET = {
+    "X": "X_Idx_Minus", "Z": "Z_Idx_Minus", "U": "U_Idx_Minus",
+    "V": "V_Idx_Minus", "W": "W_Idx_Minus", "B": "B_Idx_Rev",
+}
+
+# Axis letter -> (column-12/"-" image filename, column-13/"+" image
+# filename), both under REB_Display/Images/. U/V/W intentionally reuse
+# their parallel axis's images (U parallel to X, V parallel to Y, W
+# parallel to Z - see the AXIS CONVENTIONS text on the main panel),
+# including W's already-empirically-verified inversion relative to Z's
+# own mapping (W's "-" button shows Z's "+" image and vice versa - not a
+# typo, confirmed live previously). The three rotary letters (A/B/C) are
+# ALSO inverted relative to their own dedicated images' nominal pos/neg
+# naming (confirmed live) - i.e. the "-" button shows that letter's
+# "pos" image and vice versa, the same class of empirically-verified
+# swap as W's.
+AXIS_JOG_IMAGE = {
+    "X": ("Axis-Xneg.png", "Axis-Xpos.png"),
+    "Z": ("Axis-Zneg.png", "Axis-Zpos.png"),
+    "U": ("Axis-Xneg.png", "Axis-Xpos.png"),
+    "V": ("Axis-Yneg.png", "Axis-Ypos.png"),
+    "W": ("Axis-Zpos.png", "Axis-Zneg.png"),
+    "A": ("Axis-Apos.png", "Axis-Aneg.png"),
+    "B": ("Axis-Bpos.png", "Axis-Bneg.png"),
+    "C": ("Axis-Cpos.png", "Axis-Cneg.png"),
+}
+
+# Type -> numeric range/precision profile for a channel's Feed and Idx
+# (jog-increment) adjustments. Matches the values already shared
+# identically across all 5 linear channels' adjustments today (Feed
+# -10..10 step 0.01 digits 3; Idx 0..25 step 0.01 digits 3) and B's own
+# (Feed -600..600 step 0.01 digits 3; Idx 0..720 step 0.10 digits 1) -
+# applied by _load_panel_axis_controls so a reassigned channel's
+# controls behave correctly for its new type, not its old one.
+TYPE_ADJUSTMENT_PROFILE = {
+    "LINEAR":  {"feed": (-10, 10, 0.01, 3), "idx": (25, 0.01, 3)},
+    "ANGULAR": {"feed": (-600, 600, 0.01, 3), "idx": (720, 0.10, 1)},
+}
+
 def _save_channel_assignments(assignments):
     '''
     Persists the Axis Selection tab's channel -> axis letter choices into
@@ -750,6 +802,27 @@ def _set_busy_cursor(widget, busy):
 # no such built-in behavior to fight - only this code ever touches it,
 # and the darkened background makes the state obvious regardless of
 # theme.
+# Also carries the three reb-axis-* label color classes used by
+# _load_panel_axis_controls to recolor a channel row's letter label to
+# match its currently assigned letter (AXIS_LETTER_COLOR's three
+# distinct colors, converted from GTK's 16-bit-per-channel #RRRRGGGGBBBB
+# hex to CSS's 8-bit #RRGGBB - e.g. #e5e5a5a50a0a -> #e5a50a). A plain
+# label.set_markup() with a <span foreground="..."> was tried first and
+# didn't work here: REB_Panel_v1.ui's <letter>_Letter labels each have
+# their OWN static per-widget Pango <attributes> block (font-desc/
+# weight/foreground, straight from the original hand-authored panel).
+# That's a separate, widget-level Pango attribute list applied by
+# GtkLabel itself, layered ON TOP OF CSS when rendering - it can (and
+# here, did - confirmed live: the text updated correctly, the color
+# didn't) win over a CSS or markup-supplied foreground for the same
+# text. _load_panel_axis_controls clears that static attribute list
+# (set_attributes(None)) before applying this CSS class, so there's
+# nothing left to win over it - font-weight/family/size are restated
+# here in CSS so the label doesn't lose its original bold styling once
+# the Pango attributes carrying it are cleared. Contrast
+# _load_panel_axis_display's Panel_Channel_0N_Axis labels, which have
+# no such static foreground of their own, so set_markup() works fine
+# there without any of this.
 _DEPRESS_CSS = b"""
 button.reb-depressed,
 button.reb-depressed:hover,
@@ -759,7 +832,32 @@ button.reb-depressed:active {
     background-image: none;
     box-shadow: inset 2px 2px 4px rgba(0,0,0,0.6), inset -1px -1px 2px rgba(255,255,255,0.15);
 }
+label.reb-axis-yellow,
+label.reb-axis-red,
+label.reb-axis-blue {
+    font-family: "DejaVu Serif";
+    font-weight: bold;
+    /* Matches Sp0/Sp1's untouched font-desc="DejaVu Serif Bold 12" -
+       that "12" is POINTS (Pango's default unit in a font-desc string),
+       not pixels: CSS "12px" is only ~9pt at 96dpi, visibly smaller -
+       "pt" is the unit that actually matches. */
+    font-size: 12pt;
+}
+label.reb-axis-yellow { color: #e5a50a; }
+label.reb-axis-red    { color: #a51d2d; }
+label.reb-axis-blue   { color: #1a5fb4; }
 """
+
+# Letter -> which of the 3 CSS classes above matches AXIS_LETTER_COLOR's
+# grouping for that letter (X/U/A yellow, V/B red, Z/W/C blue) - see
+# _DEPRESS_CSS's comment for why this exists as CSS rather than reusing
+# AXIS_LETTER_COLOR's hex values directly via set_markup().
+AXIS_LETTER_COLOR_CLASS = {
+    "X": "reb-axis-yellow", "U": "reb-axis-yellow", "A": "reb-axis-yellow",
+    "V": "reb-axis-red", "B": "reb-axis-red",
+    "Z": "reb-axis-blue", "W": "reb-axis-blue", "C": "reb-axis-blue",
+}
+_AXIS_LETTER_COLOR_CLASSES = ("reb-axis-yellow", "reb-axis-red", "reb-axis-blue")
 
 def _install_depress_css():
     try:
@@ -1251,19 +1349,34 @@ class HandlerClass:
     def _apply_measurement_system_labels(self, system):
         '''
         Sets the feed-rate/indexing-distance unit labels on the main panel
-        (X/Z/U/V/W's "in / min" and "in" labels) and the scale unit labels
-        on the Settings tab (X/Z/U/V/W's "pulses / in" labels) to match
-        the given system ("Metric" or "Imperial"). Whichever labels this
-        component doesn't own (builder.get_object returns None) are
-        silently skipped - same no-op-in-the-wrong-component pattern as
-        _load_scale_settings/_load_axis_comments.
+        and the scale unit labels on the Settings tab (each channel's
+        Feed_UOM/IdxDist_UOM/Scale_UOM trio) to match the given system
+        ("Metric" or "Imperial") for channels *currently* assigned a
+        linear letter, or to the fixed angular text ("deg / min"/"deg"/
+        "pulses / deg") for channels currently assigned an angular one -
+        degrees aren't metric or imperial, so an angular channel's labels
+        don't change when the operator toggles measurement system, but
+        still need to be set at least once (a channel reassigned away
+        from its shipped-default type wouldn't otherwise get correct
+        text - the .ui file's own static default only matches that
+        channel's *default* letter, e.g. X's Scale_UOM defaults to
+        "pulses / in", wrong if X's channel is now assigned an angular
+        letter). Whichever labels this component doesn't own
+        (builder.get_object returns None) are silently skipped - same
+        no-op-in-the-wrong-component pattern as _load_scale_settings/
+        _load_axis_comments.
         '''
         if system == "Metric":
-            feed_uom, dist_uom, scale_uom = "mm / min", "mm", "pulses / mm"
+            linear_feed_uom, linear_dist_uom, linear_scale_uom = "mm / min", "mm", "pulses / mm"
         else:
-            feed_uom, dist_uom, scale_uom = "in / min", "in", "pulses / in"
+            linear_feed_uom, linear_dist_uom, linear_scale_uom = "in / min", "in", "pulses / in"
 
-        for axis_id in LINEAR_AXES:
+        for axis_id in CHANNEL_DEFAULT_LETTER.values():
+            if _axis_type_for_letter(CURRENT_LETTER[axis_id]) == "ANGULAR":
+                feed_uom, dist_uom, scale_uom = "deg / min", "deg", "pulses / deg"
+            else:
+                feed_uom, dist_uom, scale_uom = linear_feed_uom, linear_dist_uom, linear_scale_uom
+
             feed_label = self.builder.get_object(axis_id + "_Feed_UOM")
             if feed_label is not None:
                 feed_label.set_text(feed_uom)
@@ -1476,6 +1589,97 @@ class HandlerClass:
             type_label = self.builder.get_object("Panel_Channel_" + channel_id + "_Type")
             if type_label is not None:
                 type_label.set_text(_axis_type_for_letter(letter).capitalize())
+
+    def _load_panel_axis_controls(self):
+        '''
+        Configures each of the 6 channel rows' *interactive* controls to
+        match its CURRENTLY assigned letter and type (CURRENT_LETTER/
+        _axis_type_for_letter), if this component owns the main panel's
+        widgets - the working counterpart to _load_panel_axis_display's
+        read-only table above. For each channel: sets the col-0 letter
+        label's text/color (AXIS_LETTER_COLOR, same styling approach as
+        _load_panel_axis_display); swaps both jog buttons' icon to the
+        one matching the assigned letter specifically, not just its type
+        (AXIS_JOG_IMAGE - a linear channel reassigned from X to V still
+        needs V's icon, not X's, since the icon encodes physical +/-
+        direction); reconfigures the Feed/Idx adjustments' numeric range
+        and precision to the assigned type's profile
+        (TYPE_ADJUSTMENT_PROFILE); and shows whichever of the two
+        column-11 widgets matches the type (deg/div radio pair if
+        angular, the static unit label if linear) while hiding the
+        other. Unit-label *text* (Feed_UOM/IdxDist_UOM/Scale_UOM) is
+        handled separately by _apply_measurement_system_labels, called
+        from _load_measurement_system right after this in __init__ -
+        that function already needs the same per-channel type check for
+        its own purpose (Metric/Imperial only means something for a
+        linear channel), so it owns all three unit-label texts rather
+        than splitting that responsibility across two methods.
+
+        Populated once at this component's own startup, same as
+        _load_panel_axis_display - a reassignment made on the Settings
+        tab only takes effect after a restart anyway, at which point
+        this process reloads fresh too. No-ops outside the main panel
+        component.
+        '''
+        if self.builder.get_object("X_ENA") is None:
+            return
+
+        images_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Images")
+
+        for axis in CHANNEL_DEFAULT_LETTER.values():
+            letter = CURRENT_LETTER[axis].upper()
+            angular = _axis_type_for_letter(CURRENT_LETTER[axis]) == "ANGULAR"
+
+            letter_label = self.builder.get_object(axis + "_Letter")
+            if letter_label is not None:
+                letter_label.set_text(letter)
+                # Clear the static per-widget Pango attributes REB_Panel_v1.ui
+                # gives this label (font-desc/weight/foreground) - see
+                # _DEPRESS_CSS's comment for why those would otherwise
+                # win over the CSS color class applied below.
+                letter_label.set_attributes(None)
+                ctx = letter_label.get_style_context()
+                for css_class in _AXIS_LETTER_COLOR_CLASSES:
+                    ctx.remove_class(css_class)
+                css_class = AXIS_LETTER_COLOR_CLASS.get(letter)
+                if css_class is not None:
+                    ctx.add_class(css_class)
+
+            neg_file, pos_file = AXIS_JOG_IMAGE.get(letter, AXIS_JOG_IMAGE["X"])
+            neg_button = self.builder.get_object(JOG_NEG_WIDGET[axis])
+            if neg_button is not None:
+                neg_button.set_image(Gtk.Image.new_from_file(os.path.join(images_dir, neg_file)))
+            pos_button = self.builder.get_object(JOG_POS_WIDGET[axis])
+            if pos_button is not None:
+                pos_button.set_image(Gtk.Image.new_from_file(os.path.join(images_dir, pos_file)))
+
+            profile = TYPE_ADJUSTMENT_PROFILE["ANGULAR" if angular else "LINEAR"]
+
+            feed_adj = self.builder.get_object(axis + "_Feed_Rate")
+            if feed_adj is not None:
+                feed_lower, feed_upper, feed_step, _ = profile["feed"]
+                feed_adj.set_lower(feed_lower)
+                feed_adj.set_upper(feed_upper)
+                feed_adj.set_step_increment(feed_step)
+            feed_spin = self.builder.get_object(axis + "_Feed")
+            if feed_spin is not None:
+                feed_spin.set_digits(profile["feed"][3])
+
+            idx_adj = self.builder.get_object(axis + "_Idx_Dis")
+            if idx_adj is not None:
+                idx_upper, idx_step, _ = profile["idx"]
+                idx_adj.set_upper(idx_upper)
+                idx_adj.set_step_increment(idx_step)
+            idx_spin = self.builder.get_object(axis + "_Idx_Dist")
+            if idx_spin is not None:
+                idx_spin.set_digits(profile["idx"][2])
+
+            degdiv_box = self.builder.get_object(axis + "_Idx_DegDiv_Box")
+            if degdiv_box is not None:
+                degdiv_box.set_visible(angular)
+            unit_label = self.builder.get_object(axis + "_IdxDist_UOM")
+            if unit_label is not None:
+                unit_label.set_visible(not angular)
 
     def _load_max_jog_speed(self):
         '''
@@ -2606,361 +2810,13 @@ class HandlerClass:
             return
         self._save_axis_comment("B", _combo_selected_device(widget))
 
-# ********************************************************************
-#    AA    XX    XX IIIIIIII  SSSSSS      BBBBBBB
-#   AAAA    XX  XX    II     SS    SS     BB    BB
-#  AA  AA    XXXX     II      SSS         BBBBBBB
-# AAAAAAAA   XXXX     II         SSS      BB    BB
-# AA    AA  XX  XX    II     SS    SS     BB    BB
-# AA    AA XX    XX IIIIIIII  SSSSSS      BBBBBBB
-# ********************************************************************
-
-#######################################################################
-# B_Move_Idx_Fwd
-# Purpose:              This is used to run the B axis forward using
-#                       the G0 Gcode.
-#                       Note:  sends "B-" (negative), not "B" (positive),
-#                           despite being the Fwd handler - empirically-
-#                           verified swap, matching the same fix applied
-#                           to the spindles and the X/Z/U/V/W Idx_Minus/
-#                           Idx_Plus handlers (see Sp0_Move_Fwd's
-#                           docstring for that investigation). B's icons
-#                           are unaffected/still correct - only the
-#                           Gcode sign changes.
-# Updated:              ver 1.1, 8 August 2026, Claude
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Panel
-#   Button:             B_Move_Idx_Fwd  (Hal_Button)
-#   Signal:             GtkButton/pressed
-# ---------------------------------------------------------------------
-# Data
-#   Read from UI:       B_Feed - Feed rate set by user
-#   Program Variables
-#       Referenced:     (none)
-#       Set:            B_Idx_Qty - the quantity of indexes so far.
-#                           Forward increases this value.
-#   Written to UI:      B_Idx_Qty - the quantity of indexes so far.
-#                           Forward increases this value.
-# ---------------------------------------------------------------------
-# Gcodes Called:    (none)
-#######################################################################
-    def B_Move_Idx_Fwd(self,widget):
-
-        print("=================================================")
-        print("FUNCTION B_Move_Idx_Fwd")
-
-        # Ensure the system is in MDI mode
-        s.poll()
-        if s.task_state != linuxcnc.MODE_MDI:
-                c.mode(linuxcnc.MODE_MDI)
-                c.wait_complete() # Wait for mode change to complete
-
-        # Send an MDI command to move along the axis. The G-code axis
-        # word must be the CURRENTLY assigned letter for this channel
-        # (CURRENT_LETTER), not the hardcoded "B" - see _axis_idx_move's
-        # gcode_axis comment for why.
-        Gcode = "G1 " + CURRENT_LETTER["B"].upper() + "-" + str(self.B_Idx_Deg) + " F" + str(self.B_Feed)
-
-        print(Gcode)
-        c.mdi(Gcode)
-
-        # Wait for the command to complete
-        c.wait_complete()
-
-        # increment the count and write out to the UI
-        self.B_Idx_Qty = self.B_Idx_Qty + 1
-        Prt1 = "B_Idx_Qty = " + str(self.B_Idx_Qty)
-        print(Prt1)
-
-        # B_Idx_Qtystr = str(self.B_Idx_Qty)
-        # widget.set_label(B_Idx_Qty, B_Idx_Qtystr)
-
-#######################################################################
-# B_Move_Idx_Rev
-# Purpose:              This is used to run the B axis in reverse using
-#                       the G0 Gcode.
-#                       Note:  sends "B" (positive), not "B-" (negative),
-#                           despite being the Rev handler - see
-#                           B_Move_Idx_Fwd's docstring for the same
-#                           empirically-verified swap applied here.
-# Updated:              ver 1.1, 8 August 2026, Claude
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Panel
-#   Button:             B_Move_Idx_Rev  (Hal_Button)
-#   Signal:             GtkButton/pressed
-# ---------------------------------------------------------------------
-# Data
-#   Read from UI:       B_Feed - Feed rate set by user
-#   Program Variables
-#       Referenced:     (none)
-#       Set:            B_Idx_Qty - the quantity of indexes so far. Reverse
-#                           decreases this value.
-#   Written to UI:      B_Idx_Qty - the quantity of indexes so far. Reverse
-#                           decreases this value.
-# ---------------------------------------------------------------------
-# Gcodes Called:        (none)
-#######################################################################
-    def B_Move_Idx_Rev(self,widget):
-
-        print("=================================================")
-        print("FUNCTION B_Move_Idx_Rev")
-
-        # Ensure the system is in MDI mode
-        s.poll()
-        if s.task_state != linuxcnc.MODE_MDI:
-                c.mode(linuxcnc.MODE_MDI)
-                c.wait_complete() # Wait for mode change to complete
-
-        # Send an MDI command to move along the axis. See B_Move_Idx_Fwd
-        # for why the G-code axis word comes from CURRENT_LETTER.
-        Gcode = "G1 " + CURRENT_LETTER["B"].upper() + str(self.B_Idx_Deg) + " F" + str(self.B_Feed)
-
-        print(Gcode)
-        c.mdi(Gcode)
-
-        self.B_Idx_Qty = self.B_Idx_Qty - 1
-        Prt1 = "B_Idx_Qty = " + str(self.B_Idx_Qty)
-        print(Prt1)
-
-        # Wait for the command to complete
-        c.wait_complete()
-
-#######################################################################
-# Sp0_Set_Idx_DegDiv
-# Purpose:              This is used to set the rotational distance
-#                       measurement for the Sp0 & Sp1 spindles.
-#                       If degrees, set to divisions; 
-#                       if divisions, set to degrees.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Panel
-#   Button:             Sp0_Set_Idx_bW_Deg  (HAL_RadioButton)
-#   Signal:             GtkToggledButton/toggled
-# ---------------------------------------------------------------------
-# Data
-#   Read from UI:       (none)
-#   Program Variables
-#       Referenced:     self.Sp0_Idx_Dist - distance field data
-#       Set:            self.Sp0_Idx_Deg - degrees to index
-#                       self.Sp0_Idx_DegDiv - type of distance
-#                           measurement (Deg or Div)
-#   Written to UI:      (none)
-# ---------------------------------------------------------------------
-# Gcodes Called:        (none)
-#######################################################################
-    def B_Set_Idx_DegDiv(self,widget):
-
-        print("=================================================")
-        print("FUNCTION B_Set_Idx_DegDiv")
-
-        if self.B_Idx_DegDiv == "Deg":
-                        self.B_Idx_DegDiv = "Div"
-                        self.B_Idx_Deg = round(360 / self.B_Idx_Dist, 1)
-        else:
-                        self.B_Idx_DegDiv = "Deg"
-                        self.B_Idx_Deg = round(self.B_Idx_Dist, 1)
-
-        Prt1 = "B_Idx_Deg = " + str(self.B_Idx_Deg)
-        print(Prt1)
-
-        Prt2 = "self.B_Idx_DegDiv = " + self.B_Idx_DegDiv
-        print(Prt2)
-
-#######################################################################
-# B_Set_Move_Dist
-# Purpose:              This is used to set the movement distance for
-#                           the B axis.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Panel
-#   Button:             B_Move_Dist (on setting the value)
-#   Signal:             GtkSpinButton/value-changed
-# ---------------------------------------------------------------------
-# Data
-#   Read from UI:       B_Move_Dist
-#   Program Variables
-#       Referenced:     (none)
-#       Set:            self.B_Move_Dist
-#   Written to UI:      (none)
-# ---------------------------------------------------------------------
-# Gcodes Called:        (none)
-#######################################################################
-    def B_Set_Move_Dist(self,widget):
-
-        print("=================================================")
-        print("FUNCTION B_Set_Move_Dist")
-
-        self.B_Move_Dist = widget.get_value()
-
-        print("B_Move_Dist = " + str(self.B_Move_Dist))
-
-#######################################################################
-# B_Set_Scale
-# Purpose:              This is used to set the scale distance for the
-#                           B axis.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Tab_Settings
-#   Button:             B_Set_Scale (on setting the value)
-#   Signal:             HAL_SpinButton/value-changed
-# ---------------------------------------------------------------------
-# Data
-#   Read from UI:       (none)
-#   Program Variables
-#       Referenced:     (none)
-#       Set:            (none)
-#   Written to UI:      (none)
-# ---------------------------------------------------------------------
-# Gcodes Called:        (none)
-# ---------------------------------------------------------------------
-# HAL Commands:         halcmd setp hm2_7i92.0.stepgen.04.position-scale
-#                              (value)
-#######################################################################
-    def B_Set_Scale(self,widget):
-
-        print("=================================================")
-        print("FUNCTION B_Set_Scale")
-
-        B_Scale = round(widget.get_value(), 3)
-
-        # B_ENA-light belongs to the main panel's HAL component
-        # ("gladevcp"); read it cross-component via halcmd. To disable
-        # the axis, drive this component's own B_Ena_Override pin
-        # (ANDed with the panel button in REB_PostGUI_v1.hal) instead of
-        # trying to write another component's pin directly.
-        status_pin = "gladevcp.B_ENA-light"
-
-        try:
-            result = subprocess.run(
-                ["halcmd", "getp", status_pin],
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            is_enabled = result.stdout.strip().upper() in ("TRUE", "1")
-            print(status_pin + " = " + result.stdout.strip())
-
-            if is_enabled:
-                print("B axis is enabled - disabling")
-                self.halcomp['B_Ena_Override'] = False
-            else:
-                print("B axis is already disabled")
-        except subprocess.CalledProcessError as e:
-            print("Error checking " + status_pin + ": " + e.stderr)
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
-
-        # Send the new scale to the X axis stepgen via halcmd.
-        hal_pin = "hm2_7i92.0.stepgen.05.position-scale"
-        cmd = ["halcmd", "setp", hal_pin, str(B_Scale)]
-
-        try:
-            result = subprocess.run(
-                cmd,
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            print("Set " + hal_pin + " = " + str(B_Scale))
-        except subprocess.CalledProcessError as e:
-            print("Error setting " + hal_pin + ": " + e.stderr)
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
-
-#######################################################################
-# B_Set_Ena
-# Purpose:              Clears this axis's Ena_Override veto whenever
-#                           the ENA button is pressed, so an axis that
-#                           was force-disabled by a scale change
-#                           (B_Set_Scale) can be re-enabled by the
-#                           operator afterward. Does not touch the
-#                           panel's own toggle state - see
-#                           REB_PostGUI_v1.hal for the flip-flop that
-#                           tracks that.
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Panel
-#   Button:             B_ENA
-#   Signal:             GtkButton/pressed
-#######################################################################
-    def B_Set_Ena(self,widget,*args):
-        _clear_ena_override('B')
-
-#######################################################################
-# B_Set_Idx_Dist
-# Purpose:              This is used to set the rotational distance
-#                       (degrees or divisions of a circle) for the B
-#                       axis.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Panel
-#   Button:             B_Set_Idx_Dist  (HAL_SpinButton)
-#   Signal:             GtkSpinButton/value-changed
-# ---------------------------------------------------------------------
-# Data
-#   Read from UI:       B_Idx_Dist
-#   Program Variables
-#       Referenced:     B_Idx_Dist - Distance set by user
-#       Set:            B_Idx_Deg - Degrees to index during movement
-#                       B_Idx_DegDiv - type of distance measurement
-#                           (Deg or Div)
-#   Written to UI:      (none)
-# ---------------------------------------------------------------------
-# Gcodes Called:        (none)
-#######################################################################
-    def B_Set_Idx_Dist(self,widget):
-
-        print("=================================================")
-        print("FUNCTION B_Set_Idx_Dist")
-
-        self.B_Idx_Dist = widget.get_value()
-
-        if self.B_Idx_DegDiv == "Deg":
-                self.B_Idx_Deg = round(self.B_Idx_Dist, 1)
-        else:
-                self.B_Idx_Deg = round(360 / self.B_Idx_Dist, 1)
-
-        Prt1 = "B_Idx_DegDiv = " + self.B_Idx_DegDiv
-        print(Prt1)
-        Prt2 = "B_Idx_Deg = " + str(self.B_Idx_Deg) + " deg"
-        print(Prt2)
-
-#######################################################################
-# B_Set_Idx_Feed
-# Purpose:              This is used to set the movement speed for the
-#                       B axis.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Panel
-#   Button:             B_Feed
-#   Signal:             GtkSpinButton/value-changed
-# ---------------------------------------------------------------------
-# Data
-#   Read from UI:       B_Feed - Feed rate set by user
-#   Program Variables
-#       Referenced:
-#       Set:            B_Feed
-#   Written to UI:      (none)
-# ---------------------------------------------------------------------
-# Gcodes Called:        (none)
-#######################################################################
-    def B_Set_Idx_Feed(self,widget):
-
-        print("=================================================")
-        print("FUNCTION B_Set_Idx_Feed")
-
-        self.B_Feed = widget.get_value()
-
-        Prt1 = "B_Feed = " + str(self.B_Feed)
-        print(Prt1)
-
+# B's jog/feed/index/scale/ena handlers used to be hand-written here
+# (B_Move_Idx_Fwd/Rev, B_Set_Idx_Feed, B_Set_Idx_Dist, B_Set_Idx_DegDiv,
+# B_Set_Move_Dist, B_Set_Scale, B_Set_Ena) - they're now generated by the
+# same type-aware factories as every other channel (see "Generated
+# per-channel handlers" below, JOG_NEG_HANDLER/JOG_POS_HANDLER/
+# FEED_HANDLER for the handful of B-specific widget-id names those
+# factories still have to honor).
 
 # ********************************************************************
 #    AA     LL       LL              AA    XX    XX EEEEEEEE  SSSSSS 
@@ -4409,6 +4265,12 @@ class HandlerClass:
         # (if owned by this component).
         self._load_panel_axis_display()
 
+        # Reconfigure the main panel's 6 channel rows (letter label,
+        # jog icons, adjustment ranges, column-11 widget visibility) to
+        # match each channel's current type/letter (if owned by this
+        # component).
+        self._load_panel_axis_controls()
+
         # Restore the persisted Max Jog Speed (REB_Settings_v1.ini) into
         # the Settings tab's spin button (if owned by this component).
         self._load_max_jog_speed()
@@ -4445,13 +4307,6 @@ class HandlerClass:
         # Global Program Variables - declare and set initial value.
         ###############################################################
 
-        self.B_Feed         = 10.0      # B axis feed rate
-        self.B_Idx_Deg      = 90.0      # B axis index degrees
-        self.B_Idx_DegDiv   = "Deg"     # B axis index by degrees or divisions
-        self.B_Idx_Dist     = 90.0      # B axis index distance
-        self.B_Idx_Qty      = 0         # B axis index counter
-        self.B_Move_Dist    = 0.0       # B axis move distance
-
         self.Sp0_Feed       = 1.0       # Sp0 Speed
         self.Sp0_Idx_Bool   = True      # Index this spindle? Default enabled at startup. The checkbox itself doesn't reliably render checked from the .ui file's active="True" alone (confirmed live) - _set_checkbox_active below forces it to match once the panel is up.
         self.Sp0_Idx_DegDiv = "Deg"     # Sp0 & Sp1 spindles: index by degrees or divisions
@@ -4478,61 +4333,107 @@ class HandlerClass:
         # call in every component other than the main panel.
         GLib.timeout_add(100, self._sync_run_operation_buttons)
 
-        # Per-axis state for the five linear axes (LINEAR_AXES, defined
-        # below with the generated Idx_Minus/Set_Feed/etc. methods that
-        # read/write these same attributes via getattr/setattr). B and
-        # Sp0/Sp1 keep their own hand-written state above - not the same
-        # shape (DegDiv fields, Idx_Bool checkboxes, no Move_Dist, etc.).
-        for axis in LINEAR_AXES:
-            setattr(self, axis + "_Feed", 1.0)
-            setattr(self, axis + "_Idx_Dist", 0.0)
+        # Per-channel state for all 6 reassignable channels (internal ids
+        # X/Z/U/V/W/B - CHANNEL_DEFAULT_LETTER's values), read/written by
+        # the generated Idx_Fwd/Idx_Rev/Set_Feed/etc. methods below via
+        # getattr/setattr. Defaults are picked from this SESSION's actual
+        # current type (CURRENT_LETTER/_axis_type_for_letter), not the
+        # internal id's own historical type - a channel reassigned to an
+        # angular letter needs angular-shaped defaults even though its
+        # internal id is, say, "X". Idx_Deg/Idx_DegDiv are harmless to set
+        # on a currently-linear channel - they simply go unused until (if
+        # ever) that channel becomes angular after a future restart, the
+        # same moment this whole block re-runs with fresh CURRENT_LETTER
+        # values anyway. Sp0/Sp1 keep their own hand-written state above -
+        # genuinely different shape (Idx_Bool checkboxes, no Move_Dist).
+        for axis in CHANNEL_DEFAULT_LETTER.values():
+            if _axis_type_for_letter(CURRENT_LETTER[axis]) == "ANGULAR":
+                setattr(self, axis + "_Feed", 10.0)
+                setattr(self, axis + "_Idx_Dist", 90.0)
+                setattr(self, axis + "_Idx_Deg", 90.0)
+            else:
+                setattr(self, axis + "_Feed", 1.0)
+                setattr(self, axis + "_Idx_Dist", 0.0)
+                setattr(self, axis + "_Idx_Deg", 0.0)
+            setattr(self, axis + "_Idx_DegDiv", "Deg")
             setattr(self, axis + "_Idx_Qty", 0)
             setattr(self, axis + "_Move_Dist", 0.0)
 
 # ------------------------------------------------------------------
-# Generated per-axis handlers (linear axes: X, Z, U, V, W).
+# Generated per-channel handlers, for all 6 reassignable channels
+# (X/Z/U/V/W/B - CHANNEL_DEFAULT_LETTER's values).
 #
-# Collapses the near-identical Idx_Minus/Idx_Plus/Set_Feed/Set_Idx_Dist/
-# Set_Move_Dist/Set_Scale methods that used to be hand-written once per
-# axis (see docs/hitcounter-review.md, Issue 1) into one factory function
-# per pattern, looped over the axes and bound onto HandlerClass via
+# Collapses the near-identical Idx_Fwd/Idx_Rev/Set_Feed/Set_Idx_Dist/
+# Set_Idx_DegDiv/Set_Move_Dist/Set_Scale methods - which used to be
+# hand-written once per axis (see docs/hitcounter-review.md, Issue 1),
+# then generated for the 5 linear axes only, with B kept separately
+# hand-written (different shape: Idx_Deg/Idx_DegDiv derivation, no
+# equivalent in the linear factories) - into one factory function per
+# pattern, looped over all 6 channels and bound onto HandlerClass via
 # setattr. This has to produce real, named methods rather than a
 # __getattr__ dispatcher: GladeVCP discovers handlers via dir(instance)
 # fed into builder.connect_signals(), and dir() does not enumerate names
 # that only exist through __getattr__ - such a button would silently
 # stop working with no error anywhere.
 #
-# All five linear axes migrated (X, Z, then U/V/W batched together once
-# Z proved the new-behavior pattern live - see the refactor plan). B and
-# Sp0/Sp1 stay hand-written above/below - different mechanisms entirely,
-# not just axis-letter variations of this same pattern.
+# Channels are no longer permanently linear or angular - which shape a
+# given channel's controls behave as is decided at CALL TIME by
+# _axis_type_for_letter(CURRENT_LETTER[axis]), since the operator can
+# reassign any channel to any letter via the Axis Selection tab (taking
+# effect on next restart, same as everywhere else this matters). Widget
+# ids themselves are NEVER renamed - REB_Panel_v1.ui's buttons still
+# have the ids they've always had; only B's jog buttons/Feed widget use
+# a different naming pattern than the rest (JOG_NEG_HANDLER/
+# JOG_POS_HANDLER/FEED_HANDLER below), a historical quirk from B being
+# hand-written for so long, not something worth renaming widgets over.
 #
 # Set_Ena IS generated here (revised 2026-07-28): initially thought dead
 # (no .ui file wires a <signal> to any <Axis>_Set_Ena), but that's because
 # the ENA buttons were redesigned from HAL_Button (which used a "pressed"
-# signal - see B_Set_Ena's banner comment) to HAL_LightButton, which only
-# emits "clicked" - the signal wiring was never carried over, silently
-# orphaning _clear_ena_override()'s fix for the "press ENA and nothing
-# happens, need a confusing second press" bug (see that function's own
-# comments). The real fix is reconnecting REB_Panel_v1.ui's <Axis>_ENA
-# widgets' "clicked" signal to <Axis>_Set_Ena, not deleting the method.
+# signal) to HAL_LightButton, which only emits "clicked" - the signal
+# wiring was never carried over, silently orphaning
+# _clear_ena_override()'s fix for the "press ENA and nothing happens,
+# need a confusing second press" bug (see that function's own comments).
+# The real fix is reconnecting REB_Panel_v1.ui's <Axis>_ENA widgets'
+# "clicked" signal to <Axis>_Set_Ena, not deleting the method.
 
-LINEAR_AXES = ("X", "Z", "U", "V", "W")  # all five linear axes migrated
+# Column-12/column-13 jog button handler names actually wired in
+# REB_Panel_v1.ui, per channel. These are fixed forever (widgets are
+# never renamed) - only B differs from the "<letter>_Idx_Minus"/
+# "<letter>_Idx_Plus" pattern the rest use (B_Move_Idx_Fwd/Rev, a
+# leftover from before this handler was generated generically). Despite
+# the different naming, column 12 always sends G-code sign "-" and
+# column 13 always sends "+" for every channel, linear or angular alike
+# (empirically verified independently for both X's Idx_Minus/Idx_Plus
+# and B's Move_Idx_Fwd/Rev - see the loop below) - that's what lets one
+# factory serve both naming patterns.
+JOG_NEG_HANDLER = {  # column 12, gcode sign "-"
+    "X": "X_Idx_Plus", "Z": "Z_Idx_Plus", "U": "U_Idx_Plus",
+    "V": "V_Idx_Plus", "W": "W_Idx_Plus", "B": "B_Move_Idx_Fwd",
+}
+JOG_POS_HANDLER = {  # column 13, gcode sign "+"
+    "X": "X_Idx_Minus", "Z": "Z_Idx_Minus", "U": "U_Idx_Minus",
+    "V": "V_Idx_Minus", "W": "W_Idx_Minus", "B": "B_Move_Idx_Rev",
+}
+FEED_HANDLER = {
+    "X": "X_Set_Feed", "Z": "Z_Set_Feed", "U": "U_Set_Feed",
+    "V": "V_Set_Feed", "W": "W_Set_Feed", "B": "B_Set_Idx_Feed",
+}
 
-def _axis_idx_move(axis, label, gcode_sign):
+def _axis_idx_move(axis, handler_name, gcode_sign):
     '''
-    label ("Minus"/"Plus") names the handler/button/print output;
-    gcode_sign ("+"/"-") is the actual sign sent in the G-code. These
-    are deliberately NOT tied together 1:1 below - see the LINEAR_AXES
-    loop's comment for why (empirically-verified direction swap,
-    mirroring the same fix applied to Sp0_Move_Fwd/Rev and
-    Sp0_Move_Idx_Fwd/Rev). Keeping label driving the printed FUNCTION
-    name and handler.__name__ means the console trace still matches
-    whichever button was physically pressed.
+    handler_name is the exact method name GladeVCP dispatches to (see
+    JOG_NEG_HANDLER/JOG_POS_HANDLER - varies per channel, not derived
+    from axis here); gcode_sign ("+"/"-") is the actual sign sent in the
+    G-code, and also which way the Idx_Qty counter moves (matches B's
+    old Fwd=+1/Rev=-1 behavior, now applied to every channel instead of
+    just B). Whether this move uses Idx_Dist (linear) or the derived
+    Idx_Deg (angular) is decided at call time from the channel's current
+    type - see the module comment above.
     '''
     def handler(self, widget):
         print("=================================================")
-        print("FUNCTION " + axis + "_Idx_" + label)
+        print("FUNCTION " + handler_name)
 
         # Depress the button for the duration of the move (see
         # _set_depressed for why this isn't a HAL_ToggleButton).
@@ -4543,7 +4444,8 @@ def _axis_idx_move(axis, label, gcode_sign):
                 c.mode(linuxcnc.MODE_MDI)
                 c.wait_complete()
 
-            dist = getattr(self, axis + "_Idx_Dist")
+            angular = _axis_type_for_letter(CURRENT_LETTER[axis]) == "ANGULAR"
+            amount = getattr(self, axis + "_Idx_Deg") if angular else getattr(self, axis + "_Idx_Dist")
             feed = getattr(self, axis + "_Feed")
             # The G-code axis word must be the CURRENTLY assigned letter
             # for this channel (CURRENT_LETTER), not the fixed internal
@@ -4553,34 +4455,78 @@ def _axis_idx_move(axis, label, gcode_sign):
             # other uses of "axis" in this function (attribute names,
             # handler naming) correctly stay the internal id.
             gcode_axis = CURRENT_LETTER.get(axis, axis.lower()).upper()
-            Gcode = "G1 " + gcode_axis + gcode_sign + str(dist) + " F" + str(feed)
+            Gcode = "G1 " + gcode_axis + gcode_sign + str(amount) + " F" + str(feed)
 
             print(Gcode)
             c.mdi(Gcode)
             c.wait_complete()
+
+            qty_delta = 1 if gcode_sign == "-" else -1
+            setattr(self, axis + "_Idx_Qty", getattr(self, axis + "_Idx_Qty") + qty_delta)
+            print(axis + "_Idx_Qty = " + str(getattr(self, axis + "_Idx_Qty")))
         finally:
             _set_depressed(widget, False)
-    handler.__name__ = axis + "_Idx_" + label
+    handler.__name__ = handler_name
     return handler
 
-def _axis_set_feed(axis):
+def _axis_set_feed(axis, handler_name):
     def handler(self, widget):
         print("=================================================")
-        print("FUNCTION " + axis + "_Set_Feed")
+        print("FUNCTION " + handler_name)
         setattr(self, axis + "_Feed", round(widget.get_value(), 1))
-        print(axis + "_Set_Feed =")
-        print(getattr(self, axis + "_Feed"))
-    handler.__name__ = axis + "_Set_Feed"
+        print(axis + "_Feed = " + str(getattr(self, axis + "_Feed")))
+    handler.__name__ = handler_name
     return handler
 
 def _axis_set_idx_dist(axis):
+    '''
+    Linear channels: Idx_Dist is used directly. Angular channels: Idx_Dist
+    is the raw user entry, which - depending on the channel's Idx_DegDiv
+    mode ("Deg" vs "Div", toggled by _axis_set_idx_degdiv below) - gets
+    derived into Idx_Deg, the value _axis_idx_move actually sends in
+    G-code (matches B's old hand-written derivation, now available to
+    any channel currently angular).
+    '''
     def handler(self, widget):
         print("=================================================")
         print("FUNCTION " + axis + "_Set_Idx_Dist")
-        setattr(self, axis + "_Idx_Dist", widget.get_value())
-        print(axis + "_Idx_Dist =")
-        print(getattr(self, axis + "_Idx_Dist"))
+        value = widget.get_value()
+        setattr(self, axis + "_Idx_Dist", value)
+        if _axis_type_for_letter(CURRENT_LETTER[axis]) == "ANGULAR":
+            if getattr(self, axis + "_Idx_DegDiv") == "Deg":
+                setattr(self, axis + "_Idx_Deg", round(value, 1))
+            else:
+                setattr(self, axis + "_Idx_Deg", round(360 / value, 1))
+            print(axis + "_Idx_DegDiv = " + getattr(self, axis + "_Idx_DegDiv"))
+            print(axis + "_Idx_Deg = " + str(getattr(self, axis + "_Idx_Deg")) + " deg")
+        else:
+            print(axis + "_Idx_Dist = " + str(value))
     handler.__name__ = axis + "_Set_Idx_Dist"
+    return handler
+
+def _axis_set_idx_degdiv(axis):
+    '''
+    Toggles a currently-angular channel's jog-increment entry between
+    meaning degrees directly ("Deg") and meaning "N divisions of a full
+    circle" ("Div", i.e. 360/N degrees) - wired to the deg/div
+    HAL_RadioButton pair every channel's row now has (previously only
+    B's row did). Matches B's old hand-written B_Set_Idx_DegDiv exactly;
+    only reachable in practice on a currently-angular channel, since
+    that's the only case _load_panel_axis_controls makes this pair
+    visible - harmless to register for every channel regardless.
+    '''
+    def handler(self, widget):
+        print("=================================================")
+        print("FUNCTION " + axis + "_Set_Idx_DegDiv")
+        if getattr(self, axis + "_Idx_DegDiv") == "Deg":
+            setattr(self, axis + "_Idx_DegDiv", "Div")
+            setattr(self, axis + "_Idx_Deg", round(360 / getattr(self, axis + "_Idx_Dist"), 1))
+        else:
+            setattr(self, axis + "_Idx_DegDiv", "Deg")
+            setattr(self, axis + "_Idx_Deg", round(getattr(self, axis + "_Idx_Dist"), 1))
+        print(axis + "_Idx_Deg = " + str(getattr(self, axis + "_Idx_Deg")))
+        print(axis + "_Idx_DegDiv = " + getattr(self, axis + "_Idx_DegDiv"))
+    handler.__name__ = axis + "_Set_Idx_DegDiv"
     return handler
 
 def _axis_set_move_dist(axis):
@@ -4663,20 +4609,22 @@ def _axis_set_ena(axis):
     handler.__name__ = axis + "_Set_Ena"
     return handler
 
-for _axis in LINEAR_AXES:
-    # Idx_Minus sends "+" and Idx_Plus sends "-" - swapped relative to
-    # each button's own name, but NOT relative to its icon (X/U/V/Z/W's
-    # Idx_Minus/Idx_Plus icons are confirmed correct - see the earlier
-    # pixbuf revert). Empirically-verified fix: live testing showed all
-    # five linear axes moving the physically wrong way relative to their
-    # (correct) icons, the same class of bug already found and fixed for
-    # the spindles' Fwd/Rev and Idx_Fwd/Idx_Rev via live halcmd pin
-    # tracing - see Sp0_Move_Fwd's docstring for that investigation.
-    setattr(HandlerClass, _axis + "_Idx_Minus", _axis_idx_move(_axis, "Minus", "+"))
-    setattr(HandlerClass, _axis + "_Idx_Plus",  _axis_idx_move(_axis, "Plus",  "-"))
-    setattr(HandlerClass, _axis + "_Set_Feed", _axis_set_feed(_axis))
+for _axis in CHANNEL_DEFAULT_LETTER.values():
+    # Column 12 sends gcode sign "-", column 13 sends "+" - empirically
+    # verified independently for X/U/V/Z/W's Idx_Minus/Idx_Plus (live
+    # testing showed all five linear axes moving the physically wrong
+    # way relative to their correct icons - the same class of bug
+    # already found and fixed for the spindles' Fwd/Rev and Idx_Fwd/
+    # Idx_Rev via live halcmd pin tracing, see Sp0_Move_Fwd's docstring)
+    # and for B's Move_Idx_Fwd/Rev (see that method's old banner comment,
+    # now folded into _axis_idx_move above) - see JOG_NEG_HANDLER/
+    # JOG_POS_HANDLER for why this holds regardless of the handler name.
+    setattr(HandlerClass, JOG_NEG_HANDLER[_axis], _axis_idx_move(_axis, JOG_NEG_HANDLER[_axis], "-"))
+    setattr(HandlerClass, JOG_POS_HANDLER[_axis], _axis_idx_move(_axis, JOG_POS_HANDLER[_axis], "+"))
+    setattr(HandlerClass, FEED_HANDLER[_axis], _axis_set_feed(_axis, FEED_HANDLER[_axis]))
     setattr(HandlerClass, _axis + "_Set_Ena", _axis_set_ena(_axis))
     setattr(HandlerClass, _axis + "_Set_Idx_Dist", _axis_set_idx_dist(_axis))
+    setattr(HandlerClass, _axis + "_Set_Idx_DegDiv", _axis_set_idx_degdiv(_axis))
     setattr(HandlerClass, _axis + "_Set_Move_Dist", _axis_set_move_dist(_axis))
     setattr(HandlerClass, _axis + "_Set_Scale", _axis_set_scale(_axis))
 del _axis

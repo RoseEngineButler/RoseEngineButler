@@ -684,23 +684,6 @@
                                   <object class="GtkLabel">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
-                                    <property name="label" translatable="yes">Y</property>
-                                    <attributes>
-                                      <attribute name="font-desc" value="DejaVu Serif Bold 14"/>
-                                      <attribute name="style" value="italic"/>
-                                      <attribute name="weight" value="bold"/>
-                                      <attribute name="foreground" value="#c0c0bfbfbcbc"/>
-                                    </attributes>
-                                  </object>
-                                  <packing>
-                                    <property name="left-attach">0</property>
-                                    <property name="top-attach">6</property>
-                                  </packing>
-                                </child>
-                                <child>
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
                                     <property name="label" translatable="yes">X</property>
                                     <attributes>
                                       <attribute name="font-desc" value="DejaVu Serif Bold 12"/>
@@ -1091,7 +1074,7 @@
                                   </packing>
                                 </child>
                                 <child>
-                                  <object class="GtkLabel">
+                                  <object class="GtkLabel" id="B_Scale_UOM">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
                                     <property name="halign">start</property>
