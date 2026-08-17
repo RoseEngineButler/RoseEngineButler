@@ -109,7 +109,10 @@ DEFAULT_LETTER_CHANNEL = {v: k for k, v in CHANNEL_DEFAULT_LETTER.items()}
 AXIS_SELECTION_LETTERS = ("X", "Z", "U", "V", "W", "A", "B", "C")
 
 def _axis_type_for_letter(letter):
-    return "ANGULAR" if letter in ("A", "B", "C") else "LINEAR"
+    # CURRENT_LETTER's values are lowercase (see below) and most call
+    # sites pass those straight through without their own .upper() -
+    # case-fold here so this stays correct regardless of caller casing.
+    return "ANGULAR" if letter.upper() in ("A", "B", "C") else "LINEAR"
 
 # Letter -> the same foreground color REB_Panel_v1.ui's original per-axis
 # DRO/jog labels already use for that letter (X/U share one color, Z/W
@@ -337,6 +340,22 @@ CURRENT_LETTER = {
 # loop right now (see CURRENT_LETTER above for why this can't be a
 # static dict, and PID_SPINDLE_LOOPS below for Sp0/Sp1's own loops).
 PID_AXES = {internal_id: "pid." + letter for internal_id, letter in CURRENT_LETTER.items()}
+
+# Reverse of CURRENT_LETTER: currently-assigned axis letter (uppercase)
+# -> internal id of whichever physical channel is driving it right now,
+# if any - used to resolve EXTRA_SETTINGS_LETTERS' live HAL pin below.
+CURRENT_LETTER_INTERNAL_ID = {letter.upper(): internal_id for internal_id, letter in CURRENT_LETTER.items()}
+
+# Settings-tab Axis Scaling rows with no fixed physical channel of their
+# own (see CHANNEL_DEFAULT_LETTER) - added so an operator can
+# pre-configure/retain a Scale value for an A/C attachment even while it
+# isn't currently plugged into any channel ("no need for this page to
+# only show the 'selected axes'"). Persisted in REBset_v1.ini as
+# <axis id="A">/<axis id="C"> blocks, independent of the six physical
+# channels' own blocks - see _load_scale_settings and
+# _axis_set_scale_letter below, and REB_Scale_Persist.py's mirror of
+# this same constant.
+EXTRA_SETTINGS_LETTERS = ("A", "C")
 
 # Spindle id -> {"Pos": position-loop component, "Vel": velocity-loop
 # component}. The suffix ("Pos"/"Vel") matches the Settings tab widget
@@ -1095,6 +1114,47 @@ class HandlerClass:
                     text=True
                 )
                 print("Restored " + hal_pin + " = " + str(value))
+            except subprocess.CalledProcessError as e:
+                print("Error restoring " + hal_pin + ": " + e.stderr)
+            except FileNotFoundError:
+                print("halcmd not found - is the LinuxCNC environment sourced?")
+
+        # EXTRA_SETTINGS_LETTERS (A/C): letter-keyed, no fixed channel of
+        # their own - always load the persisted value into the spin
+        # button, but only push it live if this letter is currently
+        # assigned to a channel this session (CURRENT_LETTER_INTERNAL_ID).
+        for letter in EXTRA_SETTINGS_LETTERS:
+            match = re.search(
+                r'<axis\s+id="' + re.escape(letter) + r'">\s*<scale>(-?[\d.]+)</scale>',
+                xml_text
+            )
+            if not match:
+                print("No stored scale found for axis " + letter
+                      + " in " + SETTINGS_PATH)
+                continue
+
+            value = float(match.group(1))
+
+            widget = self.builder.get_object(letter + "_Set_Scale")
+            if widget is not None:
+                widget.set_value(value)
+
+            internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
+            if internal_id is None:
+                # Not currently assigned to any channel - nothing live
+                # to push to, the value just sits in the spin button/
+                # file for whenever this letter is assigned.
+                continue
+
+            hal_pin = "hm2_7i92.0.stepgen." + AXIS_STEPGEN[internal_id] + ".position-scale"
+            try:
+                subprocess.run(
+                    ["halcmd", "setp", hal_pin, str(value)],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                print("Restored " + hal_pin + " = " + str(value) + " (" + letter + ")")
             except subprocess.CalledProcessError as e:
                 print("Error restoring " + hal_pin + ": " + e.stderr)
             except FileNotFoundError:
@@ -1995,12 +2055,25 @@ class HandlerClass:
             print("Could not read " + SETTINGS_PATH + ": " + str(e))
             return
 
-        for axis_id in AXIS_STEPGEN:
+        for axis_id in list(AXIS_STEPGEN) + list(EXTRA_SETTINGS_LETTERS):
             axis_match = re.search(
                 r'<axis\s+id="' + re.escape(axis_id) + r'">.*?</axis>',
                 xml_text, re.DOTALL
             )
             if not axis_match:
+                if axis_id in EXTRA_SETTINGS_LETTERS:
+                    # No block yet for this letter-keyed row (see
+                    # EXTRA_SETTINGS_LETTERS) - create a minimal one so its
+                    # Scale isn't silently dropped from the snapshot,
+                    # mirroring REB_Scale_Persist.py's set_scale_value.
+                    scale_widget = self.builder.get_object(axis_id + "_Set_Scale")
+                    if scale_widget is not None:
+                        block = ('    <axis id="' + axis_id + '">\n        <scale>'
+                                 + str(scale_widget.get_value()) + '</scale>\n    </axis>\n')
+                        xml_text, count = re.subn(r'</settings>', block + '</settings>', xml_text, count=1)
+                        if count:
+                            print("Created <axis id=\"" + axis_id + "\"> in " + SETTINGS_PATH)
+                    continue
                 print("No <axis id=\"" + axis_id + "\"> entry found in " + SETTINGS_PATH)
                 continue
 
@@ -2444,14 +2517,20 @@ class HandlerClass:
 
         checks = {}
         comment_combos = {}
-        for axis_id in AXIS_STEPGEN:
+        for axis_id in list(AXIS_STEPGEN) + list(EXTRA_SETTINGS_LETTERS):
             row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
             check = Gtk.CheckButton(label=axis_id)
             check.set_active(True)
-            check.set_tooltip_text(
-                "Exports this axis's Scale, Backlash, and Stepper Motor "
-                "Tuning together."
-            )
+            if axis_id in EXTRA_SETTINGS_LETTERS:
+                # No fixed channel of its own (see EXTRA_SETTINGS_LETTERS) -
+                # only has a Scale to export, unlike the six physical
+                # channels' Scale+Backlash+PID unit below.
+                check.set_tooltip_text("Exports this axis's Scale.")
+            else:
+                check.set_tooltip_text(
+                    "Exports this axis's Scale, Backlash, and Stepper Motor "
+                    "Tuning together."
+                )
             axis_label_group.add_widget(check)
             row.pack_start(check, False, False, 0)
 
@@ -2621,7 +2700,7 @@ class HandlerClass:
         comment_imported = False
         for axis_el in root.findall("axis"):
             axis_id = axis_el.get("id")
-            if axis_id not in AXIS_STEPGEN:
+            if axis_id not in AXIS_STEPGEN and axis_id not in EXTRA_SETTINGS_LETTERS:
                 continue
 
             # Scale and PID are independent - a file may carry either,
@@ -4628,6 +4707,74 @@ for _axis in CHANNEL_DEFAULT_LETTER.values():
     setattr(HandlerClass, _axis + "_Set_Move_Dist", _axis_set_move_dist(_axis))
     setattr(HandlerClass, _axis + "_Set_Scale", _axis_set_scale(_axis))
 del _axis
+
+def _axis_set_scale_letter(letter):
+    '''
+    Value-changed handler for the Settings tab's A_Set_Scale/C_Set_Scale
+    spin buttons (see EXTRA_SETTINGS_LETTERS) - mirrors _axis_set_scale
+    above, but letter has no fixed internal id/channel of its own, so
+    the live stepgen pin (and the ENA-light/override pins used to
+    disable the axis first) are resolved through
+    CURRENT_LETTER_INTERNAL_ID/AXIS_STEPGEN at call time instead of a
+    closure-captured constant. If this letter isn't currently assigned
+    to any channel, the value is simply kept (and persisted at shutdown
+    by REB_Scale_Persist.py) with no live HAL write to make.
+    '''
+    def handler(self, widget):
+        print("=================================================")
+        print("FUNCTION " + letter + "_Set_Scale")
+
+        internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
+        if internal_id is None:
+            print(letter + " is not currently assigned to a channel - value kept, no live HAL write")
+            return
+
+        c.abort()
+        c.wait_complete()
+
+        scale = round(widget.get_value(), 1)
+        hal_pin = "hm2_7i92.0.stepgen." + AXIS_STEPGEN[internal_id] + ".position-scale"
+        status_pin = "gladevcp." + internal_id + "_ENA-light"
+
+        try:
+            result = subprocess.run(
+                ["halcmd", "getp", status_pin],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            is_enabled = result.stdout.strip().upper() in ("TRUE", "1")
+            print(status_pin + " = " + result.stdout.strip())
+
+            if is_enabled:
+                print(internal_id + " axis is enabled - disabling")
+                self.halcomp[internal_id + '_Ena_Override'] = False
+            else:
+                print(internal_id + " axis is already disabled")
+        except subprocess.CalledProcessError as e:
+            print("Error checking " + status_pin + ": " + e.stderr)
+        except FileNotFoundError:
+            print("halcmd not found - is the LinuxCNC environment sourced?")
+
+        cmd = ["halcmd", "setp", hal_pin, str(scale)]
+        try:
+            subprocess.run(
+                cmd,
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            print("Set " + hal_pin + " = " + str(scale) + " (" + letter + ")")
+        except subprocess.CalledProcessError as e:
+            print("Error setting " + hal_pin + ": " + e.stderr)
+        except FileNotFoundError:
+            print("halcmd not found - is the LinuxCNC environment sourced?")
+    handler.__name__ = letter + "_Set_Scale"
+    return handler
+
+for _letter in EXTRA_SETTINGS_LETTERS:
+    setattr(HandlerClass, _letter + "_Set_Scale", _axis_set_scale_letter(_letter))
+del _letter
 
 def _axis_set_backlash(axis):
     '''

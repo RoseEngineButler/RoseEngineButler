@@ -133,6 +133,18 @@ CURRENT_LETTER = {
 # loop right now (see CURRENT_LETTER above for why this can't be a
 # static dict).
 PID_AXES = {internal_id: "pid." + letter for internal_id, letter in CURRENT_LETTER.items()}
+
+# Reverse of CURRENT_LETTER - mirrors REB_main.py's constant of the same
+# name (see AXIS_STEPGEN above for why these are duplicated across
+# scripts). Currently-assigned axis letter (uppercase) -> internal id of
+# whichever physical channel is driving it right now, if any.
+CURRENT_LETTER_INTERNAL_ID = {letter.upper(): internal_id for internal_id, letter in CURRENT_LETTER.items()}
+
+# Settings-tab Axis Scaling rows with no fixed physical channel of their
+# own - mirrors REB_main.py's constant of the same name. Persisted as
+# <axis id="A">/<axis id="C"> blocks, independent of the six physical
+# channels' own blocks - see main() below.
+EXTRA_SETTINGS_LETTERS = ("A", "C")
 PID_SPINDLE_LOOPS = {
     "Sp0": {"Pos": "pid.p0", "Vel": "pid.s0"},
     "Sp1": {"Pos": "pid.p1", "Vel": "pid.s1"},
@@ -176,6 +188,34 @@ def get_backlash(joint_num):
         text=True
     )
     return result.stdout.strip()
+
+def set_scale_value(xml_text, axis_id, value):
+    '''
+    Patches a given axis's <scale> value, same as the inline patch in
+    main()'s AXIS_STEPGEN loop, but creates a minimal
+    <axis id="..."><scale>...</scale></axis> block right before
+    </settings> if none exists yet - unlike every other axis id here,
+    EXTRA_SETTINGS_LETTERS (A/C) have no block shipped in
+    REBset_v1.ini's template on a machine that predates this feature, so
+    without this the value would silently never persist. Returns
+    (new_xml_text, created).
+    '''
+    pattern = (
+        r'(<axis\s+id="' + re.escape(axis_id) + r'">\s*<scale>)'
+        r'-?[\d.]+'
+        r'(</scale>)'
+    )
+    new_text, count = re.subn(pattern, r'\g<1>' + value + r'\g<2>', xml_text, count=1)
+    if count:
+        return new_text, False
+
+    block = '    <axis id="' + axis_id + '">\n        <scale>' + value + '</scale>\n    </axis>\n'
+    new_text, count = re.subn(r'</settings>', block + '</settings>', xml_text, count=1)
+    if count == 0:
+        print("Could not find </settings> to insert a new <axis id=\""
+              + axis_id + "\"> block into " + SETTINGS_PATH)
+        return xml_text, False
+    return new_text, True
 
 def set_single_value(xml_text, axis_id, tag, value):
     '''
@@ -285,6 +325,25 @@ def main():
 
         xml_text = new_text
         print("Saved " + axis_id + " scale = " + value)
+
+    for letter in EXTRA_SETTINGS_LETTERS:
+        internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
+        if internal_id is None:
+            # Not currently assigned to any channel this session -
+            # nothing live to read, leave its persisted value untouched.
+            continue
+
+        try:
+            value = get_scale(AXIS_STEPGEN[internal_id])
+        except subprocess.CalledProcessError as e:
+            print("Error reading scale for axis " + letter + ": " + e.stderr)
+            continue
+        except FileNotFoundError:
+            print("halcmd not found - is the LinuxCNC environment sourced?")
+            sys.exit(1)
+
+        xml_text, created = set_scale_value(xml_text, letter, value)
+        print(("Created" if created else "Saved") + " " + letter + " scale = " + value)
 
     for axis_id, hal_component in PID_AXES.items():
         values = {}

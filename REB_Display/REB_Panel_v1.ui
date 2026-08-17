@@ -506,7 +506,6 @@
             </child>
             <child>
               <object class="GtkLabel" id="B_IdxDist_UOM">
-                <property name="visible">False</property>
                 <property name="can-focus">False</property>
                 <property name="halign">start</property>
                 <property name="valign">center</property>
@@ -908,7 +907,7 @@
                 <property name="can-focus">False</property>
                 <property name="halign">start</property>
                 <property name="hexpand">True</property>
-                <property name="label" translatable="yes">REB O/S 1.0 - alpha 16 August 2026</property>
+                <property name="label" translatable="yes">REB O/S 1.0 - alpha 17 August 2026</property>
                 <property name="justify">right</property>
                 <property name="width-chars">9</property>
                 <attributes>
@@ -1611,7 +1610,6 @@ feed rate</property>
             </child>
             <child>
               <object class="GtkBox" id="X_Idx_DegDiv_Box">
-                <property name="visible">False</property>
                 <property name="can-focus">False</property>
                 <property name="valign">center</property>
                 <property name="margin-left">4</property>
@@ -1693,7 +1691,6 @@ feed rate</property>
             </child>
             <child>
               <object class="GtkBox" id="Z_Idx_DegDiv_Box">
-                <property name="visible">False</property>
                 <property name="can-focus">False</property>
                 <property name="valign">center</property>
                 <property name="margin-left">4</property>
@@ -1775,7 +1772,6 @@ feed rate</property>
             </child>
             <child>
               <object class="GtkBox" id="U_Idx_DegDiv_Box">
-                <property name="visible">False</property>
                 <property name="can-focus">False</property>
                 <property name="valign">center</property>
                 <property name="margin-left">4</property>
@@ -1857,7 +1853,6 @@ feed rate</property>
             </child>
             <child>
               <object class="GtkBox" id="V_Idx_DegDiv_Box">
-                <property name="visible">False</property>
                 <property name="can-focus">False</property>
                 <property name="valign">center</property>
                 <property name="margin-left">4</property>
@@ -1918,7 +1913,6 @@ feed rate</property>
             </child>
             <child>
               <object class="GtkBox" id="W_Idx_DegDiv_Box">
-                <property name="visible">False</property>
                 <property name="can-focus">False</property>
                 <property name="valign">center</property>
                 <property name="margin-left">4</property>
@@ -2829,6 +2823,57 @@ After entering any comments, you must press ENTER to have them saved.</property>
                 <property name="top-attach">8</property>
                 <property name="width">3</property>
               </packing>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
             </child>
             <child>
               <placeholder/>
