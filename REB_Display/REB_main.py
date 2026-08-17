@@ -111,6 +111,26 @@ AXIS_SELECTION_LETTERS = ("X", "Z", "U", "V", "W", "A", "B", "C")
 def _axis_type_for_letter(letter):
     return "ANGULAR" if letter in ("A", "B", "C") else "LINEAR"
 
+# Letter -> the same foreground color REB_Panel_v1.ui's original per-axis
+# DRO/jog labels already use for that letter (X/U share one color, Z/W
+# share another, V/B share a third - grouped by mechanical relationship,
+# e.g. "U is parallel to X" per the AXIS CONVENTIONS text), extended to
+# cover A/C (not present elsewhere in the panel) by following the same
+# X/Z/V groupings the Axis Selection tab already applies for TYPE
+# (A angular like B, but grouped with X/U's color here; C angular like B,
+# grouped with Z/W's color) - used by _load_panel_axis_display to color
+# the main panel's read-only "Axis Assignments" letters the same way.
+AXIS_LETTER_COLOR = {
+    "X": "#e5e5a5a50a0a",
+    "U": "#e5e5a5a50a0a",
+    "A": "#e5e5a5a50a0a",
+    "V": "#a5a51d1d2d2d",
+    "B": "#a5a51d1d2d2d",
+    "Z": "#1a1a5f5fb4b4",
+    "W": "#1a1a5f5fb4b4",
+    "C": "#1a1a5f5fb4b4",
+}
+
 def _save_channel_assignments(assignments):
     '''
     Persists the Axis Selection tab's channel -> axis letter choices into
@@ -1416,6 +1436,46 @@ class HandlerClass:
         # this should always clear every warning - called anyway so the
         # tab's own state stays consistent if that ever changes.
         self._update_duplicate_warnings()
+
+    def _load_panel_axis_display(self):
+        '''
+        Reads the persisted channel -> axis letter assignment and
+        populates the main panel's own read-only "Axis Assignments"
+        display (Panel_Channel_0N_Axis/_Type - REB_Panel_v1.ui), if
+        this component owns those widgets. Unlike the Axis Selection
+        tab's combos, these are plain labels with no signal handlers -
+        purely informational; the Settings tab is the only place the
+        assignment can actually be changed. Populated once at this
+        component's own startup, same as everything else keyed off
+        REBset_v1.ini - a change made on the Settings tab only takes
+        effect (here and everywhere else) after a restart anyway, at
+        which point this process reloads fresh too. No-ops outside the
+        main panel component.
+        '''
+        if self.builder.get_object("Panel_Channel_00_Axis") is None:
+            return
+
+        assignments = _read_persisted_channel_assignments()
+        for channel_id, letter in assignments.items():
+            axis_label = self.builder.get_object("Panel_Channel_" + channel_id + "_Axis")
+            if axis_label is not None:
+                color = AXIS_LETTER_COLOR.get(letter)
+                if color is not None:
+                    # set_markup takes over the label's whole attribute
+                    # list, so the big/bold styling REB_Panel_v1.ui gives
+                    # this label has to be restated here too, not just
+                    # the color - otherwise it would revert to plain text
+                    # the moment this runs.
+                    axis_label.set_markup(
+                        '<span foreground="' + color + '" font_desc="DejaVu Serif 24" weight="bold">'
+                        + letter + '</span>'
+                    )
+                else:
+                    axis_label.set_text(letter)
+
+            type_label = self.builder.get_object("Panel_Channel_" + channel_id + "_Type")
+            if type_label is not None:
+                type_label.set_text(_axis_type_for_letter(letter).capitalize())
 
     def _load_max_jog_speed(self):
         '''
@@ -4343,6 +4403,11 @@ class HandlerClass:
         # (REBset_v1.ini) into the Axis Selection tab's six combos (if
         # owned by this component).
         self._load_channel_assignments()
+
+        # Restore the persisted channel -> axis letter assignment
+        # (REBset_v1.ini) into the main panel's own read-only display
+        # (if owned by this component).
+        self._load_panel_axis_display()
 
         # Restore the persisted Max Jog Speed (REB_Settings_v1.ini) into
         # the Settings tab's spin button (if owned by this component).
