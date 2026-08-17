@@ -947,7 +947,7 @@
                 <property name="overwrite-mode">True</property>
                 <property name="input-purpose">number</property>
                 <property name="adjustment">Sp_Idx_Dis</property>
-                <property name="digits">1</property>
+                <property name="digits">2</property>
                 <property name="numeric">True</property>
                 <property name="value">90</property>
                 <signal name="value-changed" handler="Sp0_Set_Idx_Dist" swapped="no"/>
@@ -2097,7 +2097,7 @@ feed rate</property>
                 <property name="overwrite-mode">True</property>
                 <property name="input-purpose">number</property>
                 <property name="adjustment">B_Idx_Dis</property>
-                <property name="digits">1</property>
+                <property name="digits">2</property>
                 <property name="numeric">True</property>
                 <property name="value">90</property>
                 <signal name="value-changed" handler="B_Set_Idx_Dist" swapped="no"/>

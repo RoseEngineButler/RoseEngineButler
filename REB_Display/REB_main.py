@@ -183,7 +183,7 @@ AXIS_JOG_IMAGE = {
 # controls behave correctly for its new type, not its old one.
 TYPE_ADJUSTMENT_PROFILE = {
     "LINEAR":  {"feed": (-10, 10, 0.01, 3), "idx": (25, 0.01, 3)},
-    "ANGULAR": {"feed": (-600, 600, 0.01, 3), "idx": (720, 0.10, 1)},
+    "ANGULAR": {"feed": (-600, 600, 0.01, 3), "idx": (720, 0.10, 2)},
 }
 
 def _save_channel_assignments(assignments):
