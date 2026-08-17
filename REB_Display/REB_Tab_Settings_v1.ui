@@ -67,6 +67,41 @@
 <interface>
   <requires lib="gtk+" version="3.24"/>
   <requires lib="gladevcp" version="0.0"/>
+  <object class="GtkAdjustment" id="A_Set_Backlash_adj">
+    <property name="upper">10</property>
+    <property name="step-increment">0.0001</property>
+    <property name="page-increment">0.001</property>
+  </object>
+  <object class="GtkAdjustment" id="A_Set_D_adj">
+    <property name="upper">100</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="A_Set_FF0_adj">
+    <property name="upper">100</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="A_Set_FF1_adj">
+    <property name="upper">100</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="A_Set_FF2_adj">
+    <property name="upper">100</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="A_Set_I_adj">
+    <property name="upper">100</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="A_Set_P_adj">
+    <property name="upper">100</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
   <object class="GtkAdjustment" id="A_Set_Scale_adj">
     <property name="lower">-1000000</property>
     <property name="upper">1000000</property>
@@ -111,6 +146,41 @@
   <object class="GtkAdjustment" id="B_Set_Scale_adj">
     <property name="lower">-1000000</property>
     <property name="upper">1000000</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="C_Set_Backlash_adj">
+    <property name="upper">10</property>
+    <property name="step-increment">0.0001</property>
+    <property name="page-increment">0.001</property>
+  </object>
+  <object class="GtkAdjustment" id="C_Set_D_adj">
+    <property name="upper">100</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="C_Set_FF0_adj">
+    <property name="upper">100</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="C_Set_FF1_adj">
+    <property name="upper">100</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="C_Set_FF2_adj">
+    <property name="upper">100</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="C_Set_I_adj">
+    <property name="upper">100</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="C_Set_P_adj">
+    <property name="upper">100</property>
     <property name="step-increment">1</property>
     <property name="page-increment">10</property>
   </object>
@@ -3291,6 +3361,22 @@ from File</property>
                               <object class="GtkLabel">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">A</property>
+                                <attributes>
+                                  <attribute name="font-desc" value="DejaVu Serif Bold 12"/>
+                                  <attribute name="weight" value="bold"/>
+                                  <attribute name="foreground" value="#e5e5a5a50a0a"/>
+                                </attributes>
+                              </object>
+                              <packing>
+                                <property name="left-attach">1</property>
+                                <property name="top-attach">28</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
                                 <property name="label" translatable="yes">B</property>
                                 <attributes>
                                   <attribute name="font-desc" value="DejaVu Serif Bold 12"/>
@@ -3300,6 +3386,22 @@ from File</property>
                               </object>
                               <packing>
                                 <property name="left-attach">2</property>
+                                <property name="top-attach">28</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">C</property>
+                                <attributes>
+                                  <attribute name="font-desc" value="DejaVu Serif Bold 12"/>
+                                  <attribute name="weight" value="bold"/>
+                                  <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                                </attributes>
+                              </object>
+                              <packing>
+                                <property name="left-attach">3</property>
                                 <property name="top-attach">28</property>
                               </packing>
                             </child>
@@ -3672,6 +3774,32 @@ from File</property>
                               </packing>
                             </child>
                             <child>
+                              <object class="HAL_SpinButton" id="A_Set_FF2">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="can-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Second-order feedforward. Output += FF2 × commanded acceleration. Can compensate for inertia.</property>
+                                <property name="halign">end</property>
+                                <property name="valign">center</property>
+                                <property name="margin-left">5</property>
+                                <property name="margin-start">5</property>
+                                <property name="margin-top">2</property>
+                                <property name="margin-bottom">2</property>
+                                <property name="text" translatable="yes">0.0</property>
+                                <property name="overwrite-mode">True</property>
+                                <property name="input-purpose">number</property>
+                                <property name="adjustment">A_Set_FF2_adj</property>
+                                <property name="climb-rate">0.01</property>
+                                <property name="digits">1</property>
+                                <property name="numeric">True</property>
+                                <signal name="value-changed" handler="A_Set_FF2" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="left-attach">1</property>
+                                <property name="top-attach">34</property>
+                              </packing>
+                            </child>
+                            <child>
                               <object class="HAL_SpinButton" id="B_Set_FF2">
                                 <property name="visible">True</property>
                                 <property name="can-focus">True</property>
@@ -3695,6 +3823,58 @@ from File</property>
                               <packing>
                                 <property name="left-attach">2</property>
                                 <property name="top-attach">34</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="HAL_SpinButton" id="C_Set_FF2">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="can-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Second-order feedforward. Output += FF2 × commanded acceleration. Can compensate for inertia.</property>
+                                <property name="halign">end</property>
+                                <property name="valign">center</property>
+                                <property name="margin-left">5</property>
+                                <property name="margin-start">5</property>
+                                <property name="margin-top">2</property>
+                                <property name="margin-bottom">2</property>
+                                <property name="text" translatable="yes">0.0</property>
+                                <property name="overwrite-mode">True</property>
+                                <property name="input-purpose">number</property>
+                                <property name="adjustment">C_Set_FF2_adj</property>
+                                <property name="climb-rate">0.01</property>
+                                <property name="digits">1</property>
+                                <property name="numeric">True</property>
+                                <signal name="value-changed" handler="C_Set_FF2" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="left-attach">3</property>
+                                <property name="top-attach">34</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="HAL_SpinButton" id="A_Set_FF1">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="can-default">True</property>
+                                <property name="tooltip-text" translatable="yes">First-order feedforward. Output += FF1 × commanded speed. Lets the loop anticipate motion instead of only reacting to error. On this machine, FF1 - not P/I - does most of the tracking; see REB.ini's tuning notes for this axis.</property>
+                                <property name="halign">end</property>
+                                <property name="valign">center</property>
+                                <property name="margin-left">5</property>
+                                <property name="margin-start">5</property>
+                                <property name="margin-top">2</property>
+                                <property name="margin-bottom">2</property>
+                                <property name="text" translatable="yes">0.0</property>
+                                <property name="overwrite-mode">True</property>
+                                <property name="input-purpose">number</property>
+                                <property name="adjustment">A_Set_FF1_adj</property>
+                                <property name="climb-rate">0.01</property>
+                                <property name="digits">1</property>
+                                <property name="numeric">True</property>
+                                <signal name="value-changed" handler="A_Set_FF1" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="left-attach">1</property>
+                                <property name="top-attach">33</property>
                               </packing>
                             </child>
                             <child>
@@ -3724,6 +3904,58 @@ from File</property>
                               </packing>
                             </child>
                             <child>
+                              <object class="HAL_SpinButton" id="C_Set_FF1">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="can-default">True</property>
+                                <property name="tooltip-text" translatable="yes">First-order feedforward. Output += FF1 × commanded speed. Lets the loop anticipate motion instead of only reacting to error. On this machine, FF1 - not P/I - does most of the tracking; see REB.ini's tuning notes for this axis.</property>
+                                <property name="halign">end</property>
+                                <property name="valign">center</property>
+                                <property name="margin-left">5</property>
+                                <property name="margin-start">5</property>
+                                <property name="margin-top">2</property>
+                                <property name="margin-bottom">2</property>
+                                <property name="text" translatable="yes">0.0</property>
+                                <property name="overwrite-mode">True</property>
+                                <property name="input-purpose">number</property>
+                                <property name="adjustment">C_Set_FF1_adj</property>
+                                <property name="climb-rate">0.01</property>
+                                <property name="digits">1</property>
+                                <property name="numeric">True</property>
+                                <signal name="value-changed" handler="C_Set_FF1" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="left-attach">3</property>
+                                <property name="top-attach">33</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="HAL_SpinButton" id="A_Set_FF0">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="can-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Zeroth-order feedforward. Output += FF0 × commanded position. Normally left at 0 for a position loop.</property>
+                                <property name="halign">end</property>
+                                <property name="valign">center</property>
+                                <property name="margin-left">5</property>
+                                <property name="margin-start">5</property>
+                                <property name="margin-top">2</property>
+                                <property name="margin-bottom">2</property>
+                                <property name="text" translatable="yes">0.0</property>
+                                <property name="overwrite-mode">True</property>
+                                <property name="input-purpose">number</property>
+                                <property name="adjustment">A_Set_FF0_adj</property>
+                                <property name="climb-rate">0.01</property>
+                                <property name="digits">1</property>
+                                <property name="numeric">True</property>
+                                <signal name="value-changed" handler="A_Set_FF0" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="left-attach">1</property>
+                                <property name="top-attach">32</property>
+                              </packing>
+                            </child>
+                            <child>
                               <object class="HAL_SpinButton" id="B_Set_FF0">
                                 <property name="visible">True</property>
                                 <property name="can-focus">True</property>
@@ -3747,6 +3979,58 @@ from File</property>
                               <packing>
                                 <property name="left-attach">2</property>
                                 <property name="top-attach">32</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="HAL_SpinButton" id="C_Set_FF0">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="can-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Zeroth-order feedforward. Output += FF0 × commanded position. Normally left at 0 for a position loop.</property>
+                                <property name="halign">end</property>
+                                <property name="valign">center</property>
+                                <property name="margin-left">5</property>
+                                <property name="margin-start">5</property>
+                                <property name="margin-top">2</property>
+                                <property name="margin-bottom">2</property>
+                                <property name="text" translatable="yes">0.0</property>
+                                <property name="overwrite-mode">True</property>
+                                <property name="input-purpose">number</property>
+                                <property name="adjustment">C_Set_FF0_adj</property>
+                                <property name="climb-rate">0.01</property>
+                                <property name="digits">1</property>
+                                <property name="numeric">True</property>
+                                <signal name="value-changed" handler="C_Set_FF0" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="left-attach">3</property>
+                                <property name="top-attach">32</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="HAL_SpinButton" id="A_Set_D">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="can-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Derivative gain. Output += (rate of change of error) × D. Damps oscillation/overshoot caused by P and I.</property>
+                                <property name="halign">end</property>
+                                <property name="valign">center</property>
+                                <property name="margin-left">5</property>
+                                <property name="margin-start">5</property>
+                                <property name="margin-top">2</property>
+                                <property name="margin-bottom">2</property>
+                                <property name="text" translatable="yes">0.0</property>
+                                <property name="overwrite-mode">True</property>
+                                <property name="input-purpose">number</property>
+                                <property name="adjustment">A_Set_D_adj</property>
+                                <property name="climb-rate">0.01</property>
+                                <property name="digits">1</property>
+                                <property name="numeric">True</property>
+                                <signal name="value-changed" handler="A_Set_D" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="left-attach">1</property>
+                                <property name="top-attach">31</property>
                               </packing>
                             </child>
                             <child>
@@ -3776,6 +4060,58 @@ from File</property>
                               </packing>
                             </child>
                             <child>
+                              <object class="HAL_SpinButton" id="C_Set_D">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="can-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Derivative gain. Output += (rate of change of error) × D. Damps oscillation/overshoot caused by P and I.</property>
+                                <property name="halign">end</property>
+                                <property name="valign">center</property>
+                                <property name="margin-left">5</property>
+                                <property name="margin-start">5</property>
+                                <property name="margin-top">2</property>
+                                <property name="margin-bottom">2</property>
+                                <property name="text" translatable="yes">0.0</property>
+                                <property name="overwrite-mode">True</property>
+                                <property name="input-purpose">number</property>
+                                <property name="adjustment">C_Set_D_adj</property>
+                                <property name="climb-rate">0.01</property>
+                                <property name="digits">1</property>
+                                <property name="numeric">True</property>
+                                <signal name="value-changed" handler="C_Set_D" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="left-attach">3</property>
+                                <property name="top-attach">31</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="HAL_SpinButton" id="A_Set_I">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="can-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Integral gain. Output += (accumulated error over time) × I. Corrects lingering error P alone can't close. Too high causes slow overshoot-then-correct ("windup").</property>
+                                <property name="halign">end</property>
+                                <property name="valign">center</property>
+                                <property name="margin-left">5</property>
+                                <property name="margin-start">5</property>
+                                <property name="margin-top">2</property>
+                                <property name="margin-bottom">2</property>
+                                <property name="text" translatable="yes">0.0</property>
+                                <property name="overwrite-mode">True</property>
+                                <property name="input-purpose">number</property>
+                                <property name="adjustment">A_Set_I_adj</property>
+                                <property name="climb-rate">0.01</property>
+                                <property name="digits">1</property>
+                                <property name="numeric">True</property>
+                                <signal name="value-changed" handler="A_Set_I" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="left-attach">1</property>
+                                <property name="top-attach">30</property>
+                              </packing>
+                            </child>
+                            <child>
                               <object class="HAL_SpinButton" id="B_Set_I">
                                 <property name="visible">True</property>
                                 <property name="can-focus">True</property>
@@ -3802,6 +4138,58 @@ from File</property>
                               </packing>
                             </child>
                             <child>
+                              <object class="HAL_SpinButton" id="C_Set_I">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="can-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Integral gain. Output += (accumulated error over time) × I. Corrects lingering error P alone can't close. Too high causes slow overshoot-then-correct ("windup").</property>
+                                <property name="halign">end</property>
+                                <property name="valign">center</property>
+                                <property name="margin-left">5</property>
+                                <property name="margin-start">5</property>
+                                <property name="margin-top">2</property>
+                                <property name="margin-bottom">2</property>
+                                <property name="text" translatable="yes">0.0</property>
+                                <property name="overwrite-mode">True</property>
+                                <property name="input-purpose">number</property>
+                                <property name="adjustment">C_Set_I_adj</property>
+                                <property name="climb-rate">0.01</property>
+                                <property name="digits">1</property>
+                                <property name="numeric">True</property>
+                                <signal name="value-changed" handler="C_Set_I" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="left-attach">3</property>
+                                <property name="top-attach">30</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="HAL_SpinButton" id="A_Set_P">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="can-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Proportional gain. Output += error × P. Pushes toward the target in proportion to how far off it is. Too high causes overshoot/oscillation; too low is sluggish.</property>
+                                <property name="halign">end</property>
+                                <property name="valign">center</property>
+                                <property name="margin-left">5</property>
+                                <property name="margin-start">5</property>
+                                <property name="margin-top">2</property>
+                                <property name="margin-bottom">2</property>
+                                <property name="text" translatable="yes">0.0</property>
+                                <property name="overwrite-mode">True</property>
+                                <property name="input-purpose">number</property>
+                                <property name="adjustment">A_Set_P_adj</property>
+                                <property name="climb-rate">0.01</property>
+                                <property name="digits">1</property>
+                                <property name="numeric">True</property>
+                                <signal name="value-changed" handler="A_Set_P" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="left-attach">1</property>
+                                <property name="top-attach">29</property>
+                              </packing>
+                            </child>
+                            <child>
                               <object class="HAL_SpinButton" id="B_Set_P">
                                 <property name="visible">True</property>
                                 <property name="can-focus">True</property>
@@ -3824,6 +4212,32 @@ from File</property>
                               </object>
                               <packing>
                                 <property name="left-attach">2</property>
+                                <property name="top-attach">29</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="HAL_SpinButton" id="C_Set_P">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="can-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Proportional gain. Output += error × P. Pushes toward the target in proportion to how far off it is. Too high causes overshoot/oscillation; too low is sluggish.</property>
+                                <property name="halign">end</property>
+                                <property name="valign">center</property>
+                                <property name="margin-left">5</property>
+                                <property name="margin-start">5</property>
+                                <property name="margin-top">2</property>
+                                <property name="margin-bottom">2</property>
+                                <property name="text" translatable="yes">0.0</property>
+                                <property name="overwrite-mode">True</property>
+                                <property name="input-purpose">number</property>
+                                <property name="adjustment">C_Set_P_adj</property>
+                                <property name="climb-rate">0.01</property>
+                                <property name="digits">1</property>
+                                <property name="numeric">True</property>
+                                <signal name="value-changed" handler="C_Set_P" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="left-attach">3</property>
                                 <property name="top-attach">29</property>
                               </packing>
                             </child>
@@ -5129,6 +5543,32 @@ from File</property>
                               </packing>
                             </child>
                             <child>
+                              <object class="HAL_SpinButton" id="A_Set_Backlash">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="can-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Backlash compensation. Distance the mechanism can move, after reversing direction, before mechanical slack (leadscrew/gear play) is taken up and real motion resumes. Set to the measured lost motion for this axis; 0 disables compensation.</property>
+                                <property name="halign">end</property>
+                                <property name="valign">center</property>
+                                <property name="margin-left">5</property>
+                                <property name="margin-start">5</property>
+                                <property name="margin-top">2</property>
+                                <property name="margin-bottom">2</property>
+                                <property name="text" translatable="yes">0.0000</property>
+                                <property name="overwrite-mode">True</property>
+                                <property name="input-purpose">number</property>
+                                <property name="adjustment">A_Set_Backlash_adj</property>
+                                <property name="climb-rate">0.0001</property>
+                                <property name="digits">4</property>
+                                <property name="numeric">True</property>
+                                <signal name="value-changed" handler="A_Set_Backlash" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="left-attach">1</property>
+                                <property name="top-attach">35</property>
+                              </packing>
+                            </child>
+                            <child>
                               <object class="HAL_SpinButton" id="B_Set_Backlash">
                                 <property name="visible">True</property>
                                 <property name="can-focus">True</property>
@@ -5151,6 +5591,32 @@ from File</property>
                               </object>
                               <packing>
                                 <property name="left-attach">2</property>
+                                <property name="top-attach">35</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="HAL_SpinButton" id="C_Set_Backlash">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="can-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Backlash compensation. Distance the mechanism can move, after reversing direction, before mechanical slack (leadscrew/gear play) is taken up and real motion resumes. Set to the measured lost motion for this axis; 0 disables compensation.</property>
+                                <property name="halign">end</property>
+                                <property name="valign">center</property>
+                                <property name="margin-left">5</property>
+                                <property name="margin-start">5</property>
+                                <property name="margin-top">2</property>
+                                <property name="margin-bottom">2</property>
+                                <property name="text" translatable="yes">0.0000</property>
+                                <property name="overwrite-mode">True</property>
+                                <property name="input-purpose">number</property>
+                                <property name="adjustment">C_Set_Backlash_adj</property>
+                                <property name="climb-rate">0.0001</property>
+                                <property name="digits">4</property>
+                                <property name="numeric">True</property>
+                                <signal name="value-changed" handler="C_Set_Backlash" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="left-attach">3</property>
                                 <property name="top-attach">35</property>
                               </packing>
                             </child>

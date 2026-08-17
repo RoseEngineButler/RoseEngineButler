@@ -1186,13 +1186,19 @@ class HandlerClass:
             print("Could not read " + SETTINGS_PATH + ": " + str(e))
             return
 
-        def apply(axis_id, block_tag, hal_component, widget_id_for_param):
+        def apply(axis_id, block_tag, hal_component, widget_id_for_param, push_live=True):
             '''
             widget_id_for_param(param) builds the Settings tab widget id
             for a given P/I/D/FF0/FF1/FF2 param - axes and spindle loops
             put their disambiguating suffix in different places
             (X_Set_P vs Sp0_Set_P_Pos), so the caller supplies this
             rather than apply() assuming one fixed naming shape.
+
+            push_live=False (used for EXTRA_SETTINGS_LETTERS when not
+            currently assigned to a channel - see below) still sets the
+            widget from file but skips the halcmd push, since
+            hal_component names a pid.* instance that doesn't currently
+            exist rather than one that's merely stale.
             '''
             axis_match = re.search(
                 r'<axis\s+id="' + re.escape(axis_id) + r'">(.*?)</axis>',
@@ -1228,6 +1234,9 @@ class HandlerClass:
                 if widget is not None:
                     widget.set_value(float(value))
 
+                if not push_live:
+                    continue
+
                 hal_pin = hal_component + "." + PID_PARAM_PIN[param]
                 try:
                     subprocess.run(
@@ -1252,6 +1261,17 @@ class HandlerClass:
                 apply(spindle_id, block_tag, component,
                       lambda param, spindle_id=spindle_id, suffix=suffix:
                           spindle_id + "_Set_" + param + "_" + suffix)
+
+        # EXTRA_SETTINGS_LETTERS (A/C): letter-keyed, no fixed channel of
+        # their own - the live pid.<letter> component is named after the
+        # letter itself (REB_Generate_Local_Ini.py renames each channel's
+        # pid component to match its current assignment), so it only
+        # exists at all while this letter is currently assigned to a
+        # channel (CURRENT_LETTER_INTERNAL_ID) - see _pid_set_letter.
+        for letter in EXTRA_SETTINGS_LETTERS:
+            apply(letter, "pid", "pid." + letter.lower(),
+                  lambda param, letter=letter: letter + "_Set_" + param,
+                  push_live=letter in CURRENT_LETTER_INTERNAL_ID)
 
     def _load_backlash_settings(self):
         '''
@@ -1308,6 +1328,50 @@ class HandlerClass:
                     text=True
                 )
                 print("Restored " + hal_pin + " = " + str(value))
+            except subprocess.CalledProcessError as e:
+                print("Error restoring " + hal_pin + ": " + e.stderr)
+            except FileNotFoundError:
+                print("halcmd not found - is the LinuxCNC environment sourced?")
+
+        # EXTRA_SETTINGS_LETTERS (A/C): letter-keyed, no fixed joint
+        # number of their own - always load the persisted value into the
+        # spin button, but only push it live if this letter is currently
+        # assigned to a channel this session (CURRENT_LETTER_INTERNAL_ID),
+        # same pattern as _load_scale_settings.
+        for letter in EXTRA_SETTINGS_LETTERS:
+            axis_match = re.search(
+                r'<axis\s+id="' + re.escape(letter) + r'">(.*?)</axis>',
+                xml_text, re.DOTALL
+            )
+            if not axis_match:
+                print("No <axis id=\"" + letter + "\"> entry found in " + SETTINGS_PATH)
+                continue
+
+            match = re.search(r'<backlash>(-?[\d.]+)</backlash>', axis_match.group(1))
+            if not match:
+                print("No stored backlash found for axis " + letter
+                      + " in " + SETTINGS_PATH)
+                continue
+
+            value = float(match.group(1))
+
+            widget = self.builder.get_object(letter + "_Set_Backlash")
+            if widget is not None:
+                widget.set_value(value)
+
+            internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
+            if internal_id is None:
+                continue
+
+            hal_pin = "joint." + str(JOINT_NUMBER[internal_id]) + ".backlash"
+            try:
+                subprocess.run(
+                    ["halcmd", "setp", hal_pin, str(value)],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                print("Restored " + hal_pin + " = " + str(value) + " (" + letter + ")")
             except subprocess.CalledProcessError as e:
                 print("Error restoring " + hal_pin + ": " + e.stderr)
             except FileNotFoundError:
@@ -2063,21 +2127,49 @@ class HandlerClass:
             if not axis_match:
                 if axis_id in EXTRA_SETTINGS_LETTERS:
                     # No block yet for this letter-keyed row (see
-                    # EXTRA_SETTINGS_LETTERS) - create a minimal one so its
-                    # Scale isn't silently dropped from the snapshot,
-                    # mirroring REB_Scale_Persist.py's set_scale_value.
+                    # EXTRA_SETTINGS_LETTERS) - create one with whatever
+                    # Scale/Backlash/PID widgets exist so nothing is
+                    # silently dropped from the snapshot, mirroring
+                    # REB_Scale_Persist.py's set_scale_value.
+                    lines = ['    <axis id="' + axis_id + '">']
                     scale_widget = self.builder.get_object(axis_id + "_Set_Scale")
                     if scale_widget is not None:
-                        block = ('    <axis id="' + axis_id + '">\n        <scale>'
-                                 + str(scale_widget.get_value()) + '</scale>\n    </axis>\n')
-                        xml_text, count = re.subn(r'</settings>', block + '</settings>', xml_text, count=1)
-                        if count:
-                            print("Created <axis id=\"" + axis_id + "\"> in " + SETTINGS_PATH)
+                        lines.append('        <scale>' + str(scale_widget.get_value()) + '</scale>')
+                    backlash_widget = self.builder.get_object(axis_id + "_Set_Backlash")
+                    if backlash_widget is not None:
+                        lines.append('        <backlash>' + str(backlash_widget.get_value()) + '</backlash>')
+                    values = self._read_pid_gains(lambda param, axis_id=axis_id: axis_id + "_Set_" + param)
+                    if values:
+                        lines.append('        <pid>')
+                        for param in PID_PARAMS:
+                            if param in values:
+                                lines.append('            <' + param + '>' + str(values[param]) + '</' + param + '>')
+                        lines.append('        </pid>')
+                    lines.append('    </axis>')
+                    block = "\n".join(lines) + "\n"
+                    xml_text, count = re.subn(r'</settings>', block + '</settings>', xml_text, count=1)
+                    if count:
+                        print("Created <axis id=\"" + axis_id + "\"> in " + SETTINGS_PATH)
                     continue
                 print("No <axis id=\"" + axis_id + "\"> entry found in " + SETTINGS_PATH)
                 continue
 
             axis_block = axis_match.group(0)
+
+            if axis_id in EXTRA_SETTINGS_LETTERS:
+                # An existing <axis id="A"/"C"> block may predate
+                # Backlash/PID support (e.g. created by an earlier
+                # Scale-only save) and be missing these sub-elements -
+                # _patch_pid_block/the <backlash> regex below silently
+                # no-op if their target tag isn't present, so add
+                # skeletons here rather than losing the value.
+                if not re.search(r'<backlash>', axis_block):
+                    axis_block = re.sub(r'</axis>', '        <backlash>0.0</backlash>\n    </axis>', axis_block, count=1)
+                if not re.search(r'<pid>', axis_block):
+                    skeleton = ("        <pid>\n"
+                                + "".join('            <' + p + '>0</' + p + '>\n' for p in PID_PARAMS)
+                                + "        </pid>\n    </axis>")
+                    axis_block = re.sub(r'</axis>', skeleton, axis_block, count=1)
 
             scale_widget = self.builder.get_object(axis_id + "_Set_Scale")
             if scale_widget is not None:
@@ -2095,7 +2187,7 @@ class HandlerClass:
                     axis_block, count=1
                 )
 
-            if axis_id in PID_AXES:
+            if axis_id in PID_AXES or axis_id in EXTRA_SETTINGS_LETTERS:
                 values = self._read_pid_gains(lambda param, axis_id=axis_id: axis_id + "_Set_" + param)
                 axis_block = self._patch_pid_block(axis_block, "pid", values)
             elif axis_id in PID_SPINDLE_LOOPS:
@@ -2370,7 +2462,7 @@ class HandlerClass:
                 ET.SubElement(get_axis_el(axis_id), "backlash").text = str(backlash_spin.get_value())
                 exported.append(axis_id + " Backlash")
 
-            if axis_id in PID_AXES:
+            if axis_id in PID_AXES or axis_id in EXTRA_SETTINGS_LETTERS:
                 self._export_pid_block(get_axis_el(axis_id), axis_id, "pid",
                                         lambda param, axis_id=axis_id: axis_id + "_Set_" + param)
                 exported.append(axis_id + " PID")
@@ -2521,16 +2613,10 @@ class HandlerClass:
             row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
             check = Gtk.CheckButton(label=axis_id)
             check.set_active(True)
-            if axis_id in EXTRA_SETTINGS_LETTERS:
-                # No fixed channel of its own (see EXTRA_SETTINGS_LETTERS) -
-                # only has a Scale to export, unlike the six physical
-                # channels' Scale+Backlash+PID unit below.
-                check.set_tooltip_text("Exports this axis's Scale.")
-            else:
-                check.set_tooltip_text(
-                    "Exports this axis's Scale, Backlash, and Stepper Motor "
-                    "Tuning together."
-                )
+            check.set_tooltip_text(
+                "Exports this axis's Scale, Backlash, and Stepper Motor "
+                "Tuning together."
+            )
             axis_label_group.add_widget(check)
             row.pack_start(check, False, False, 0)
 
@@ -2754,7 +2840,7 @@ class HandlerClass:
                 comment_imported = True
 
             pid_applied = False
-            if axis_id in PID_AXES:
+            if axis_id in PID_AXES or axis_id in EXTRA_SETTINGS_LETTERS:
                 pid_applied = self._import_pid_block(
                     axis_el, "pid", lambda param, axis_id=axis_id: axis_id + "_Set_" + param
                 )
@@ -4812,6 +4898,41 @@ for _axis_id in JOINT_NUMBER:
     setattr(HandlerClass, _axis_id + "_Set_Backlash", _axis_set_backlash(_axis_id))
 del _axis_id
 
+def _axis_set_backlash_letter(letter):
+    '''
+    Value-changed handler for A_Set_Backlash/C_Set_Backlash (see
+    EXTRA_SETTINGS_LETTERS) - mirrors _axis_set_backlash, but letter has
+    no fixed joint number of its own, so the live joint.N.backlash pin is
+    resolved through CURRENT_LETTER_INTERNAL_ID/JOINT_NUMBER at call
+    time, same as _axis_set_scale_letter does for Scale.
+    '''
+    def handler(self, widget):
+        internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
+        if internal_id is None:
+            print(letter + " is not currently assigned to a channel - value kept, no live HAL write")
+            return
+
+        hal_pin = "joint." + str(JOINT_NUMBER[internal_id]) + ".backlash"
+        value = widget.get_value()
+        try:
+            subprocess.run(
+                ["halcmd", "setp", hal_pin, str(value)],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            print("Set " + hal_pin + " = " + str(value) + " (" + letter + ")")
+        except subprocess.CalledProcessError as e:
+            print("Error setting " + hal_pin + ": " + e.stderr)
+        except FileNotFoundError:
+            print("halcmd not found - is the LinuxCNC environment sourced?")
+    handler.__name__ = letter + "_Set_Backlash"
+    return handler
+
+for _letter in EXTRA_SETTINGS_LETTERS:
+    setattr(HandlerClass, _letter + "_Set_Backlash", _axis_set_backlash_letter(_letter))
+del _letter
+
 def _channel_axis_changed(channel_id):
     '''
     Generic "changed" handler for one Axis Selection combo. Records the
@@ -4896,6 +5017,45 @@ for _axis_id, _component in PID_AXES.items():
         _handler.__name__ = _widget_id
         setattr(HandlerClass, _widget_id, _handler)
 del _axis_id, _component, _param, _widget_id, _handler
+
+def _pid_set_letter(letter, param):
+    '''
+    Value-changed handler for A_Set_<param>/C_Set_<param> (see
+    EXTRA_SETTINGS_LETTERS) - unlike _pid_set's fixed-at-load-time pin,
+    the live pid.* component here is named after the LETTER ITSELF
+    (REB_Generate_Local_Ini.py renames each channel's pid component to
+    match its current assignment - see PID_AXES above), so no channel
+    indirection is needed to build the pin name, only a check that some
+    channel is actually using this letter right now
+    (CURRENT_LETTER_INTERNAL_ID), since the component doesn't exist at
+    all otherwise - same gating _axis_set_scale_letter/
+    _axis_set_backlash_letter use.
+    '''
+    hal_pin = "pid." + letter.lower() + "." + PID_PARAM_PIN[param]
+    def handler(self, widget):
+        if letter not in CURRENT_LETTER_INTERNAL_ID:
+            print(letter + " is not currently assigned to a channel - value kept, no live HAL write")
+            return
+        value = widget.get_value()
+        try:
+            subprocess.run(
+                ["halcmd", "setp", hal_pin, str(value)],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            print("Set " + hal_pin + " = " + str(value))
+        except subprocess.CalledProcessError as e:
+            print("Error setting " + hal_pin + ": " + e.stderr)
+        except FileNotFoundError:
+            print("halcmd not found - is the LinuxCNC environment sourced?")
+    handler.__name__ = letter + "_Set_" + param
+    return handler
+
+for _letter in EXTRA_SETTINGS_LETTERS:
+    for _param in PID_PARAMS:
+        setattr(HandlerClass, _letter + "_Set_" + _param, _pid_set_letter(_letter, _param))
+del _letter, _param
 
 for _spindle_id, _loops in PID_SPINDLE_LOOPS.items():
     for _suffix, _component in _loops.items():

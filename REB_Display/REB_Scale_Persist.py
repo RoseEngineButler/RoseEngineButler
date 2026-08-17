@@ -217,7 +217,7 @@ def set_scale_value(xml_text, axis_id, value):
         return xml_text, False
     return new_text, True
 
-def set_single_value(xml_text, axis_id, tag, value):
+def set_single_value(xml_text, axis_id, tag, value, create_if_missing=False):
     '''
     Patches a single flat <tag>value</tag> element (e.g. <backlash>)
     inside a specific axis's <axis id="..."> block, leaving everything
@@ -226,6 +226,11 @@ def set_single_value(xml_text, axis_id, tag, value):
     within it" approach as set_pid_block above (more robust than
     assuming a fixed element order within <axis>, unlike the scale
     patch in main() below). Returns (new_xml_text, ok).
+
+    create_if_missing=True (used for EXTRA_SETTINGS_LETTERS, whose
+    <axis id="A"/"C"> block may predate Backlash support - e.g. one
+    created by an earlier Scale-only save) inserts the tag right before
+    </axis> instead of leaving it unchanged when absent.
     '''
     axis_match = re.search(
         r'<axis\s+id="' + re.escape(axis_id) + r'">.*?</axis>',
@@ -243,19 +248,30 @@ def set_single_value(xml_text, axis_id, tag, value):
         axis_block, count=1
     )
     if count == 0:
-        print("No <" + tag + "> entry found for axis " + axis_id
-              + " in " + SETTINGS_PATH + " - leaving it unchanged")
-        return xml_text, False
+        if create_if_missing:
+            new_axis_block = re.sub(
+                r'</axis>',
+                '        <' + tag + '>' + value + '</' + tag + '>\n    </axis>',
+                axis_block, count=1
+            )
+        else:
+            print("No <" + tag + "> entry found for axis " + axis_id
+                  + " in " + SETTINGS_PATH + " - leaving it unchanged")
+            return xml_text, False
 
     new_xml_text = xml_text[:axis_match.start()] + new_axis_block + xml_text[axis_match.end():]
     return new_xml_text, True
 
-def set_pid_block(xml_text, axis_id, block_tag, values):
+def set_pid_block(xml_text, axis_id, block_tag, values, create_if_missing=False):
     '''
     Patches P/I/D/FF0/FF1/FF2 values into a specific axis's <pid> (or
     <pid_pos>/<pid_vel>) block, leaving everything else in the file -
     including any other block on that same axis - untouched. Returns
     (new_xml_text, ok).
+
+    create_if_missing=True (see set_single_value above) inserts a fresh
+    <block_tag> skeleton right before </axis> instead of leaving it
+    unchanged when absent.
     '''
     axis_match = re.search(
         r'<axis\s+id="' + re.escape(axis_id) + r'">.*?</axis>',
@@ -272,9 +288,16 @@ def set_pid_block(xml_text, axis_id, block_tag, values):
         axis_block, re.DOTALL
     )
     if not block_match:
-        print("No <" + block_tag + "> entry found for axis " + axis_id
-              + " in " + SETTINGS_PATH + " - leaving it unchanged")
-        return xml_text, False
+        if not create_if_missing:
+            print("No <" + block_tag + "> entry found for axis " + axis_id
+                  + " in " + SETTINGS_PATH + " - leaving it unchanged")
+            return xml_text, False
+        skeleton = ("        <" + block_tag + ">\n"
+                    + "".join('            <' + p + '>' + v + '</' + p + '>\n' for p, v in values.items())
+                    + "        </" + block_tag + ">")
+        new_axis_block = re.sub(r'</axis>', skeleton + '\n    </axis>', axis_block, count=1)
+        new_xml_text = xml_text[:axis_match.start()] + new_axis_block + xml_text[axis_match.end():]
+        return new_xml_text, True
 
     pid_block = block_match.group(0)
     for param, value in values.items():
@@ -361,6 +384,26 @@ def main():
         if ok:
             print("Saved " + axis_id + " PID gains = " + str(values))
 
+    for letter in EXTRA_SETTINGS_LETTERS:
+        internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
+        if internal_id is None:
+            continue
+
+        values = {}
+        try:
+            for param in PID_PARAMS:
+                values[param] = get_pid_gain("pid." + letter.lower(), param)
+        except subprocess.CalledProcessError as e:
+            print("Error reading PID gains for axis " + letter + ": " + e.stderr)
+            continue
+        except FileNotFoundError:
+            print("halcmd not found - is the LinuxCNC environment sourced?")
+            sys.exit(1)
+
+        xml_text, ok = set_pid_block(xml_text, letter, "pid", values, create_if_missing=True)
+        if ok:
+            print("Saved " + letter + " PID gains = " + str(values))
+
     for spindle_id, loops in PID_SPINDLE_LOOPS.items():
         for suffix, hal_component in loops.items():
             block_tag = "pid_pos" if suffix == "Pos" else "pid_vel"
@@ -393,6 +436,24 @@ def main():
         xml_text, ok = set_single_value(xml_text, axis_id, "backlash", value)
         if ok:
             print("Saved " + axis_id + " backlash = " + value)
+
+    for letter in EXTRA_SETTINGS_LETTERS:
+        internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
+        if internal_id is None:
+            continue
+
+        try:
+            value = get_backlash(JOINT_NUMBER[internal_id])
+        except subprocess.CalledProcessError as e:
+            print("Error reading backlash for axis " + letter + ": " + e.stderr)
+            continue
+        except FileNotFoundError:
+            print("halcmd not found - is the LinuxCNC environment sourced?")
+            sys.exit(1)
+
+        xml_text, ok = set_single_value(xml_text, letter, "backlash", value, create_if_missing=True)
+        if ok:
+            print("Saved " + letter + " backlash = " + value)
 
     try:
         with open(SETTINGS_PATH, "w") as f:
