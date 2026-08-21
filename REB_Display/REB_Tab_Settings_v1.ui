@@ -6574,7 +6574,7 @@ System</property>
                               <object class="GtkComboBoxText" id="Measurement_System">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
-                                <property name="tooltip-text" translatable="yes">Metric or Imperial units for the linear axes (X, Z, U, V, W). Changing this requires exiting and restarting LinuxCNC to take effect.</property>
+                                <property name="tooltip-text" translatable="yes">Metric or Imperial units for the linear axes (X, Z, U, V, W). Angular axes (A, B, C) are always in degrees and are unaffected. Changing this requires exiting and restarting LinuxCNC to take effect.</property>
                                 <property name="halign">start</property>
                                 <property name="valign">center</property>
                                 <property name="margin-left">5</property>
