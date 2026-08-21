@@ -1952,7 +1952,7 @@ class HandlerClass:
 #                           REBset_v1.ini, and warns that a restart
 #                           is needed for the new units to actually take
 #                           effect. REB.ini itself is never patched here
-#                           any more - REB_Setup/REB_Launch.sh overlays
+#                           any more - REB_Launch.sh overlays
 #                           this persisted choice onto a fresh copy of
 #                           REB.ini (REB.local.ini, written next to
 #                           REB.ini in this repo's own directory - see
@@ -1997,7 +1997,7 @@ class HandlerClass:
 #                           tab's "General" section. Persists the value
 #                           to REBset_v1.ini and warns that a
 #                           restart is needed. REB.ini itself is never
-#                           patched here any more - REB_Setup/REB_Launch.sh
+#                           patched here any more - REB_Launch.sh
 #                           overlays this persisted value onto a fresh
 #                           copy of REB.ini (REB.local.ini, written next
 #                           to REB.ini in this repo's own directory - see
