@@ -32,6 +32,8 @@
 #         "update".
 #   1.2 - 22 Jan 2026, R. Colvin - Updated for the Trixie install.
 #   1.3 - 12 Aug 2026, R. Colvin - Added creation of gcode folder.
+#   1.4 - 22 Aug 2026, R. Colvin - Moved more install steps to use
+#         this program.
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #
@@ -87,113 +89,53 @@ echo -e "${TITLE}as it applies to the Rose Engine Butler system.                
 echo -e "${TITLE}                                                                       ${NOCOLOR}"
 echo -e "${TITLE}Installation program                                                   ${NOCOLOR}"
 echo -e "${TITLE}                                                                       ${NOCOLOR}"
-# ********************************************************************
-# Step 1 - Setup the wired Ethernet connection.
-# 
+
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
-echo -e "${TITLE}Step 1 - Setup the wired Ethernet connection                           ${NOCOLOR}"
-#
-#
+echo -e "${TITLE}Step 1 - Setup the wired Ethernet connection (to connect to the Mesa   ${NOCOLOR}"
+echo -e "${TITLE}card)                                                                  ${NOCOLOR}"
+
 # Add the wired Ethernet network connectin
 echo -e "${CMNTTEXT}Add the wired Ethernet network connectin${NOCOLOR}"
-# 
+
 nmcli con add type ethernet con-name "Wired Ethernet" ipv4.address 192.168.1.120/24 ipv4.method manual ipv4.gateway 192.168.1.1 ipv4.dns 192.168.1.1
 if [ $? != 0 ]; then
     echo -e "${KEYNOTE}ERROR: nmcli failed.                                             ${NOCOLOR}"
     echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                   ${NOCOLOR}"
     exit $?
 fi
-# ********************************************************************
-# Step 2 - Setup the Mesa card.
-# 
+
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
-echo -e "${TITLE}Step 2 - Update the Mesa card                                          ${NOCOLOR}"
-#
+echo -e "${TITLE}Step 2 - Update the Mesa card configuration                            ${NOCOLOR}"
+
 # Create the location where they are to be
 echo -e "${CMNTTEXT}Create the directory${NOCOLOR} /usr/lib/firmware/hm2/hostmot2"
 cd /usr/lib/firmware
 sudo mkdir hm2
 cd hm2
-if [ $? != 0 ]; then
-    echo -e "${KEYNOTE}ERROR: /usr/lib/firmware/hm2 does not exist.                         ${NOCOLOR}"
-    echo -e "${KEYNOTE}Ensure you have unzipped the REB system file                         ${NOCOLOR}"
-    echo -e "${KEYNOTE}successfully.                                                        ${NOCOLOR}"
-    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-    exit $?
-fi
 sudo mkdir hostmot2
-# if [ $? != 0 ]; then
-#    echo -e "${KEYNOTE}ERROR: mkdir /usr/lib/firmware/hm2/hostmot2 failed.                  ${NOCOLOR}"
-#    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-#    exit $?
-# fi
-#
+
 # Copy the files
 echo -e "${CMNTTEXT}Copy the files to /usr/lib/firmware/hm2/hostmot2                    ${NOCOLOR}"
-#
 cd /usr/lib/firmware/hm2/hostmot2
-#
 sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/MesaCard/7i92t_REB.bin .
-if [ $? != 0 ]; then
-    echo -e "${KEYNOTE}ERROR: copy of                                                       ${NOCOLOR}"
-    echo -e "${KEYNOTE}   7i92t_REB.bin to /usr/lib/firmware/hm2/hostmot2                   ${NOCOLOR}"
-    echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
-    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-    exit $?
-fi
-#
 sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/MesaCard/7i92t_REB.pin .
-if [ $? != 0 ]; then
-    echo -e "${KEYNOTE}ERROR: copy of                                                       ${NOCOLOR}"
-    echo -e "${KEYNOTE}   7i92t_REB.pin to /usr/lib/firmware/hm2/hostmot2                   ${NOCOLOR}"
-    echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
-    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-    exit $?
-fi
-#
 sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/MesaCard/PIN_REB_34.vhd .
-if [ $? != 0 ]; then
-    echo -e "${KEYNOTE}ERROR: copy of                                                       ${NOCOLOR}"
-    echo -e "${KEYNOTE}   PIN_REB_34.vhd to /usr/lib/firmware/hm2/hostmot2                  ${NOCOLOR}"
-    echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
-    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-    exit $?
-fi
-#
+
 # Flash the Mesa card
 echo -e "${CMNTTEXT}Flash the Mesa Card Configuration${NOCOLOR}"
-# 
 mesaflash --device 7i92t --addr 192.168.1.121 --write 7i92t_REB.bin --reload
 if [ $? != 0 ]; then
     echo -e "${KEYNOTE}ERROR: mesaflash failed.                                             ${NOCOLOR}"
     echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
     exit $?
 fi
-#
-# ********************************************************************
-# Step 3 - Setup Rose Engine Butler file directories for LinuxCNC
+
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
-echo -e "${TITLE}Step 3 - Setup Rose Engine Butler file directories for LinuxCNC        ${NOCOLOR}"
-#
-# Set the security for the main directory
-sudo chmod 777 -R /home/reuben/linuxcnc/configs/RoseEngineButler
-if [ $? != 0 ]; then
-    echo -e "${KEYNOTE}ERROR: chmod for /home/reuben/linuxcnc/configs/RoseEngineButler      ${NOCOLOR}"
-    echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
-    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-    exit $?
-fi
-echo -e "${CMNTTEXT}Security set on /home/reuben/linuxcnc/configs/RoseEngineButler         ${NOCOLOR}"
-echo -e "${CMNTTEXT}--------------------------------------------------------------------${NOCOLOR}"
-#
-# ********************************************************************
-# Step 4 - Put key files in place
-echo -e "${TITLE}#######################################################################${NOCOLOR}"
-echo -e "${TITLE}Step 4 - Put key files in place                                        ${NOCOLOR}"
+echo -e "${TITLE}Step 3 - Put key files in place                                        ${NOCOLOR}"
 echo -e "${TITLE}                                                                       ${NOCOLOR}"
-cd /home/reuben
 echo -e "${CMNTTEXT}    .axisrc                                                         ${NOCOLOR}"
-sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/axisrc .
+cd /home/reuben
+sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/.axisrc .
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: copy of axisrc                                                ${NOCOLOR}"
    echo -e "${KEYNOTE}    from /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup    ${NOCOLOR}"
@@ -202,12 +144,7 @@ if [ $? != 0 ]; then
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
    exit $?
 fi
-sudo mv axisrc .axisrc
-if [ $? != 0 ]; then
-   echo -e "${KEYNOTE}ERROR: rename of axisrc to .axisrc failed.                           ${NOCOLOR}"
-   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-   exit $?
-fi
+
 echo -e "${CMNTTEXT}    REB_Update.sh                                                  ${NOCOLOR}"
 sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/REB_Update.sh .
 if [ $? != 0 ]; then
@@ -218,42 +155,121 @@ if [ $? != 0 ]; then
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
    exit $?
 fi
-echo -e "${CMNTTEXT}    gcode library                                                  ${NOCOLOR}"
+
+echo -e "${CMNTTEXT}    Create the gcode library                                       ${NOCOLOR}"
 cd /home/reuben/linuxcnc/configs/RoseEngineButler
 mkdir gcode
-if [ $? != 0 ]; then
-   echo -e "${KEYNOTE}ERROR: creation of gcode library failed.                             ${NOCOLOR}"
-   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-   exit $?
-fi
-#
-# ********************************************************************
-# Step 5 - Install ClamAV
+
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
-echo -e "${TITLE}Step 5 - Install ClamAV                                                ${NOCOLOR}"
+echo -e "${TITLE}Step 4 - Install ClamAV                                                ${NOCOLOR}"
 echo -e "${TITLE}                                                                       ${NOCOLOR}"
 cd /home/reuben
 mkdir ClamAv
-if [ $? != 0 ]; then
-   echo -e "${KEYNOTE}ERROR: Could not create /home/reuben/ClamAV                          ${NOCOLOR}"
-   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-   exit $?
-fi
 cd ClamAv
 mkdir SuspiciousFiles
-if [ $? != 0 ]; then
-   echo -e "${KEYNOTE}ERROR: Could not create /home/reuben/ClamAV/SuspiciousFiles          ${NOCOLOR}"
-   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-   exit $?
-fi
 sudo apt install clamav
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: Could not install ClamAV                                      ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
    exit $?
 fi
-#
-## ********************************************************************
+
+echo -e "${TITLE}#######################################################################${NOCOLOR}"
+echo -e "${TITLE}Step 5 - Install MenuLibre                                             ${NOCOLOR}"
+echo -e "${TITLE}                                                                       ${NOCOLOR}"
+sudo apt install menulibre
+if [ $? != 0 ]; then
+   echo -e "${KEYNOTE}ERROR: Could not install MenuLibre                                   ${NOCOLOR}"
+   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+   exit $?
+fi
+
+echo -e "${TITLE}#######################################################################${NOCOLOR}"
+echo -e "${TITLE}Step 6 - Install galculator                                            ${NOCOLOR}"
+echo -e "${TITLE}                                                                       ${NOCOLOR}"
+sudo apt install galculator
+if [ $? != 0 ]; then
+   echo -e "${KEYNOTE}ERROR: Could not install galculator                                  ${NOCOLOR}"
+   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+   exit $?
+fi
+
+echo -e "${TITLE}#######################################################################${NOCOLOR}"
+echo -e "${TITLE}Step 7 - Install xfce4-screenschooter                                  ${NOCOLOR}"
+echo -e "${TITLE}                                                                       ${NOCOLOR}"
+sudo apt install xfce4-screenshooter
+if [ $? != 0 ]; then
+   echo -e "${KEYNOTE}ERROR: Could not install xfce4-screenschooter                        ${NOCOLOR}"
+   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+   exit $?
+fi
+
+echo -e "${TITLE}#######################################################################${NOCOLOR}"
+echo -e "${TITLE}Step 8 - Install Claude Code                                           ${NOCOLOR}"
+echo -e "${TITLE}                                                                       ${NOCOLOR}"
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+if [ $? != 0 ]; then
+   echo -e "${KEYNOTE}ERROR: Could not install Claude Code                                 ${NOCOLOR}"
+   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+   exit $?
+fi
+
+sudo apt install -y nodejs
+if [ $? != 0 ]; then
+   echo -e "${KEYNOTE}ERROR: Could not install Claude Code                                 ${NOCOLOR}"
+   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+   exit $?
+fi
+
+echo Set up a user-level npm prefix (avoids sudo/permission mess)
+if [ $? != 0 ]; then
+   echo -e "${KEYNOTE}ERROR: Could not install Claude Code                                 ${NOCOLOR}"
+   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+   exit $?
+fi
+
+mkdir -p ~/.npm-global [[<<]]
+npm config set prefix '~/.npm-global'
+if [ $? != 0 ]; then
+   echo -e "${KEYNOTE}ERROR: Could not install Claude Code                                 ${NOCOLOR}"
+   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+   exit $?
+fi
+
+echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
+source ~/.bashrc
+if [ $? != 0 ]; then
+   echo -e "${KEYNOTE}ERROR: Could not install Claude Code                                 ${NOCOLOR}"
+   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+   exit $?
+fi
+
+echo Install Claude Code
+npm install -g @anthropic-ai/claude-code
+if [ $? != 0 ]; then
+   echo -e "${KEYNOTE}ERROR: Could not install Claude Code                                 ${NOCOLOR}"
+   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+   exit $?
+fi
+
+claude --version
+(:tableend:)
+
+echo -e "${TITLE}#######################################################################${NOCOLOR}"
+echo -e "${TITLE}Step 9 - Install Chromium                                              ${NOCOLOR}"
+echo -e "${TITLE}                                                                       ${NOCOLOR}"
+echo "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" | sudo tee /etc/apt/sources.list.d/debian.list
+sudo apt update
+
+sudo apt install chromium -y
+if [ $? != 0 ]; then
+   echo -e "${KEYNOTE}ERROR: Could not install Chromium                                    ${NOCOLOR}"
+   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+   exit $?
+fi
+(:tableend:)
+
+# ********************************************************************
 # Success
 echo -e "${TITLE}System successfully installed.                                         ${NOCOLOR}"
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
