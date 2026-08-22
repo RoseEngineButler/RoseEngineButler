@@ -155,17 +155,22 @@ JOG_POS_WIDGET = {
 # Axis letter -> (column-12/"-" image filename, column-13/"+" image
 # filename), both under REB_Display/Images/. U/V/W intentionally reuse
 # their parallel axis's images (U parallel to X, V parallel to Y, W
-# parallel to Z - see the AXIS CONVENTIONS text on the main panel),
-# including W's already-empirically-verified inversion relative to Z's
-# own mapping (W's "-" button shows Z's "+" image and vice versa - not a
-# typo, confirmed live previously). The three rotary letters (A/B/C) are
-# ALSO inverted relative to their own dedicated images' nominal pos/neg
-# naming (confirmed live) - i.e. the "-" button shows that letter's
-# "pos" image and vice versa, the same class of empirically-verified
-# swap as W's.
+# parallel to Z - see the AXIS CONVENTIONS text on the main panel). The
+# three rotary letters (A/B/C) are inverted relative to their own
+# dedicated images' nominal pos/neg naming (confirmed live) - i.e. the
+# "-" button shows that letter's "pos" image and vice versa.
+#
+# Z fixed 22 August 2026 (Rich, confirmed live): Z's "-"/"+" images were
+# swapped relative to their nominal Axis-Z{neg,pos}.png naming - the
+# opposite of every other linear letter (X/U's "-" shows *neg, "+" shows
+# *pos), which made Z's jog buttons visually point at each other instead
+# of toward the direction each one actually jogs. W's mapping was left
+# untouched (confirmed correct as-is) - it now happens to equal Z's
+# corrected mapping exactly, rather than being Z's inverse as it
+# appeared to be before this fix.
 AXIS_JOG_IMAGE = {
     "X": ("Axis-Xneg.png", "Axis-Xpos.png"),
-    "Z": ("Axis-Zneg.png", "Axis-Zpos.png"),
+    "Z": ("Axis-Zpos.png", "Axis-Zneg.png"),
     "U": ("Axis-Xneg.png", "Axis-Xpos.png"),
     "V": ("Axis-Yneg.png", "Axis-Ypos.png"),
     "W": ("Axis-Zpos.png", "Axis-Zneg.png"),
