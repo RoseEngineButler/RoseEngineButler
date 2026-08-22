@@ -114,7 +114,13 @@ import sys
 REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REB_INI_PATH = os.path.join(REPO_DIR, "REB.ini")
 
-SETTINGS_PATH = "/home/reuben/Documents/REBset_v1.ini"
+# reb_settings_io.py lives in REB_Display/, a sibling directory to this
+# script's own REB_Setup/ - not importable without this, since Python
+# only puts a script's *own* directory on sys.path automatically.
+sys.path.insert(0, os.path.join(REPO_DIR, "REB_Display"))
+import reb_settings_io
+
+SETTINGS_PATH = reb_settings_io.SETTINGS_PATH
 
 # Must sit next to REB.ini (not in RoseEngineButlerLocal) - see the file
 # header above for why: LinuxCNC resolves every relative path in the
@@ -122,17 +128,6 @@ SETTINGS_PATH = "/home/reuben/Documents/REBset_v1.ini"
 # inside the HAL files themselves) against the directory of whichever
 # ini file was actually launched.
 LOCAL_INI_PATH = os.path.join(REPO_DIR, "REB.local.ini")
-
-
-def _read_settings_xml():
-    try:
-        with open(SETTINGS_PATH, "r") as f:
-            return f.read()
-    except OSError:
-        # No persisted settings yet on this machine - fall through with
-        # every overlay below finding nothing to match, so REB.ini's own
-        # shipped values pass through unchanged.
-        return ""
 
 
 # Channel id ("00".."05", the hm2_7i92.0.stepgen.NN suffix) -> the axis
@@ -175,22 +170,18 @@ def _axis_type_for_letter(letter):
     return "ANGULAR" if letter in ("A", "B", "C") else "LINEAR"
 
 
-def _read_channel_assignments(xml_text):
+def _read_channel_assignments(settings):
     '''
-    Parses REBset_v1.ini's <channel_assignments> block (written by the
-    Axis Selection tab - REB_Display/REB_main.py's
-    _save_channel_assignments), falling back to CHANNEL_DEFAULT_LETTER
-    for any channel that's missing, unrecognized, or - defensively,
-    since REBset_v1.ini's own header says it should not be hand-edited -
-    duplicated onto more than one channel.
+    Reads REBset_v1.ini's channel_assignments dict (written by the Axis
+    Selection tab - REB_Display/REB_main.py's _save_channel_assignments),
+    falling back to CHANNEL_DEFAULT_LETTER for any channel that's
+    missing, unrecognized, or - defensively, since REBset_v1.ini's own
+    header says it should not be hand-edited - duplicated onto more than
+    one channel.
     '''
     assignments = dict(CHANNEL_DEFAULT_LETTER)
 
-    match = re.search(r'<channel_assignments>(.*?)</channel_assignments>', xml_text, re.DOTALL)
-    if not match:
-        return assignments
-
-    for channel_id, letter in re.findall(r'<channel id="(\d\d)">([A-Z])</channel>', match.group(1)):
+    for channel_id, letter in settings.get("channel_assignments", {}).items():
         if channel_id in assignments and letter in AXIS_SELECTION_LETTERS:
             assignments[channel_id] = letter
 
@@ -324,12 +315,18 @@ def _overlay_axis_assignment(text, assignments):
     return text, (changes, coordinates, n1, n2, n3)
 
 
-def _overlay_max_jog_speed(text, xml_text):
-    match = re.search(r'<max_jog_speed>([0-9.eE+-]+)</max_jog_speed>', xml_text)
-    if not match:
-        return text, None
-
-    value_text = "%.4f" % float(match.group(1))
+def _overlay_max_jog_speed(text, settings):
+    # settings is always fully populated (reb_settings_io.load_settings()
+    # fills in any absent key from default_settings(), which mirrors
+    # REB.ini's own shipped starting value here) - so this always
+    # overlays, unlike the old per-tag XML presence check. A machine
+    # that has never saved any REBset_v1.ini setting at all still gets
+    # REB.ini's own value here (defaults match); one that has saved
+    # anything gets whatever's actually persisted, customized or not -
+    # see reb_settings_io.py's module docstring for why REBset_v1.ini
+    # is a full snapshot rather than a set of independently-optional
+    # keys once anything has ever been saved to it.
+    value_text = "%.4f" % float(settings["max_jog_speed"])
     text, n = re.subn(
         r'(?m)^(MAX_LINEAR_VELOCITY\s*= )\S+',
         lambda m: m.group(1) + value_text,
@@ -357,12 +354,8 @@ VELOCITY_SETTINGS = {
 }
 
 
-def _overlay_velocity_setting(text, xml_text, xml_tag, ini_key):
-    match = re.search(r'<' + xml_tag + r'>([0-9.eE+-]+)</' + xml_tag + r'>', xml_text)
-    if not match:
-        return text, None
-
-    value_text = "%.6f" % float(match.group(1))
+def _overlay_velocity_setting(text, settings, settings_key, ini_key):
+    value_text = "%.6f" % float(settings[settings_key])
     text, n = re.subn(
         r'(?m)^(' + ini_key + r'\s*= )\S+',
         lambda m: m.group(1) + value_text,
@@ -371,12 +364,12 @@ def _overlay_velocity_setting(text, xml_text, xml_tag, ini_key):
     return text, (value_text, n)
 
 
-def _overlay_measurement_system(text, xml_text):
-    match = re.search(r'<measurement_system>(Metric|Imperial)</measurement_system>', xml_text)
-    if not match:
-        return text, None
+def _overlay_measurement_system(text, settings):
+    system = settings.get("measurement_system", "Imperial")
+    if system not in ("Metric", "Imperial"):
+        system = "Imperial"
 
-    if match.group(1) == "Metric":
+    if system == "Metric":
         linear_units, joint_units = "mm", "MM"
     else:
         linear_units, joint_units = "inch", "INCH"
@@ -397,7 +390,7 @@ def _overlay_measurement_system(text, xml_text):
         lambda m: m.group(1) + joint_units,
         text,
     )
-    return text, (match.group(1), n1, n2)
+    return text, (system, n1, n2)
 
 
 # ----------------------------------------------------------------------
@@ -709,8 +702,8 @@ def main():
         print("Could not read " + REB_INI_PATH + ": " + str(e))
         sys.exit(1)
 
-    xml_text = _read_settings_xml()
-    assignments = _read_channel_assignments(xml_text)
+    settings = reb_settings_io.load_settings()
+    assignments = _read_channel_assignments(settings)
 
     # Regenerate REB.local.hal/REB_PostGUI_v1.local.hal FIRST and abort
     # immediately if it fails (see generate_local_hal_files) - if the
@@ -734,18 +727,18 @@ def main():
         print("Overlaid coordinates = " + coordinates + " (" + str(n1) + " KINEMATICS, "
               + str(n2) + " COORDINATES, " + str(n3) + " GEOMETRY line(s))")
 
-    text, jog_result = _overlay_max_jog_speed(text, xml_text)
+    text, jog_result = _overlay_max_jog_speed(text, settings)
     if jog_result:
         value_text, n = jog_result
         print("Overlaid MAX_LINEAR_VELOCITY = " + value_text + " (" + str(n) + " line(s))")
 
-    for xml_tag, ini_key in VELOCITY_SETTINGS.items():
-        text, result = _overlay_velocity_setting(text, xml_text, xml_tag, ini_key)
+    for settings_key, ini_key in VELOCITY_SETTINGS.items():
+        text, result = _overlay_velocity_setting(text, settings, settings_key, ini_key)
         if result:
             value_text, n = result
             print("Overlaid " + ini_key + " = " + value_text + " (" + str(n) + " line(s))")
 
-    text, units_result = _overlay_measurement_system(text, xml_text)
+    text, units_result = _overlay_measurement_system(text, settings)
     if units_result:
         system, n1, n2 = units_result
         print("Overlaid " + system + " units (" + str(n1) + " LINEAR_UNITS, "

@@ -1,5 +1,28 @@
 # Named Settings Files (.settings.ini) — Design Plan
 
+> **REBset_v1.ini and .REBset_v1.ini exports moved from XML to JSON (22
+> August 2026):** `REBset_v1.ini` was XML manipulated entirely by
+> hand-rolled regex substitution (no real parser anywhere in the read/
+> write path except Export/Import, which already used `ElementTree`).
+> That fragility caused two real bugs on a live machine: cosmetic
+> indentation/duplicate-tag drift from inconsistent "insert a skeleton
+> block" code paths, and a genuine data-loss bug where one axis's live
+> HAL state got captured into a different axis's persisted block. Both
+> `REBset_v1.ini` itself and `Export_Settings`/`Import_Settings`'s
+> `.REBset_v1.ini`-suffixed export files are now plain JSON, read/written
+> via `json.load`/`json.dump` through a new shared module,
+> `REB_Display/reb_settings_io.py` - the same JSON-not-XML fix
+> `.settings.ini` (this document's own format, below) already had from
+> the start. Filenames/extensions are unchanged; only the content
+> format changed. A machine still running the old XML format converts
+> automatically and silently the first time `reb_settings_io.load_settings()`
+> reads it (see that module's docstring), backing up the untouched
+> original to `REBset_v1.ini.xml-backup` first. Every mention of
+> `<scale>`/`<axis id="...">`/etc. below, and the "How settings are
+> persisted today"/"Export/Import" sections' XML descriptions, describe
+> the pre-migration format only - kept as historical record, not current
+> behavior.
+>
 > **RETIRED (2 August 2026):** The named `.settings.ini` Save As/Load
 > mechanism this document designs - `Settings_Save_As`, `Settings_Load`,
 > the dirty-tracking/exit-time save prompt, the startup auto-reload of
@@ -695,11 +718,13 @@ me hand someone just my B-axis calibration, or grab just their spindle
 scale without touching anything else of mine") rather than "save/reload
 a full named setup." Differences from `.settings.ini`, by design:
 
-- **Extension `.export.ini`, plain XML** (matching `REB_Settings_v1.ini`'s
-  own shape - `<settings><axis id="..."><scale>...</scale></axis>...
-  <measurement_system>...</measurement_system></settings>`), not JSON.
-  No `format_version` - this isn't a versioned profile format, just a
-  point-in-time subset dump.
+- **Extension is actually `.REBset_v1.ini` in code** (`EXPORT_EXTENSION`
+  in `REB_main.py`) - this doc's original `.export.ini` was never
+  updated after the constant changed. Matches `REB_Settings_v1.ini`'s
+  own shape (an `"axes": {"<id>": {"scale": ..., ...}}` dict, plus a
+  top-level `measurement_system` key when selected) - now JSON on both
+  sides (see the top-of-file note), not XML. No `format_version` - this
+  isn't a versioned profile format, just a point-in-time subset dump.
 - **Selectable scope is deliberately narrow: only what's literally on the
   Settings tab itself** - each axis's Scale (`X, Z, B, U, V, W, Sp0,
   Sp1`), each axis's/spindle loop's PID gains (added when Rich's PID
@@ -720,11 +745,12 @@ a full named setup." Differences from `.settings.ini`, by design:
   together; Sp0/Sp1 each cover both their position *and* velocity loop
   together) - matching Scale's existing coarse, per-axis granularity
   rather than exposing 6-12 individual gain checkboxes per axis.
-- **Import** (`Import_Settings`): an Open file chooser, then
-  `xml.etree.ElementTree`-parses the file (a real parser is fine here,
-  unlike `REB_Settings_v1.ini`'s hand-maintained-comments regex-patching
-  - this format has no comments to preserve and is fully owned by this
-  code on both ends of the round trip). For each `<axis>` present, applies
+- **Import** (`Import_Settings`): an Open file chooser, then `json.load`s
+  the file (previously `xml.etree.ElementTree` - see the top-of-file
+  note; a real parser was always fine here either way, unlike
+  `REB_Settings_v1.ini`'s old hand-maintained-comments regex-patching -
+  this format has no comments to preserve and is fully owned by this
+  code on both ends of the round trip). For each axis entry present, applies
   whichever of `<scale>` and `<pid>`/`<pid_pos>`/`<pid_vel>` it actually
   contains (independently - an export may carry either, both, or neither
   for a given axis); if `<measurement_system>` is present, calls

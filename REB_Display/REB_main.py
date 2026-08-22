@@ -71,11 +71,11 @@ import webbrowser
 import subprocess
 import shutil
 import re
-import xml.etree.ElementTree as ET
+import json
 from gi.repository import Gdk
-from xml.sax.saxutils import escape, unescape
 from gi.repository import Gtk
 from gi.repository import GLib
+import reb_settings_io
 
 SETTINGS_PATH = "/home/reuben/Documents/REBset_v1.ini"
 
@@ -189,75 +189,32 @@ TYPE_ADJUSTMENT_PROFILE = {
 def _save_channel_assignments(assignments):
     '''
     Persists the Axis Selection tab's channel -> axis letter choices into
-    REBset_v1.ini as a <channel_assignments><channel id="00">W</channel>...
-    block, replacing the whole block each time - same reasoning as
-    _save_device_names (simpler than patching individual <channel> entries,
-    and the block is small enough a full rewrite costs nothing). assignments
-    is a dict of channel id ("00".."05") -> letter; any channel missing from
-    it falls back to CHANNEL_DEFAULT_LETTER.
+    REBset_v1.ini's "channel_assignments" dict. assignments is a dict of
+    channel id ("00".."05") -> letter; any channel missing from it falls
+    back to CHANNEL_DEFAULT_LETTER.
     '''
-    try:
-        with open(SETTINGS_PATH, "r") as f:
-            xml_text = f.read()
-    except OSError as e:
-        print("Could not read " + SETTINGS_PATH + ": " + str(e))
-        return
-
-    lines = ["    <channel_assignments>"]
-    for channel_id in sorted(CHANNEL_DEFAULT_LETTER):
-        letter = assignments.get(channel_id, CHANNEL_DEFAULT_LETTER[channel_id])
-        lines.append('        <channel id="' + channel_id + '">' + letter + '</channel>')
-    lines.append("    </channel_assignments>")
-    block = "\n".join(lines)
-
-    # [ \t]* eats any pre-existing indentation on the <channel_assignments>
-    # line itself - see _save_device_names for why.
-    pattern = re.compile(r'[ \t]*<channel_assignments>.*?</channel_assignments>', re.DOTALL)
-    if pattern.search(xml_text):
-        new_text, count = pattern.subn(lambda m: block, xml_text, count=1)
-    else:
-        new_text, count = re.subn(
-            r'(<settings>)',
-            lambda m: m.group(1) + "\n" + block,
-            xml_text,
-            count=1
-        )
-
-    if count == 0:
-        print("Could not find a place to store <channel_assignments> in " + SETTINGS_PATH)
-        return
-
-    try:
-        with open(SETTINGS_PATH, "w") as f:
-            f.write(new_text)
-        print("Saved channel assignments: " + str(assignments))
-    except OSError as e:
-        print("Could not write " + SETTINGS_PATH + ": " + str(e))
+    settings = reb_settings_io.load_settings()
+    settings["channel_assignments"] = {
+        channel_id: assignments.get(channel_id, CHANNEL_DEFAULT_LETTER[channel_id])
+        for channel_id in sorted(CHANNEL_DEFAULT_LETTER)
+    }
+    reb_settings_io.save_settings(settings)
+    print("Saved channel assignments: " + str(settings["channel_assignments"]))
 
 def _read_persisted_channel_assignments():
     '''
-    Reads the persisted channel -> axis letter map straight from
-    SETTINGS_PATH, falling back to CHANNEL_DEFAULT_LETTER for any channel
-    whose <channel> entry is missing or unrecognized - same "absent ->
-    shipped default" convention as _load_measurement_system. Used by the
-    Settings tab to populate the 6 Axis Selection combos at startup, by
-    _compute_pid_axes below (module load time), and duplicated (rather
-    than imported - see AXIS_STEPGEN below for why) in
-    REB_Scale_Persist.py and REB_Setup/REB_Generate_Local_Ini.py.
+    Reads the persisted channel -> axis letter map, falling back to
+    CHANNEL_DEFAULT_LETTER for any channel whose entry is missing or
+    unrecognized - same "absent -> shipped default" convention as
+    _load_measurement_system. Used by the Settings tab to populate the 6
+    Axis Selection combos at startup, by CURRENT_LETTER below (module
+    load time), and duplicated (rather than imported - see AXIS_STEPGEN
+    below for why) in REB_Scale_Persist.py and REB_Setup/
+    REB_Generate_Local_Ini.py.
     '''
     assignments = dict(CHANNEL_DEFAULT_LETTER)
-    try:
-        with open(SETTINGS_PATH, "r") as f:
-            xml_text = f.read()
-    except OSError as e:
-        print("Could not read " + SETTINGS_PATH + ": " + str(e))
-        return assignments
-
-    match = re.search(r'<channel_assignments>(.*?)</channel_assignments>', xml_text, re.DOTALL)
-    if not match:
-        return assignments
-
-    for channel_id, letter in re.findall(r'<channel id="(\d\d)">([A-Z])</channel>', match.group(1)):
+    stored = reb_settings_io.load_settings().get("channel_assignments", {})
+    for channel_id, letter in stored.items():
         if channel_id in assignments and letter in AXIS_SELECTION_LETTERS:
             assignments[channel_id] = letter
 
@@ -554,133 +511,50 @@ def _save_measurement_system(system):
     docs/settings_file.md for why this file (rather than a .settings.ini) is
     the right home for machine-level state like this.
     '''
-    try:
-        with open(SETTINGS_PATH, "r") as f:
-            xml_text = f.read()
-    except OSError as e:
-        print("Could not read " + SETTINGS_PATH + ": " + str(e))
-        return
-
-    if re.search(r'<measurement_system>(Metric|Imperial)</measurement_system>', xml_text):
-        new_text, count = re.subn(
-            r'<measurement_system>(Metric|Imperial)</measurement_system>',
-            "<measurement_system>" + system + "</measurement_system>",
-            xml_text,
-            count=1
-        )
-    else:
-        new_text, count = re.subn(
-            r'(<settings>)',
-            r'\1\n    <measurement_system>' + system + '</measurement_system>',
-            xml_text,
-            count=1
-        )
-
-    if count == 0:
-        print("Could not find a place to store <measurement_system> in " + SETTINGS_PATH)
-        return
-
-    try:
-        with open(SETTINGS_PATH, "w") as f:
-            f.write(new_text)
-        print("Saved measurement_system = " + system)
-    except OSError as e:
-        print("Could not write " + SETTINGS_PATH + ": " + str(e))
+    settings = reb_settings_io.load_settings()
+    settings["measurement_system"] = system
+    reb_settings_io.save_settings(settings)
+    print("Saved measurement_system = " + system)
 
 def _save_device_names(names):
     '''
     Persists the maintained device-name list (General tab's Device
     Names box - one name per line, e.g. "Spindle (Sp0)", "Rosette
-    Phaser/Multiplier (Sp1)", "Retractor") into REBset_v1.ini as a
-    <device_names><name>...</name>...</device_names> block, replacing
-    the whole block each time rather than patching individual <name>
-    entries - simpler than tracking adds/removes/reorders across saves,
-    and the block is small enough that a full rewrite costs nothing.
-    escape()/unescape() (already imported for axis comments) keep any
-    stray XML-special characters in a name (&, <, >) from corrupting
-    the file.
+    Phaser/Multiplier (Sp1)", "Retractor") into REBset_v1.ini's
+    "device_names" list, replacing it wholesale each time rather than
+    tracking adds/removes/reorders across saves.
     '''
-    try:
-        with open(SETTINGS_PATH, "r") as f:
-            xml_text = f.read()
-    except OSError as e:
-        print("Could not read " + SETTINGS_PATH + ": " + str(e))
-        return
-
-    lines = ["    <device_names>"]
-    for name in names:
-        lines.append("        <name>" + escape(name) + "</name>")
-    lines.append("    </device_names>")
-    block = "\n".join(lines)
-
-    # [ \t]* eats any pre-existing indentation on the <device_names> line
-    # itself - otherwise each rewrite stacks the block's own 4-space
-    # indent onto whatever whitespace was already sitting there,
-    # growing a little further out every time this runs.
-    pattern = re.compile(r'[ \t]*<device_names>.*?</device_names>', re.DOTALL)
-    if pattern.search(xml_text):
-        new_text, count = pattern.subn(lambda m: block, xml_text, count=1)
-    else:
-        new_text, count = re.subn(
-            r'(<settings>)',
-            lambda m: m.group(1) + "\n" + block,
-            xml_text,
-            count=1
-        )
-
-    if count == 0:
-        print("Could not find a place to store <device_names> in " + SETTINGS_PATH)
-        return
-
-    try:
-        with open(SETTINGS_PATH, "w") as f:
-            f.write(new_text)
-        print("Saved " + str(len(names)) + " device name(s)")
-    except OSError as e:
-        print("Could not write " + SETTINGS_PATH + ": " + str(e))
+    settings = reb_settings_io.load_settings()
+    settings["device_names"] = list(names)
+    reb_settings_io.save_settings(settings)
+    print("Saved " + str(len(names)) + " device name(s)")
 
 def _read_persisted_device_names():
     '''
     Reads the persisted device-name list straight from SETTINGS_PATH
-    (REBset_v1.ini's <device_names> block) - the on-disk counterpart to
+    (REBset_v1.ini's "device_names" list) - the on-disk counterpart to
     HandlerClass._read_device_names, which reads the live Settings tab's
     Device_Names GtkTextView instead. Used wherever a component needs
     this list but doesn't own that widget - e.g. the main panel
     populating each axis's Comment combo box at startup, since the main
     panel and Settings tab are separate gladevcp processes with no live
     IPC between them (see CLAUDE.md). Returns [] if the file can't be
-    read or has no <device_names> block.
+    read or has no device_names list.
     '''
-    try:
-        with open(SETTINGS_PATH, "r") as f:
-            xml_text = f.read()
-    except OSError as e:
-        print("Could not read " + SETTINGS_PATH + ": " + str(e))
-        return []
+    return list(reb_settings_io.load_settings().get("device_names", []))
 
-    match = re.search(r'<device_names>(.*?)</device_names>', xml_text, re.DOTALL)
-    if not match:
-        return []
-    return [unescape(n) for n in re.findall(r'<name>(.*?)</name>', match.group(1), re.DOTALL)]
-
-def _read_persisted_axis_comment(axis_id, xml_text):
+def _read_persisted_axis_comment(axis_id, settings):
     '''
-    Extracts one axis's persisted <usercomment> value out of an
-    already-read SETTINGS_PATH xml_text. Shared by _load_axis_comments
-    (main panel, restoring its own Device combos at startup) and
+    Extracts one axis's persisted usercomment value out of an
+    already-loaded settings dict. Shared by _load_axis_comments (main
+    panel, restoring its own Device combos at startup) and
     _run_export_selection_dialog (Settings tab, defaulting each axis's
     Export dialog Device combo to whatever's currently set on the main
-    panel) - REBset_v1.ini's <usercomment> is the only channel between
+    panel) - REBset_v1.ini's usercomment is the only channel between
     those two separate gladevcp processes (see CLAUDE.md). Returns ""
-    if the axis or its <usercomment> isn't found.
+    if the axis or its usercomment isn't found.
     '''
-    match = re.search(
-        r'<axis\s+id="' + re.escape(axis_id) + r'">\s*<scale>-?[\d.]+</scale>\s*'
-        r'<usercomment>(.*?)</usercomment>',
-        xml_text,
-        re.DOTALL
-    )
-    return unescape(match.group(1)) if match else ""
+    return settings.get("axes", {}).get(axis_id, {}).get("usercomment", "")
 
 def _combo_selected_device(combo):
     '''
@@ -699,42 +573,12 @@ def _save_max_jog_speed(value):
     '''
     Persists the Max Jog Speed choice into REB_Settings_v1.ini, the same
     silent, automatic settings file _save_measurement_system already
-    writes <measurement_system> into.
+    writes measurement_system into.
     '''
-    try:
-        with open(SETTINGS_PATH, "r") as f:
-            xml_text = f.read()
-    except OSError as e:
-        print("Could not read " + SETTINGS_PATH + ": " + str(e))
-        return
-
-    value_text = "%.4f" % value
-
-    if re.search(r'<max_jog_speed>[0-9.eE+-]+</max_jog_speed>', xml_text):
-        new_text, count = re.subn(
-            r'<max_jog_speed>[0-9.eE+-]+</max_jog_speed>',
-            "<max_jog_speed>" + value_text + "</max_jog_speed>",
-            xml_text,
-            count=1
-        )
-    else:
-        new_text, count = re.subn(
-            r'(<settings>)',
-            r'\1\n    <max_jog_speed>' + value_text + '</max_jog_speed>',
-            xml_text,
-            count=1
-        )
-
-    if count == 0:
-        print("Could not find a place to store <max_jog_speed> in " + SETTINGS_PATH)
-        return
-
-    try:
-        with open(SETTINGS_PATH, "w") as f:
-            f.write(new_text)
-        print("Saved max_jog_speed = " + value_text)
-    except OSError as e:
-        print("Could not write " + SETTINGS_PATH + ": " + str(e))
+    settings = reb_settings_io.load_settings()
+    settings["max_jog_speed"] = round(value, 4)
+    reb_settings_io.save_settings(settings)
+    print("Saved max_jog_speed = " + str(settings["max_jog_speed"]))
 
 # Settings tab jog-speed-grid widget id -> (REB_Settings_v1.ini tag,
 # fallback default matching REB.ini's own shipped value). Mirrors
@@ -758,43 +602,13 @@ VELOCITY_SETTINGS = {
 def _save_velocity_setting(tag, value):
     '''
     Persists one of VELOCITY_SETTINGS' values into REB_Settings_v1.ini -
-    generic version of _save_max_jog_speed above, parameterized by tag
+    generic version of _save_max_jog_speed above, parameterized by key
     name since these five all follow the exact same shape.
     '''
-    try:
-        with open(SETTINGS_PATH, "r") as f:
-            xml_text = f.read()
-    except OSError as e:
-        print("Could not read " + SETTINGS_PATH + ": " + str(e))
-        return
-
-    value_text = "%.6f" % value
-
-    if re.search(r'<' + tag + r'>[0-9.eE+-]+</' + tag + r'>', xml_text):
-        new_text, count = re.subn(
-            r'<' + tag + r'>[0-9.eE+-]+</' + tag + r'>',
-            "<" + tag + ">" + value_text + "</" + tag + ">",
-            xml_text,
-            count=1
-        )
-    else:
-        new_text, count = re.subn(
-            r'(<settings>)',
-            r'\1\n    <' + tag + '>' + value_text + '</' + tag + '>',
-            xml_text,
-            count=1
-        )
-
-    if count == 0:
-        print("Could not find a place to store <" + tag + "> in " + SETTINGS_PATH)
-        return
-
-    try:
-        with open(SETTINGS_PATH, "w") as f:
-            f.write(new_text)
-        print("Saved " + tag + " = " + value_text)
-    except OSError as e:
-        print("Could not write " + SETTINGS_PATH + ": " + str(e))
+    settings = reb_settings_io.load_settings()
+    settings[tag] = round(value, 6)
+    reb_settings_io.save_settings(settings)
+    print("Saved " + tag + " = " + str(settings[tag]))
 
 # The indexing Fwd/Rev handlers block on c.wait_complete() for as long as
 # each M19 takes to converge (or time out), which otherwise leaves the UI
@@ -1069,10 +883,9 @@ class HandlerClass:
 
     def _load_scale_settings(self):
         '''
-        Reads persisted axis scale values from REB_Settings_v1.ini
-        (an XML file living alongside this script) and applies them
-        to the Settings tab's spin buttons and the real stepgen
-        position-scale HAL pins.
+        Reads persisted axis scale values from REB_Settings_v1.ini and
+        applies them to the Settings tab's spin buttons and the real
+        stepgen position-scale HAL pins.
 
         Only runs in the component that actually owns the Settings
         tab's spin buttons (X_Set_Scale etc.) - every other tab/panel
@@ -1082,28 +895,37 @@ class HandlerClass:
         if self.builder.get_object("X_Set_Scale") is None:
             return
 
-        try:
-            with open(SETTINGS_PATH, "r") as f:
-                xml_text = f.read()
-        except OSError as e:
-            print("Could not read " + SETTINGS_PATH + ": " + str(e))
-            return
+        settings = reb_settings_io.load_settings()
+        axes = settings.get("axes", {})
 
         for axis_id, stepgen_ch in AXIS_STEPGEN.items():
-            match = re.search(
-                r'<axis\s+id="' + re.escape(axis_id) + r'">\s*<scale>(-?[\d.]+)</scale>',
-                xml_text
-            )
-            if not match:
+            axis_entry = axes.get(axis_id)
+            if axis_entry is None or "scale" not in axis_entry:
                 print("No stored scale found for axis " + axis_id
                       + " in " + SETTINGS_PATH)
                 continue
 
-            value = float(match.group(1))
+            value = float(axis_entry["scale"])
 
             widget = self.builder.get_object(axis_id + "_Set_Scale")
             if widget is not None:
                 widget.set_value(value)
+
+            if axis_id in CURRENT_LETTER and CURRENT_LETTER[axis_id] != axis_id.lower():
+                # This channel is currently wearing a borrowed letter
+                # (EXTRA_SETTINGS_LETTERS below) - that letter's own
+                # block, not this internal id's, owns the live pin right
+                # now. Pushing this value here would just get overwritten
+                # by the EXTRA_SETTINGS_LETTERS pass below anyway, and -
+                # more importantly - leaving the live pin alone means
+                # REB_Scale_Persist.py's shutdown read-back (mirrors this
+                # same check) won't capture the *other* letter's value
+                # and stomp this axis_id's own persisted scale with it.
+                # axis_id not in CURRENT_LETTER means Sp0/Sp1 (never
+                # reassignable - CURRENT_LETTER only covers the six
+                # Axis-Selection-tab channels), which always own their
+                # own live pin unconditionally.
+                continue
 
             hal_pin = "hm2_7i92.0.stepgen." + stepgen_ch + ".position-scale"
             try:
@@ -1124,16 +946,13 @@ class HandlerClass:
         # button, but only push it live if this letter is currently
         # assigned to a channel this session (CURRENT_LETTER_INTERNAL_ID).
         for letter in EXTRA_SETTINGS_LETTERS:
-            match = re.search(
-                r'<axis\s+id="' + re.escape(letter) + r'">\s*<scale>(-?[\d.]+)</scale>',
-                xml_text
-            )
-            if not match:
+            axis_entry = axes.get(letter)
+            if axis_entry is None or "scale" not in axis_entry:
                 print("No stored scale found for axis " + letter
                       + " in " + SETTINGS_PATH)
                 continue
 
-            value = float(match.group(1))
+            value = float(axis_entry["scale"])
 
             widget = self.builder.get_object(letter + "_Set_Scale")
             if widget is not None:
@@ -1179,12 +998,8 @@ class HandlerClass:
         if self.builder.get_object("X_Set_P") is None:
             return
 
-        try:
-            with open(SETTINGS_PATH, "r") as f:
-                xml_text = f.read()
-        except OSError as e:
-            print("Could not read " + SETTINGS_PATH + ": " + str(e))
-            return
+        settings = reb_settings_io.load_settings()
+        axes = settings.get("axes", {})
 
         def apply(axis_id, block_tag, hal_component, widget_id_for_param, push_live=True):
             '''
@@ -1200,36 +1015,26 @@ class HandlerClass:
             hal_component names a pid.* instance that doesn't currently
             exist rather than one that's merely stale.
             '''
-            axis_match = re.search(
-                r'<axis\s+id="' + re.escape(axis_id) + r'">(.*?)</axis>',
-                xml_text, re.DOTALL
-            )
-            if not axis_match:
-                print("No <axis id=\"" + axis_id + "\"> entry found in " + SETTINGS_PATH)
+            axis_entry = axes.get(axis_id)
+            if axis_entry is None:
+                print("No axis \"" + axis_id + "\" entry found in " + SETTINGS_PATH)
                 return
 
-            block_match = re.search(
-                r'<' + block_tag + r'>(.*?)</' + block_tag + r'>',
-                axis_match.group(1), re.DOTALL
-            )
-            if not block_match:
-                print("No <" + block_tag + "> entry found for axis " + axis_id
+            pid_block = axis_entry.get(block_tag)
+            if pid_block is None:
+                print("No \"" + block_tag + "\" entry found for axis " + axis_id
                       + " in " + SETTINGS_PATH)
                 return
 
             for param in PID_PARAMS:
                 widget_id = widget_id_for_param(param)
 
-                param_match = re.search(
-                    r'<' + param + r'>(-?[\d.]+)</' + param + r'>',
-                    block_match.group(1)
-                )
-                if not param_match:
+                if param not in pid_block:
                     print("No stored " + param + " found for " + widget_id
                           + " in " + SETTINGS_PATH)
                     continue
 
-                value = param_match.group(1)
+                value = pid_block[param]
                 widget = self.builder.get_object(widget_id)
                 if widget is not None:
                     widget.set_value(float(value))
@@ -1240,20 +1045,25 @@ class HandlerClass:
                 hal_pin = hal_component + "." + PID_PARAM_PIN[param]
                 try:
                     subprocess.run(
-                        ["halcmd", "setp", hal_pin, value],
+                        ["halcmd", "setp", hal_pin, str(value)],
                         check=True,
                         capture_output=True,
                         text=True
                     )
-                    print("Restored " + hal_pin + " = " + value)
+                    print("Restored " + hal_pin + " = " + str(value))
                 except subprocess.CalledProcessError as e:
                     print("Error restoring " + hal_pin + ": " + e.stderr)
                 except FileNotFoundError:
                     print("halcmd not found - is the LinuxCNC environment sourced?")
 
         for axis_id, component in PID_AXES.items():
+            # push_live=False whenever this channel is currently wearing
+            # a borrowed letter (EXTRA_SETTINGS_LETTERS below owns the
+            # live pid.* component in that case) - same reasoning as
+            # _load_scale_settings's identical check.
             apply(axis_id, "pid", component,
-                  lambda param, axis_id=axis_id: axis_id + "_Set_" + param)
+                  lambda param, axis_id=axis_id: axis_id + "_Set_" + param,
+                  push_live=(CURRENT_LETTER[axis_id] == axis_id.lower()))
 
         for spindle_id, loops in PID_SPINDLE_LOOPS.items():
             for suffix, component in loops.items():
@@ -1291,33 +1101,28 @@ class HandlerClass:
         if self.builder.get_object("X_Set_Backlash") is None:
             return
 
-        try:
-            with open(SETTINGS_PATH, "r") as f:
-                xml_text = f.read()
-        except OSError as e:
-            print("Could not read " + SETTINGS_PATH + ": " + str(e))
-            return
+        settings = reb_settings_io.load_settings()
+        axes = settings.get("axes", {})
 
         for axis_id, joint_num in JOINT_NUMBER.items():
-            axis_match = re.search(
-                r'<axis\s+id="' + re.escape(axis_id) + r'">(.*?)</axis>',
-                xml_text, re.DOTALL
-            )
-            if not axis_match:
-                print("No <axis id=\"" + axis_id + "\"> entry found in " + SETTINGS_PATH)
-                continue
-
-            match = re.search(r'<backlash>(-?[\d.]+)</backlash>', axis_match.group(1))
-            if not match:
+            axis_entry = axes.get(axis_id)
+            if axis_entry is None or "backlash" not in axis_entry:
                 print("No stored backlash found for axis " + axis_id
                       + " in " + SETTINGS_PATH)
                 continue
 
-            value = float(match.group(1))
+            value = float(axis_entry["backlash"])
 
             widget = self.builder.get_object(axis_id + "_Set_Backlash")
             if widget is not None:
                 widget.set_value(value)
+
+            if axis_id in CURRENT_LETTER and CURRENT_LETTER[axis_id] != axis_id.lower():
+                # This channel is currently wearing a borrowed letter -
+                # same reasoning as the identical check in
+                # _load_scale_settings. axis_id not in CURRENT_LETTER
+                # means Sp0/Sp1, which always own their own live pin.
+                continue
 
             hal_pin = "joint." + str(joint_num) + ".backlash"
             try:
@@ -1339,21 +1144,13 @@ class HandlerClass:
         # assigned to a channel this session (CURRENT_LETTER_INTERNAL_ID),
         # same pattern as _load_scale_settings.
         for letter in EXTRA_SETTINGS_LETTERS:
-            axis_match = re.search(
-                r'<axis\s+id="' + re.escape(letter) + r'">(.*?)</axis>',
-                xml_text, re.DOTALL
-            )
-            if not axis_match:
-                print("No <axis id=\"" + letter + "\"> entry found in " + SETTINGS_PATH)
-                continue
-
-            match = re.search(r'<backlash>(-?[\d.]+)</backlash>', axis_match.group(1))
-            if not match:
+            axis_entry = axes.get(letter)
+            if axis_entry is None or "backlash" not in axis_entry:
                 print("No stored backlash found for axis " + letter
                       + " in " + SETTINGS_PATH)
                 continue
 
-            value = float(match.group(1))
+            value = float(axis_entry["backlash"])
 
             widget = self.builder.get_object(letter + "_Set_Backlash")
             if widget is not None:
@@ -1404,13 +1201,7 @@ class HandlerClass:
         if self.builder.get_object("X_Comment") is None:
             return
 
-        try:
-            with open(SETTINGS_PATH, "r") as f:
-                xml_text = f.read()
-        except OSError as e:
-            print("Could not read " + SETTINGS_PATH + ": " + str(e))
-            return
-
+        settings = reb_settings_io.load_settings()
         device_names = _read_persisted_device_names()
 
         self._applying_axis_comments = True
@@ -1425,7 +1216,7 @@ class HandlerClass:
                 for name in device_names:
                     widget.append_text(name)
 
-                stored = _read_persisted_axis_comment(axis_id, xml_text)
+                stored = _read_persisted_axis_comment(axis_id, settings)
                 if not stored:
                     print("No stored comment found for axis " + axis_id
                           + " in " + SETTINGS_PATH)
@@ -1521,15 +1312,10 @@ class HandlerClass:
         (if this component owns it) and to whichever unit-of-measure labels
         this component owns (see _apply_measurement_system_labels).
         '''
-        system = "Imperial"
-        try:
-            with open(SETTINGS_PATH, "r") as f:
-                xml_text = f.read()
-            match = re.search(r'<measurement_system>(Metric|Imperial)</measurement_system>', xml_text)
-            if match:
-                system = match.group(1)
-        except OSError as e:
-            print("Could not read " + SETTINGS_PATH + ": " + str(e))
+        settings = reb_settings_io.load_settings()
+        system = settings.get("measurement_system", "Imperial")
+        if system not in ("Metric", "Imperial"):
+            system = "Imperial"
 
         combo = self.builder.get_object("Measurement_System")
         if combo is not None:
@@ -1813,15 +1599,8 @@ class HandlerClass:
         button, if this component owns it - same no-op-in-the-wrong-
         component pattern as _load_measurement_system.
         '''
-        value = 1.0
-        try:
-            with open(SETTINGS_PATH, "r") as f:
-                xml_text = f.read()
-            match = re.search(r'<max_jog_speed>([0-9.eE+-]+)</max_jog_speed>', xml_text)
-            if match:
-                value = float(match.group(1))
-        except OSError as e:
-            print("Could not read " + SETTINGS_PATH + ": " + str(e))
+        settings = reb_settings_io.load_settings()
+        value = float(settings.get("max_jog_speed", 1.0))
 
         spin = self.builder.get_object("Max_Jog_Speed")
         if spin is not None:
@@ -1840,20 +1619,12 @@ class HandlerClass:
         flag covering the whole batch is enough - no risk of one load
         call falsely suppressing a genuine edit to a different widget).
         '''
-        try:
-            with open(SETTINGS_PATH, "r") as f:
-                xml_text = f.read()
-        except OSError as e:
-            print("Could not read " + SETTINGS_PATH + ": " + str(e))
-            xml_text = ""
+        settings = reb_settings_io.load_settings()
 
         self._applying_velocity_settings = True
         try:
             for widget_id, (tag, default) in VELOCITY_SETTINGS.items():
-                value = default
-                match = re.search(r'<' + tag + r'>([0-9.eE+-]+)</' + tag + r'>', xml_text)
-                if match:
-                    value = float(match.group(1))
+                value = float(settings.get(tag, default))
 
                 spin = self.builder.get_object(widget_id)
                 if spin is not None:
@@ -1863,60 +1634,14 @@ class HandlerClass:
 
     def _save_axis_comment(self, axis_id, text):
         '''
-        Writes a single axis's comment back into REB_Settings_v1.ini,
-        updating that axis's <usercomment> value - or inserting one
-        right after its <scale> element if this axis doesn't have one
-        yet. Every existing REB_Settings_v1.ini predates <usercomment>
-        entirely (confirmed live: none of X/Z/B/U/V/W had one), so
-        without this fallback every comment save was a silent no-op
-        forever - there was nothing already there to update. Called
-        from each comment Entry's focus-out-event handler below.
+        Writes a single axis's comment back into REB_Settings_v1.ini's
+        usercomment value for that axis. Called from each comment
+        Entry's focus-out-event handler below.
         '''
-        try:
-            with open(SETTINGS_PATH, "r") as f:
-                xml_text = f.read()
-        except OSError as e:
-            print("Could not read " + SETTINGS_PATH + ": " + str(e))
-            return
-
-        escaped = escape(text)
-
-        update_pattern = (
-            r'(<axis\s+id="' + re.escape(axis_id) + r'">\s*<scale>-?[\d.]+</scale>\s*<usercomment>)'
-            r'.*?'
-            r'(</usercomment>)'
-        )
-        new_text, count = re.subn(
-            update_pattern,
-            lambda m: m.group(1) + escaped + m.group(2),
-            xml_text,
-            count=1,
-            flags=re.DOTALL
-        )
-
-        if count == 0:
-            insert_pattern = (
-                r'<axis\s+id="' + re.escape(axis_id) + r'">\s*<scale>-?[\d.]+</scale>'
-            )
-            new_text, count = re.subn(
-                insert_pattern,
-                lambda m: m.group(0) + "\n        <usercomment>" + escaped + "</usercomment>",
-                xml_text,
-                count=1
-            )
-
-        if count == 0:
-            print("No <axis id=\"" + axis_id + "\"> entry found in "
-                  + SETTINGS_PATH + " - leaving it unchanged")
-            return
-
-        try:
-            with open(SETTINGS_PATH, "w") as f:
-                f.write(new_text)
-            print("Saved " + axis_id + " comment")
-        except OSError as e:
-            print("Could not write " + SETTINGS_PATH + ": " + str(e))
-            return
+        settings = reb_settings_io.load_settings()
+        settings.setdefault("axes", {}).setdefault(axis_id, {})["usercomment"] = text
+        reb_settings_io.save_settings(settings)
+        print("Saved " + axis_id + " comment")
 
     def _read_pid_gains(self, widget_id_for_param):
         '''
@@ -2078,133 +1803,45 @@ class HandlerClass:
         print("FUNCTION Settings_Save")
         self._write_rebset_snapshot()
 
-    def _patch_pid_block(self, text, block_tag, values):
-        '''
-        Patches P/I/D/FF0/FF1/FF2 values into a <pid>/<pid_pos>/
-        <pid_vel> sub-element within text (an already-extracted <axis>
-        block), leaving everything else untouched. Mirrors
-        REB_Scale_Persist.py's set_pid_block, but operating on values
-        already read from this component's own widgets rather than via
-        halcmd getp (this component IS the live process, no subprocess
-        round-trip needed). Returns the patched text unchanged if the
-        block isn't found.
-        '''
-        block_match = re.search(r'<' + block_tag + r'>.*?</' + block_tag + r'>', text, re.DOTALL)
-        if not block_match:
-            return text
-
-        block = block_match.group(0)
-        for param, value in values.items():
-            block = re.sub(
-                r'(<' + param + r'>)-?[\d.]+(</' + param + r'>)',
-                lambda m: m.group(1) + str(value) + m.group(2),
-                block, count=1
-            )
-        return text[:block_match.start()] + block + text[block_match.end():]
-
     def _write_rebset_snapshot(self):
         '''
         Writes this tab's live Scale/Backlash/PID widget values into
-        SETTINGS_PATH's <axis> blocks - see Settings_Save above for why
-        Measurement System/Max Jog Speed/VELOCITY_SETTINGS aren't
-        touched here. Reads the whole file once, patches every axis in
-        memory, then writes it back once - unlike the shutdown path
-        (REB_Scale_Persist.py), which patches and writes incrementally
-        since it goes through separate halcmd calls per value.
+        REBset_v1.ini's per-axis entries - see Settings_Save above for
+        why Measurement System/Max Jog Speed/VELOCITY_SETTINGS aren't
+        touched here. Reads the whole file once, patches every axis's
+        dict entry in memory, then writes it back once - unlike the
+        shutdown path (REB_Scale_Persist.py), which patches and writes
+        incrementally since it goes through separate halcmd calls per
+        value.
         '''
-        try:
-            with open(SETTINGS_PATH, "r") as f:
-                xml_text = f.read()
-        except OSError as e:
-            print("Could not read " + SETTINGS_PATH + ": " + str(e))
-            return
+        settings = reb_settings_io.load_settings()
+        axes = settings.setdefault("axes", {})
 
         for axis_id in list(AXIS_STEPGEN) + list(EXTRA_SETTINGS_LETTERS):
-            axis_match = re.search(
-                r'<axis\s+id="' + re.escape(axis_id) + r'">.*?</axis>',
-                xml_text, re.DOTALL
-            )
-            if not axis_match:
-                if axis_id in EXTRA_SETTINGS_LETTERS:
-                    # No block yet for this letter-keyed row (see
-                    # EXTRA_SETTINGS_LETTERS) - create one with whatever
-                    # Scale/Backlash/PID widgets exist so nothing is
-                    # silently dropped from the snapshot, mirroring
-                    # REB_Scale_Persist.py's set_scale_value.
-                    lines = ['    <axis id="' + axis_id + '">']
-                    scale_widget = self.builder.get_object(axis_id + "_Set_Scale")
-                    if scale_widget is not None:
-                        lines.append('        <scale>' + str(scale_widget.get_value()) + '</scale>')
-                    backlash_widget = self.builder.get_object(axis_id + "_Set_Backlash")
-                    if backlash_widget is not None:
-                        lines.append('        <backlash>' + str(backlash_widget.get_value()) + '</backlash>')
-                    values = self._read_pid_gains(lambda param, axis_id=axis_id: axis_id + "_Set_" + param)
-                    if values:
-                        lines.append('        <pid>')
-                        for param in PID_PARAMS:
-                            if param in values:
-                                lines.append('            <' + param + '>' + str(values[param]) + '</' + param + '>')
-                        lines.append('        </pid>')
-                    lines.append('    </axis>')
-                    block = "\n".join(lines) + "\n"
-                    xml_text, count = re.subn(r'</settings>', block + '</settings>', xml_text, count=1)
-                    if count:
-                        print("Created <axis id=\"" + axis_id + "\"> in " + SETTINGS_PATH)
-                    continue
-                print("No <axis id=\"" + axis_id + "\"> entry found in " + SETTINGS_PATH)
-                continue
-
-            axis_block = axis_match.group(0)
-
-            if axis_id in EXTRA_SETTINGS_LETTERS:
-                # An existing <axis id="A"/"C"> block may predate
-                # Backlash/PID support (e.g. created by an earlier
-                # Scale-only save) and be missing these sub-elements -
-                # _patch_pid_block/the <backlash> regex below silently
-                # no-op if their target tag isn't present, so add
-                # skeletons here rather than losing the value.
-                if not re.search(r'<backlash>', axis_block):
-                    axis_block = re.sub(r'</axis>', '        <backlash>0.0</backlash>\n    </axis>', axis_block, count=1)
-                if not re.search(r'<pid>', axis_block):
-                    skeleton = ("        <pid>\n"
-                                + "".join('            <' + p + '>0</' + p + '>\n' for p in PID_PARAMS)
-                                + "        </pid>\n    </axis>")
-                    axis_block = re.sub(r'</axis>', skeleton, axis_block, count=1)
+            axis_entry = axes.setdefault(axis_id, {})
 
             scale_widget = self.builder.get_object(axis_id + "_Set_Scale")
             if scale_widget is not None:
-                axis_block = re.sub(
-                    r'(<scale>)-?[\d.]+(</scale>)',
-                    lambda m: m.group(1) + str(scale_widget.get_value()) + m.group(2),
-                    axis_block, count=1
-                )
+                axis_entry["scale"] = scale_widget.get_value()
 
             backlash_widget = self.builder.get_object(axis_id + "_Set_Backlash")
             if backlash_widget is not None:
-                axis_block = re.sub(
-                    r'(<backlash>)-?[\d.]+(</backlash>)',
-                    lambda m: m.group(1) + str(backlash_widget.get_value()) + m.group(2),
-                    axis_block, count=1
-                )
+                axis_entry["backlash"] = backlash_widget.get_value()
 
             if axis_id in PID_AXES or axis_id in EXTRA_SETTINGS_LETTERS:
                 values = self._read_pid_gains(lambda param, axis_id=axis_id: axis_id + "_Set_" + param)
-                axis_block = self._patch_pid_block(axis_block, "pid", values)
+                if values:
+                    axis_entry.setdefault("pid", {}).update(values)
             elif axis_id in PID_SPINDLE_LOOPS:
                 for suffix, block_tag in (("Pos", "pid_pos"), ("Vel", "pid_vel")):
                     values = self._read_pid_gains(
                         lambda param, axis_id=axis_id, suffix=suffix: axis_id + "_Set_" + param + "_" + suffix
                     )
-                    axis_block = self._patch_pid_block(axis_block, block_tag, values)
+                    if values:
+                        axis_entry.setdefault(block_tag, {}).update(values)
 
-            xml_text = xml_text[:axis_match.start()] + axis_block + xml_text[axis_match.end():]
-
-        try:
-            with open(SETTINGS_PATH, "w") as f:
-                f.write(xml_text)
-            print("Saved live scale/backlash/PID values to " + SETTINGS_PATH)
-        except OSError as e:
-            print("Could not write " + SETTINGS_PATH + ": " + str(e))
+        reb_settings_io.save_settings(settings)
+        print("Saved live scale/backlash/PID values to " + SETTINGS_PATH)
 
 #######################################################################
 # Settings_Save_As
@@ -2343,16 +1980,17 @@ class HandlerClass:
             return
 
         try:
-            root = ET.parse(path).getroot()
-        except (OSError, ET.ParseError) as e:
+            with open(path, "r") as f:
+                data = json.load(f)
+        except (OSError, ValueError) as e:
             _show_settings_error(widget, "Could not read " + path + ":\n" + str(e))
             return
 
-        if root.tag != "settings":
+        if not isinstance(data, dict) or "axes" not in data:
             _show_settings_error(widget, path + " is not a Rose Engine Butler settings file.")
             return
 
-        self._apply_settings_root(widget, root, path, "usercomment")
+        self._apply_settings_root(widget, data, path, "usercomment")
 
 
 #######################################################################
@@ -2439,13 +2077,10 @@ class HandlerClass:
         if not path.endswith(EXPORT_EXTENSION):
             path += EXPORT_EXTENSION
 
-        root = ET.Element("settings")
-        axis_els = {}
+        data = {"axes": {}}
 
-        def get_axis_el(axis_id):
-            if axis_id not in axis_els:
-                axis_els[axis_id] = ET.SubElement(root, "axis", {"id": axis_id})
-            return axis_els[axis_id]
+        def get_axis_entry(axis_id):
+            return data["axes"].setdefault(axis_id, {})
 
         # Each selected axis exports Scale, Backlash, and Stepper Motor
         # Tuning/PID together as one unit - see _run_export_selection_dialog
@@ -2454,67 +2089,64 @@ class HandlerClass:
         for axis_id in selected.get("axes", ()):
             spin = self.builder.get_object(axis_id + "_Set_Scale")
             if spin is not None:
-                ET.SubElement(get_axis_el(axis_id), "scale").text = str(spin.get_value())
+                get_axis_entry(axis_id)["scale"] = spin.get_value()
                 exported.append(axis_id + " Scale")
 
             backlash_spin = self.builder.get_object(axis_id + "_Set_Backlash")
             if backlash_spin is not None:
-                ET.SubElement(get_axis_el(axis_id), "backlash").text = str(backlash_spin.get_value())
+                get_axis_entry(axis_id)["backlash"] = backlash_spin.get_value()
                 exported.append(axis_id + " Backlash")
 
             if axis_id in PID_AXES or axis_id in EXTRA_SETTINGS_LETTERS:
-                self._export_pid_block(get_axis_el(axis_id), axis_id, "pid",
+                self._export_pid_block(get_axis_entry(axis_id), "pid",
                                         lambda param, axis_id=axis_id: axis_id + "_Set_" + param)
                 exported.append(axis_id + " PID")
             elif axis_id in PID_SPINDLE_LOOPS:
                 for suffix in ("Pos", "Vel"):
                     block_tag = "pid_pos" if suffix == "Pos" else "pid_vel"
                     self._export_pid_block(
-                        get_axis_el(axis_id), axis_id, block_tag,
+                        get_axis_entry(axis_id), block_tag,
                         lambda param, axis_id=axis_id, suffix=suffix: axis_id + "_Set_" + param + "_" + suffix
                     )
                 exported.append(axis_id + " PID")
 
         for axis_id, comment in selected.get("comments", {}).items():
-            ET.SubElement(get_axis_el(axis_id), "comment").text = comment
+            get_axis_entry(axis_id)["comment"] = comment
             exported.append(axis_id + " Comment (" + comment + ")")
 
         if selected.get("measurement_system"):
             combo = self.builder.get_object("Measurement_System")
             system = combo.get_active_text() if combo is not None else None
             if system:
-                ET.SubElement(root, "measurement_system").text = system
+                data["measurement_system"] = system
                 exported.append("Measurement System")
 
-        ET.indent(root, space="    ")
-
         try:
-            ET.ElementTree(root).write(path, encoding="UTF-8", xml_declaration=True)
+            reb_settings_io.save_settings(data, path)
         except OSError as e:
             _show_settings_error(widget, "Could not write " + path + ":\n" + str(e))
             return
 
         print("Exported " + ", ".join(exported) + " to " + path)
 
-    def _export_pid_block(self, axis_el, axis_id, block_tag, widget_id_for_param):
+    def _export_pid_block(self, axis_entry, block_tag, widget_id_for_param):
         '''
         Reads P/I/D/FF0/FF1/FF2 from this axis's/spindle loop's own
-        Settings tab widgets and writes them into a <pid>/<pid_pos>/
-        <pid_vel> sub-element of axis_el - the same block shape
-        REB_Settings_v1.ini already uses, so a value round-trips through
-        Import_Settings/_load_pid_settings identically either way. Missing
-        widgets are skipped rather than erroring - matches the tolerant,
-        "just skip what isn't there" pattern the rest of Export/Import
-        already uses.
+        Settings tab widgets into a "pid"/"pid_pos"/"pid_vel" dict on
+        axis_entry - the same shape REB_Settings_v1.ini already uses, so
+        a value round-trips through Import_Settings/_load_pid_settings
+        identically either way. Missing widgets are skipped rather than
+        erroring - matches the tolerant, "just skip what isn't there"
+        pattern the rest of Export/Import already uses.
         '''
-        block_el = None
+        block = {}
         for param in PID_PARAMS:
             widget = self.builder.get_object(widget_id_for_param(param))
             if widget is None:
                 continue
-            if block_el is None:
-                block_el = ET.SubElement(axis_el, block_tag)
-            ET.SubElement(block_el, param).text = str(widget.get_value())
+            block[param] = widget.get_value()
+        if block:
+            axis_entry[block_tag] = block
 
     def _run_export_selection_dialog(self, widget):
         '''
@@ -2582,13 +2214,7 @@ class HandlerClass:
             return label
 
         device_names = self._read_device_names()
-
-        try:
-            with open(SETTINGS_PATH, "r") as f:
-                comments_xml_text = f.read()
-        except OSError as e:
-            print("Could not read " + SETTINGS_PATH + ": " + str(e))
-            comments_xml_text = ""
+        comments_settings = reb_settings_io.load_settings()
 
         axis_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         content.pack_start(axis_col, False, False, 0)
@@ -2625,7 +2251,7 @@ class HandlerClass:
             for name in device_names:
                 combo.append_text(name)
 
-            stored = (_read_persisted_axis_comment(axis_id, comments_xml_text)
+            stored = (_read_persisted_axis_comment(axis_id, comments_settings)
                       or SPINDLE_DEFAULT_DEVICE_NAME.get(axis_id, ""))
             try:
                 combo.set_active(device_names.index(stored) + 1 if stored else 0)
@@ -2753,27 +2379,28 @@ class HandlerClass:
             return
 
         try:
-            root = ET.parse(path).getroot()
-        except (OSError, ET.ParseError) as e:
+            with open(path, "r") as f:
+                data = json.load(f)
+        except (OSError, ValueError) as e:
             _show_settings_error(widget, "Could not read " + path + ":\n" + str(e))
             return
 
-        if root.tag != "settings":
+        if not isinstance(data, dict) or "axes" not in data:
             _show_settings_error(widget, path + " is not a Rose Engine Butler export file.")
             return
 
-        self._apply_settings_root(widget, root, path, "comment")
+        self._apply_settings_root(widget, data, path, "comment")
 
-    def _apply_settings_root(self, widget, root, path, comment_tag):
+    def _apply_settings_root(self, widget, data, path, comment_key):
         '''
         Applies whatever subset of axis Scale/Backlash/PID/comment/
-        Measurement System values a parsed <settings> root contains to
+        Measurement System values a parsed settings dict contains to
         the live Settings-tab widgets, then reports what changed. Shared
-        by Import_Settings (small <comment>-tagged Export_Settings
-        subset files) and Settings_Load (full <usercomment>-tagged
-        REBset_v1.ini-shaped snapshots) - comment_tag is the only thing
+        by Import_Settings (small "comment"-keyed Export_Settings
+        subset files) and Settings_Load (full "usercomment"-keyed
+        REBset_v1.ini-shaped snapshots) - comment_key is the only thing
         that differs between those two file shapes; everything else
-        (scale/backlash/pid/measurement_system element names) is common
+        (scale/backlash/pid/measurement_system field names) is common
         to both. See Import_Settings's old docstring history for why
         each value is applied through its own widget handler
         (<Axis>_Set_Scale/<Axis>_Set_Backlash/Measurement_System_Changed)
@@ -2784,36 +2411,35 @@ class HandlerClass:
         '''
         imported = []
         comment_imported = False
-        for axis_el in root.findall("axis"):
-            axis_id = axis_el.get("id")
+        for axis_id, axis_entry in data.get("axes", {}).items():
             if axis_id not in AXIS_STEPGEN and axis_id not in EXTRA_SETTINGS_LETTERS:
+                continue
+            if not isinstance(axis_entry, dict):
                 continue
 
             # Scale and PID are independent - a file may carry either,
             # both, or neither for a given axis, so check each on its own
-            # rather than skipping the whole <axis> element when one is
+            # rather than skipping the whole axis entry when one is
             # absent.
-            scale_el = axis_el.find("scale")
-            if scale_el is not None and scale_el.text is not None:
+            if "scale" in axis_entry:
                 spin = self.builder.get_object(axis_id + "_Set_Scale")
                 if spin is not None:
                     try:
-                        scale = float(scale_el.text.strip())
-                    except ValueError:
-                        print("Skipping " + axis_id + " scale - not a number: " + scale_el.text)
+                        scale = float(axis_entry["scale"])
+                    except (TypeError, ValueError):
+                        print("Skipping " + axis_id + " scale - not a number: " + str(axis_entry["scale"]))
                         scale = None
                     if scale is not None:
                         spin.set_value(scale)  # fires <Axis>_Set_Scale: abort/disable-if-enabled/halcmd setp/mark dirty
                         imported.append(axis_id + " Scale")
 
-            backlash_el = axis_el.find("backlash")
-            if backlash_el is not None and backlash_el.text is not None:
+            if "backlash" in axis_entry:
                 spin = self.builder.get_object(axis_id + "_Set_Backlash")
                 if spin is not None:
                     try:
-                        backlash = float(backlash_el.text.strip())
-                    except ValueError:
-                        print("Skipping " + axis_id + " backlash - not a number: " + backlash_el.text)
+                        backlash = float(axis_entry["backlash"])
+                    except (TypeError, ValueError):
+                        print("Skipping " + axis_id + " backlash - not a number: " + str(axis_entry["backlash"]))
                         backlash = None
                     if backlash is not None:
                         spin.set_value(backlash)  # fires <Axis>_Set_Backlash: halcmd setp/mark dirty
@@ -2833,33 +2459,33 @@ class HandlerClass:
             # process. There is no live IPC between them for this, so the
             # panel only picks up the new text from _load_axis_comments()
             # at its own next startup - hence comment_imported below.
-            comment_el = axis_el.find(comment_tag)
-            if comment_el is not None and comment_el.text is not None and axis_id in COMMENT_AXES:
-                self._save_axis_comment(axis_id, comment_el.text)
+            comment_value = axis_entry.get(comment_key)
+            if comment_value is not None and axis_id in COMMENT_AXES:
+                self._save_axis_comment(axis_id, comment_value)
                 imported.append(axis_id + " Comment")
                 comment_imported = True
 
             pid_applied = False
             if axis_id in PID_AXES or axis_id in EXTRA_SETTINGS_LETTERS:
                 pid_applied = self._import_pid_block(
-                    axis_el, "pid", lambda param, axis_id=axis_id: axis_id + "_Set_" + param
+                    axis_entry, "pid", lambda param, axis_id=axis_id: axis_id + "_Set_" + param
                 )
             elif axis_id in PID_SPINDLE_LOOPS:
                 for suffix in ("Pos", "Vel"):
                     block_tag = "pid_pos" if suffix == "Pos" else "pid_vel"
                     if self._import_pid_block(
-                        axis_el, block_tag,
+                        axis_entry, block_tag,
                         lambda param, axis_id=axis_id, suffix=suffix: axis_id + "_Set_" + param + "_" + suffix
                     ):
                         pid_applied = True
             if pid_applied:
                 imported.append(axis_id + " PID")
 
-        measurement_el = root.find("measurement_system")
-        if measurement_el is not None and measurement_el.text in ("Metric", "Imperial"):
+        measurement_system = data.get("measurement_system")
+        if measurement_system in ("Metric", "Imperial"):
             combo = self.builder.get_object("Measurement_System")
             if combo is not None:
-                combo.set_active(0 if measurement_el.text == "Metric" else 1)  # fires Measurement_System_Changed
+                combo.set_active(0 if measurement_system == "Metric" else 1)  # fires Measurement_System_Changed
                 imported.append("Measurement System")
 
         if imported:
@@ -2882,11 +2508,11 @@ class HandlerClass:
         else:
             _show_settings_error(widget, "Nothing recognizable to import in " + path)
 
-    def _import_pid_block(self, axis_el, block_tag, widget_id_for_param):
+    def _import_pid_block(self, axis_entry, block_tag, widget_id_for_param):
         '''
-        Mirror of _export_pid_block: reads a <pid>/<pid_pos>/<pid_vel>
-        sub-element (if present) and applies each P/I/D/FF0/FF1/FF2 value
-        it contains to that param's own Settings tab widget via
+        Mirror of _export_pid_block: reads a "pid"/"pid_pos"/"pid_vel"
+        dict (if present) and applies each P/I/D/FF0/FF1/FF2 value it
+        contains to that param's own Settings tab widget via
         set_value() - fires the same _pid_set handler a live edit would
         (pushes straight to the live pid.* HAL gain pin; see that
         function's docstring for why it doesn't need the abort/disable
@@ -2894,14 +2520,13 @@ class HandlerClass:
         PID gains aren't part of that format's schema). Returns True if
         anything was actually applied.
         '''
-        block_el = axis_el.find(block_tag)
-        if block_el is None:
+        block = axis_entry.get(block_tag)
+        if not isinstance(block, dict):
             return False
 
         applied = False
         for param in PID_PARAMS:
-            param_el = block_el.find(param)
-            if param_el is None or param_el.text is None:
+            if param not in block:
                 continue
 
             widget = self.builder.get_object(widget_id_for_param(param))
@@ -2909,9 +2534,9 @@ class HandlerClass:
                 continue
 
             try:
-                value = float(param_el.text.strip())
-            except ValueError:
-                print("Skipping " + widget_id_for_param(param) + " - not a number: " + param_el.text)
+                value = float(block[param])
+            except (TypeError, ValueError):
+                print("Skipping " + widget_id_for_param(param) + " - not a number: " + str(block[param]))
                 continue
 
             widget.set_value(value)

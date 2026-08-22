@@ -4,22 +4,22 @@ REB_Scale_Persist.py
 
 At LinuxCNC shutdown, reads the current stepgen position-scale value
 for each Rose Engine Butler axis directly from HAL and writes it back
-into REB_Settings_v1.ini, updating only the <scale> value inside each
-<axis id="..."> block. The rest of the file - including its header
-comment - is left untouched.
+into REB_Settings_v1.ini, updating only that axis's "scale" value. The
+rest of the file is left untouched.
 
 Also persists each axis's/spindle loop's live P/I/D/FF0/FF1/FF2 pid.*
-gains the same way, into that axis's <pid> block (or <pid_pos>/<pid_vel>
-for the two spindle loops) - see PID_AXES/PID_SPINDLE_LOOPS below. These
-gains are set live from REB_Settings_v1.ini by REB_main.py's
-_load_pid_settings() at Settings-tab load and by each PID spin button's
-value-changed handler while running (see REB.hal for why they're no
-longer set from REB.ini directly), so this is the only place that
-carries a retuned gain forward into the next session - exactly mirroring
-how scale already worked before PID gains were added to this file.
+gains the same way, into that axis's "pid" entry (or "pid_pos"/
+"pid_vel" for the two spindle loops) - see PID_AXES/PID_SPINDLE_LOOPS
+below. These gains are set live from REB_Settings_v1.ini by
+REB_main.py's _load_pid_settings() at Settings-tab load and by each PID
+spin button's value-changed handler while running (see REB.hal for why
+they're no longer set from REB.ini directly), so this is the only place
+that carries a retuned gain forward into the next session - exactly
+mirroring how scale already worked before PID gains were added to this
+file.
 
 Also persists each axis's/spindle's live joint.N.backlash HAL
-parameter into that axis's <backlash> value the same way - see
+parameter into that axis's "backlash" value the same way - see
 JOINT_NUMBER below. Set live from REB_Settings_v1.ini by REB_main.py's
 _load_backlash_settings() at Settings-tab load and by each Backlash
 spin button's value-changed handler while running (see REB.ini for why
@@ -31,9 +31,10 @@ Invoked from REB_Shutdown.hal:
 """
 
 import os
-import re
 import subprocess
 import sys
+
+import reb_settings_io
 
 # Axis id (as used in REB_Settings_v1.ini and the Settings tab spin
 # buttons) -> hm2_7i92.0 stepgen channel. Verified against the actual
@@ -66,7 +67,7 @@ JOINT_NUMBER = {
     "Sp0": 7,
 }
 
-SETTINGS_PATH = "/home/reuben/Documents/REBset_v1.ini"
+SETTINGS_PATH = reb_settings_io.SETTINGS_PATH
 
 # Mirrors CHANNEL_DEFAULT_LETTER/AXIS_SELECTION_LETTERS/
 # _read_persisted_channel_assignments in REB_main.py (see AXIS_STEPGEN
@@ -90,23 +91,13 @@ AXIS_SELECTION_LETTERS = ("X", "Z", "U", "V", "W", "A", "B", "C")
 def _read_persisted_channel_assignments():
     '''
     Mirrors REB_main.py's function of the same name - reads the
-    persisted channel -> axis letter map from SETTINGS_PATH, falling
-    back to CHANNEL_DEFAULT_LETTER for anything missing/unrecognized/
+    persisted channel -> axis letter map, falling back to
+    CHANNEL_DEFAULT_LETTER for anything missing/unrecognized/
     duplicated. See that function's docstring for the full reasoning.
     '''
     assignments = dict(CHANNEL_DEFAULT_LETTER)
-    try:
-        with open(SETTINGS_PATH, "r") as f:
-            xml_text = f.read()
-    except OSError as e:
-        print("Could not read " + SETTINGS_PATH + ": " + str(e))
-        return assignments
-
-    match = re.search(r'<channel_assignments>(.*?)</channel_assignments>', xml_text, re.DOTALL)
-    if not match:
-        return assignments
-
-    for channel_id, letter in re.findall(r'<channel id="(\d\d)">([A-Z])</channel>', match.group(1)):
+    stored = reb_settings_io.load_settings().get("channel_assignments", {})
+    for channel_id, letter in stored.items():
         if channel_id in assignments and letter in AXIS_SELECTION_LETTERS:
             assignments[channel_id] = letter
 
@@ -142,8 +133,8 @@ CURRENT_LETTER_INTERNAL_ID = {letter.upper(): internal_id for internal_id, lette
 
 # Settings-tab Axis Scaling rows with no fixed physical channel of their
 # own - mirrors REB_main.py's constant of the same name. Persisted as
-# <axis id="A">/<axis id="C"> blocks, independent of the six physical
-# channels' own blocks - see main() below.
+# "A"/"C" entries in the axes dict, independent of the six physical
+# channels' own entries - see main() below.
 EXTRA_SETTINGS_LETTERS = ("A", "C")
 PID_SPINDLE_LOOPS = {
     "Sp0": {"Pos": "pid.p0", "Vel": "pid.s0"},
@@ -167,7 +158,7 @@ def get_scale(stepgen_ch):
         capture_output=True,
         text=True
     )
-    return result.stdout.strip()
+    return float(result.stdout.strip())
 
 def get_pid_gain(hal_component, param):
     hal_pin = hal_component + "." + PID_PARAM_PIN[param]
@@ -177,7 +168,7 @@ def get_pid_gain(hal_component, param):
         capture_output=True,
         text=True
     )
-    return result.stdout.strip()
+    return float(result.stdout.strip())
 
 def get_backlash(joint_num):
     hal_pin = "joint." + str(joint_num) + ".backlash"
@@ -187,143 +178,25 @@ def get_backlash(joint_num):
         capture_output=True,
         text=True
     )
-    return result.stdout.strip()
-
-def set_scale_value(xml_text, axis_id, value):
-    '''
-    Patches a given axis's <scale> value, same as the inline patch in
-    main()'s AXIS_STEPGEN loop, but creates a minimal
-    <axis id="..."><scale>...</scale></axis> block right before
-    </settings> if none exists yet - unlike every other axis id here,
-    EXTRA_SETTINGS_LETTERS (A/C) have no block shipped in
-    REBset_v1.ini's template on a machine that predates this feature, so
-    without this the value would silently never persist. Returns
-    (new_xml_text, created).
-    '''
-    pattern = (
-        r'(<axis\s+id="' + re.escape(axis_id) + r'">\s*<scale>)'
-        r'-?[\d.]+'
-        r'(</scale>)'
-    )
-    new_text, count = re.subn(pattern, r'\g<1>' + value + r'\g<2>', xml_text, count=1)
-    if count:
-        return new_text, False
-
-    block = '    <axis id="' + axis_id + '">\n        <scale>' + value + '</scale>\n    </axis>\n'
-    new_text, count = re.subn(r'</settings>', block + '</settings>', xml_text, count=1)
-    if count == 0:
-        print("Could not find </settings> to insert a new <axis id=\""
-              + axis_id + "\"> block into " + SETTINGS_PATH)
-        return xml_text, False
-    return new_text, True
-
-def set_single_value(xml_text, axis_id, tag, value, create_if_missing=False):
-    '''
-    Patches a single flat <tag>value</tag> element (e.g. <backlash>)
-    inside a specific axis's <axis id="..."> block, leaving everything
-    else in the file - including any other element on that same axis -
-    untouched. Same two-step "find the axis block, then find the tag
-    within it" approach as set_pid_block above (more robust than
-    assuming a fixed element order within <axis>, unlike the scale
-    patch in main() below). Returns (new_xml_text, ok).
-
-    create_if_missing=True (used for EXTRA_SETTINGS_LETTERS, whose
-    <axis id="A"/"C"> block may predate Backlash support - e.g. one
-    created by an earlier Scale-only save) inserts the tag right before
-    </axis> instead of leaving it unchanged when absent.
-    '''
-    axis_match = re.search(
-        r'<axis\s+id="' + re.escape(axis_id) + r'">.*?</axis>',
-        xml_text, re.DOTALL
-    )
-    if not axis_match:
-        print("No <axis id=\"" + axis_id + "\"> entry found in "
-              + SETTINGS_PATH + " - leaving it unchanged")
-        return xml_text, False
-
-    axis_block = axis_match.group(0)
-    new_axis_block, count = re.subn(
-        r'(<' + tag + r'>)-?[\d.]+(</' + tag + r'>)',
-        r'\g<1>' + value + r'\g<2>',
-        axis_block, count=1
-    )
-    if count == 0:
-        if create_if_missing:
-            new_axis_block = re.sub(
-                r'</axis>',
-                '        <' + tag + '>' + value + '</' + tag + '>\n    </axis>',
-                axis_block, count=1
-            )
-        else:
-            print("No <" + tag + "> entry found for axis " + axis_id
-                  + " in " + SETTINGS_PATH + " - leaving it unchanged")
-            return xml_text, False
-
-    new_xml_text = xml_text[:axis_match.start()] + new_axis_block + xml_text[axis_match.end():]
-    return new_xml_text, True
-
-def set_pid_block(xml_text, axis_id, block_tag, values, create_if_missing=False):
-    '''
-    Patches P/I/D/FF0/FF1/FF2 values into a specific axis's <pid> (or
-    <pid_pos>/<pid_vel>) block, leaving everything else in the file -
-    including any other block on that same axis - untouched. Returns
-    (new_xml_text, ok).
-
-    create_if_missing=True (see set_single_value above) inserts a fresh
-    <block_tag> skeleton right before </axis> instead of leaving it
-    unchanged when absent.
-    '''
-    axis_match = re.search(
-        r'<axis\s+id="' + re.escape(axis_id) + r'">.*?</axis>',
-        xml_text, re.DOTALL
-    )
-    if not axis_match:
-        print("No <axis id=\"" + axis_id + "\"> entry found in "
-              + SETTINGS_PATH + " - leaving it unchanged")
-        return xml_text, False
-
-    axis_block = axis_match.group(0)
-    block_match = re.search(
-        r'<' + block_tag + r'>.*?</' + block_tag + r'>',
-        axis_block, re.DOTALL
-    )
-    if not block_match:
-        if not create_if_missing:
-            print("No <" + block_tag + "> entry found for axis " + axis_id
-                  + " in " + SETTINGS_PATH + " - leaving it unchanged")
-            return xml_text, False
-        skeleton = ("        <" + block_tag + ">\n"
-                    + "".join('            <' + p + '>' + v + '</' + p + '>\n' for p, v in values.items())
-                    + "        </" + block_tag + ">")
-        new_axis_block = re.sub(r'</axis>', skeleton + '\n    </axis>', axis_block, count=1)
-        new_xml_text = xml_text[:axis_match.start()] + new_axis_block + xml_text[axis_match.end():]
-        return new_xml_text, True
-
-    pid_block = block_match.group(0)
-    for param, value in values.items():
-        pid_block, count = re.subn(
-            r'(<' + param + r'>)-?[\d.]+(</' + param + r'>)',
-            r'\g<1>' + value + r'\g<2>',
-            pid_block, count=1
-        )
-        if count == 0:
-            print("No <" + param + "> entry found in axis " + axis_id + "'s <"
-                  + block_tag + "> block in " + SETTINGS_PATH + " - leaving it unchanged")
-            return xml_text, False
-
-    new_axis_block = axis_block[:block_match.start()] + pid_block + axis_block[block_match.end():]
-    new_xml_text = xml_text[:axis_match.start()] + new_axis_block + xml_text[axis_match.end():]
-    return new_xml_text, True
+    return float(result.stdout.strip())
 
 def main():
-    try:
-        with open(SETTINGS_PATH, "r") as f:
-            xml_text = f.read()
-    except OSError as e:
-        print("Could not read " + SETTINGS_PATH + ": " + str(e))
-        sys.exit(1)
+    settings = reb_settings_io.load_settings()
+    axes = settings.setdefault("axes", {})
 
     for axis_id, stepgen_ch in AXIS_STEPGEN.items():
+        if axis_id in CURRENT_LETTER and CURRENT_LETTER[axis_id] != axis_id.lower():
+            # This channel is currently wearing a borrowed letter
+            # (EXTRA_SETTINGS_LETTERS below) - the live pin reflects that
+            # letter's tuning, not axis_id's own. Reading it back here
+            # would stomp axis_id's own persisted scale with the
+            # borrowed letter's value; leave it untouched instead - see
+            # REB_main.py's _load_scale_settings for the load-side half
+            # of this same fix. axis_id not in CURRENT_LETTER means
+            # Sp0/Sp1 (never reassignable), which always own their own
+            # live pin unconditionally.
+            continue
+
         try:
             value = get_scale(stepgen_ch)
         except subprocess.CalledProcessError as e:
@@ -333,21 +206,8 @@ def main():
             print("halcmd not found - is the LinuxCNC environment sourced?")
             sys.exit(1)
 
-        pattern = (
-            r'(<axis\s+id="' + re.escape(axis_id) + r'">\s*<scale>)'
-            r'-?[\d.]+'
-            r'(</scale>)'
-        )
-        new_text, count = re.subn(
-            pattern, r'\g<1>' + value + r'\g<2>', xml_text, count=1
-        )
-        if count == 0:
-            print("No <axis id=\"" + axis_id + "\"> entry found in "
-                  + SETTINGS_PATH + " - leaving it unchanged")
-            continue
-
-        xml_text = new_text
-        print("Saved " + axis_id + " scale = " + value)
+        axes.setdefault(axis_id, {})["scale"] = value
+        print("Saved " + axis_id + " scale = " + str(value))
 
     for letter in EXTRA_SETTINGS_LETTERS:
         internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
@@ -365,10 +225,16 @@ def main():
             print("halcmd not found - is the LinuxCNC environment sourced?")
             sys.exit(1)
 
-        xml_text, created = set_scale_value(xml_text, letter, value)
-        print(("Created" if created else "Saved") + " " + letter + " scale = " + value)
+        axes.setdefault(letter, {})["scale"] = value
+        print("Saved " + letter + " scale = " + str(value))
 
     for axis_id, hal_component in PID_AXES.items():
+        if CURRENT_LETTER[axis_id] != axis_id.lower():
+            # Same reasoning as the identical check in the scale loop
+            # above - hal_component here is currently driven by a
+            # borrowed letter's tuning, not axis_id's own.
+            continue
+
         values = {}
         try:
             for param in PID_PARAMS:
@@ -380,9 +246,8 @@ def main():
             print("halcmd not found - is the LinuxCNC environment sourced?")
             sys.exit(1)
 
-        xml_text, ok = set_pid_block(xml_text, axis_id, "pid", values)
-        if ok:
-            print("Saved " + axis_id + " PID gains = " + str(values))
+        axes.setdefault(axis_id, {}).setdefault("pid", {}).update(values)
+        print("Saved " + axis_id + " PID gains = " + str(values))
 
     for letter in EXTRA_SETTINGS_LETTERS:
         internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
@@ -400,9 +265,8 @@ def main():
             print("halcmd not found - is the LinuxCNC environment sourced?")
             sys.exit(1)
 
-        xml_text, ok = set_pid_block(xml_text, letter, "pid", values, create_if_missing=True)
-        if ok:
-            print("Saved " + letter + " PID gains = " + str(values))
+        axes.setdefault(letter, {}).setdefault("pid", {}).update(values)
+        print("Saved " + letter + " PID gains = " + str(values))
 
     for spindle_id, loops in PID_SPINDLE_LOOPS.items():
         for suffix, hal_component in loops.items():
@@ -419,11 +283,18 @@ def main():
                 print("halcmd not found - is the LinuxCNC environment sourced?")
                 sys.exit(1)
 
-            xml_text, ok = set_pid_block(xml_text, spindle_id, block_tag, values)
-            if ok:
-                print("Saved " + spindle_id + " " + suffix + " PID gains = " + str(values))
+            axes.setdefault(spindle_id, {}).setdefault(block_tag, {}).update(values)
+            print("Saved " + spindle_id + " " + suffix + " PID gains = " + str(values))
 
     for axis_id, joint_num in JOINT_NUMBER.items():
+        if axis_id in CURRENT_LETTER and CURRENT_LETTER[axis_id] != axis_id.lower():
+            # Same reasoning as the identical check in the scale loop
+            # above (axis_id not in CURRENT_LETTER means Sp0/Sp1, which
+            # always own their own live pin) - joint_num's live backlash
+            # currently reflects a borrowed letter's tuning, not
+            # axis_id's own.
+            continue
+
         try:
             value = get_backlash(joint_num)
         except subprocess.CalledProcessError as e:
@@ -433,9 +304,8 @@ def main():
             print("halcmd not found - is the LinuxCNC environment sourced?")
             sys.exit(1)
 
-        xml_text, ok = set_single_value(xml_text, axis_id, "backlash", value)
-        if ok:
-            print("Saved " + axis_id + " backlash = " + value)
+        axes.setdefault(axis_id, {})["backlash"] = value
+        print("Saved " + axis_id + " backlash = " + str(value))
 
     for letter in EXTRA_SETTINGS_LETTERS:
         internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
@@ -451,13 +321,11 @@ def main():
             print("halcmd not found - is the LinuxCNC environment sourced?")
             sys.exit(1)
 
-        xml_text, ok = set_single_value(xml_text, letter, "backlash", value, create_if_missing=True)
-        if ok:
-            print("Saved " + letter + " backlash = " + value)
+        axes.setdefault(letter, {})["backlash"] = value
+        print("Saved " + letter + " backlash = " + str(value))
 
     try:
-        with open(SETTINGS_PATH, "w") as f:
-            f.write(xml_text)
+        reb_settings_io.save_settings(settings)
     except OSError as e:
         print("Could not write " + SETTINGS_PATH + ": " + str(e))
         sys.exit(1)
