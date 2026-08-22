@@ -228,7 +228,7 @@ if [ $? != 0 ]; then
    exit $?
 fi
 
-mkdir -p ~/.npm-global [[<<]]
+mkdir -p ~/.npm-global
 npm config set prefix '~/.npm-global'
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: Could not install Claude Code                                 ${NOCOLOR}"
