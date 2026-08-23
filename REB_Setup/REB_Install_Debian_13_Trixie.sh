@@ -169,9 +169,9 @@ echo -e "${CMNTTEXT}    Create the gcode library                                
 cd /home/reuben/linuxcnc/configs/RoseEngineButler
 mkdir gcode
 
-echo -e "${CMNTTEXT}    REBset.ini                                                     ${NOCOLOR}"
+echo -e "${CMNTTEXT}    REBset_v1.ini                                                  ${NOCOLOR}"
 cd /home/reuben/Documents
-sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/REBset.ini .
+sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/REBset_v1.ini .
 
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
 echo -e "${TITLE}Step 4 - Install ClamAV                                                ${NOCOLOR}"
