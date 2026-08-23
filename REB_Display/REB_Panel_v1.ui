@@ -2825,16 +2825,26 @@ After entering any comments, you must press ENTER to have them saved.</property>
               </packing>
             </child>
             <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
+              <object class="GtkLabel" id="Comments3">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="halign">start</property>
+                <property name="valign">start</property>
+                <property name="margin-left">2</property>
+                <property name="margin-start">2</property>
+                <property name="vexpand">True</property>
+                <property name="label" translatable="yes">The axis letter
+is on the plus (+) 
+direction</property>
+                <property name="wrap">True</property>
+                <property name="xalign">0.5</property>
+              </object>
+              <packing>
+                <property name="left-attach">12</property>
+                <property name="top-attach">20</property>
+                <property name="width">2</property>
+                <property name="height">2</property>
+              </packing>
             </child>
             <child>
               <placeholder/>
