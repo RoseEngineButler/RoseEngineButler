@@ -135,11 +135,20 @@ echo -e "${TITLE}Step 3 - Put key files in place                                
 echo -e "${TITLE}                                                                       ${NOCOLOR}"
 echo -e "${CMNTTEXT}    .axisrc                                                         ${NOCOLOR}"
 cd /home/reuben
-sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/.axisrc .
+cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/axisrc .
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: copy of axisrc                                                ${NOCOLOR}"
    echo -e "${KEYNOTE}    from /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup    ${NOCOLOR}"
    echo -e "${KEYNOTE}    to /home/reuben/                                                 ${NOCOLOR}"
+   echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
+   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
+   exit $?
+fi
+
+mv axisrc .axisrc
+if [ $? != 0 ]; then
+   echo -e "${KEYNOTE}ERROR: rename of axisrc                                              ${NOCOLOR}"
+   echo -e "${KEYNOTE}    to .axisrc                                                       ${NOCOLOR}"
    echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
    exit $?
@@ -167,7 +176,7 @@ cd /home/reuben
 mkdir ClamAv
 cd ClamAv
 mkdir SuspiciousFiles
-sudo apt install clamav
+sudo apt install -y clamav
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: Could not install ClamAV                                      ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
@@ -177,7 +186,7 @@ fi
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
 echo -e "${TITLE}Step 5 - Install MenuLibre                                             ${NOCOLOR}"
 echo -e "${TITLE}                                                                       ${NOCOLOR}"
-sudo apt install menulibre
+sudo apt install -y menulibre
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: Could not install MenuLibre                                   ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
@@ -187,7 +196,7 @@ fi
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
 echo -e "${TITLE}Step 6 - Install galculator                                            ${NOCOLOR}"
 echo -e "${TITLE}                                                                       ${NOCOLOR}"
-sudo apt install galculator
+sudo apt install -y galculator
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: Could not install galculator                                  ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
@@ -197,7 +206,7 @@ fi
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
 echo -e "${TITLE}Step 7 - Install xfce4-screenschooter                                  ${NOCOLOR}"
 echo -e "${TITLE}                                                                       ${NOCOLOR}"
-sudo apt install xfce4-screenshooter
+sudo apt install -y xfce4-screenshooter
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: Could not install xfce4-screenschooter                        ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
@@ -214,21 +223,14 @@ if [ $? != 0 ]; then
    exit $?
 fi
 
-sudo apt install -y nodejs
+sudo apt install -y -y nodejs
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: Could not install Claude Code                                 ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
    exit $?
 fi
 
-echo Set up a user-level npm prefix (avoids sudo/permission mess)
-if [ $? != 0 ]; then
-   echo -e "${KEYNOTE}ERROR: Could not install Claude Code                                 ${NOCOLOR}"
-   echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-   exit $?
-fi
-
-mkdir -p ~/.npm-global [[<<]]
+mkdir -p ~/.npm-global
 npm config set prefix '~/.npm-global'
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: Could not install Claude Code                                 ${NOCOLOR}"
@@ -261,7 +263,7 @@ echo -e "${TITLE}                                                               
 echo "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" | sudo tee /etc/apt/sources.list.d/debian.list
 sudo apt update
 
-sudo apt install chromium -y
+sudo apt install -y chromium
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: Could not install Chromium                                    ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
