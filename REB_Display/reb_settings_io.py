@@ -134,17 +134,45 @@ VELOCITY_DEFAULTS = {
 }
 
 
+# REB.ini's own shipped [JOINT_n]/[SPINDLE_n] STEPGEN_MAXVEL/
+# STEPGEN_MAXACCEL starting values, by axis category - what a brand-new
+# axis entry's "max_vel"/"max_accel" should start from. These are the
+# stepgen hardware limits (live hm2_7i92.0.stepgen.NN.maxvel/maxaccel
+# HAL params - see AXIS_STEPGEN in REB_main.py), not the [JOINT_n]/
+# [AXIS_*] MAX_VELOCITY/MAX_ACCELERATION ini keys - those are a
+# deliberately unreachable trajectory-planner ceiling that never binds
+# (see CLAUDE.md), so this Settings-tab feature exposes the stepgen
+# limit instead, matching REB_Generate_Local_Ini.py's docstring, which
+# already calls STEPGEN_MAXVEL/STEPGEN_MAXACCEL "physical-channel
+# tuning values the operator retunes via the Settings tab".
+_DEFAULT_LINEAR_MAX_VEL = 0.4
+_DEFAULT_LINEAR_MAX_ACCEL = 30.0
+_DEFAULT_ROTARY_MAX_VEL = 100.0
+_DEFAULT_ROTARY_MAX_ACCEL = 20.0
+_DEFAULT_SPINDLE_MAX_VEL = 3.0
+_DEFAULT_SPINDLE_MAX_ACCEL = 1.0
+
+
 def _default_axis_entry(axis_id):
     if axis_id in SPINDLE_IDS:
         return {
             "scale": 1,
             "backlash": 0.0,
+            "max_vel": _DEFAULT_SPINDLE_MAX_VEL,
+            "max_accel": _DEFAULT_SPINDLE_MAX_ACCEL,
             "pid_pos": dict(_DEFAULT_SPINDLE_PID_POS),
             "pid_vel": dict(_DEFAULT_SPINDLE_PID_VEL),
         }
+    # A/B/C are always the angular slots (see CLAUDE.md's axis/joint/
+    # plug map and REB_main.py's AXIS_SELECTION_LETTERS) - X/Z/U/V/W
+    # always linear - regardless of which physical channel A/C are
+    # currently borrowing via the Axis Selection tab.
+    angular = axis_id in ("A", "B", "C")
     return {
         "scale": 1,
         "backlash": 0.0,
+        "max_vel": _DEFAULT_ROTARY_MAX_VEL if angular else _DEFAULT_LINEAR_MAX_VEL,
+        "max_accel": _DEFAULT_ROTARY_MAX_ACCEL if angular else _DEFAULT_LINEAR_MAX_ACCEL,
         "usercomment": "",
         "pid": dict(_DEFAULT_A_PID if axis_id == "A" else _DEFAULT_PID),
     }

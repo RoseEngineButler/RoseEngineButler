@@ -984,6 +984,85 @@ class HandlerClass:
             except FileNotFoundError:
                 print("halcmd not found - is the LinuxCNC environment sourced?")
 
+    def _load_max_vel_accel_settings(self):
+        '''
+        Reads persisted axis/spindle "max_vel"/"max_accel" values from
+        REB_Settings_v1.ini and applies them to the Settings tab's Max
+        Vel/Max Accel spin buttons and the real stepgen maxvel/maxaccel
+        HAL params (hm2_7i92.0.stepgen.NN.maxvel/.maxaccel) - mirrors
+        _load_scale_settings above exactly (same stepgen-channel-based
+        pin, same borrowed-letter skip logic), just pushing two values
+        per axis instead of one. These are the stepgen hardware limits,
+        not [JOINT_n]MAX_VELOCITY/MAX_ACCELERATION - see
+        reb_settings_io.py's _default_axis_entry for why.
+
+        Only runs in the component that actually owns the Settings
+        tab's spin buttons (X_Set_Max_Vel etc.) - every other tab/panel
+        also using REB_main.py will find that widget missing and
+        return immediately.
+        '''
+        if self.builder.get_object("X_Set_Max_Vel") is None:
+            return
+
+        settings = reb_settings_io.load_settings()
+        axes = settings.get("axes", {})
+
+        def restore(axis_id, stepgen_ch, axis_entry, label_suffix=""):
+            for key, widget_suffix, hal_suffix in (
+                ("max_vel", "_Set_Max_Vel", ".maxvel"),
+                ("max_accel", "_Set_Max_Accel", ".maxaccel"),
+            ):
+                if key not in axis_entry:
+                    print("No stored " + key + " found for axis " + axis_id
+                          + " in " + SETTINGS_PATH)
+                    continue
+
+                value = float(axis_entry[key])
+
+                widget = self.builder.get_object(axis_id + widget_suffix)
+                if widget is not None:
+                    widget.set_value(value)
+
+                if stepgen_ch is None:
+                    continue
+
+                hal_pin = "hm2_7i92.0.stepgen." + stepgen_ch + hal_suffix
+                try:
+                    subprocess.run(
+                        ["halcmd", "setp", hal_pin, str(value)],
+                        check=True,
+                        capture_output=True,
+                        text=True
+                    )
+                    print("Restored " + hal_pin + " = " + str(value) + label_suffix)
+                except subprocess.CalledProcessError as e:
+                    print("Error restoring " + hal_pin + ": " + e.stderr)
+                except FileNotFoundError:
+                    print("halcmd not found - is the LinuxCNC environment sourced?")
+
+        for axis_id, stepgen_ch in AXIS_STEPGEN.items():
+            axis_entry = axes.get(axis_id)
+            if axis_entry is None:
+                continue
+            # Same borrowed-letter reasoning as _load_scale_settings:
+            # skip the live HAL push (but not the spin-button restore
+            # loop above - restore() already handles that) when this
+            # channel is currently wearing a different letter.
+            if axis_id in CURRENT_LETTER and CURRENT_LETTER[axis_id] != axis_id.lower():
+                restore(axis_id, None, axis_entry)
+                continue
+            restore(axis_id, stepgen_ch, axis_entry)
+
+        # EXTRA_SETTINGS_LETTERS (A/C): letter-keyed, no fixed channel of
+        # their own - same pattern as _load_scale_settings.
+        for letter in EXTRA_SETTINGS_LETTERS:
+            axis_entry = axes.get(letter)
+            if axis_entry is None:
+                continue
+            internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
+            stepgen_ch = AXIS_STEPGEN[internal_id] if internal_id is not None else None
+            restore(letter, stepgen_ch, axis_entry, " (" + letter + ")")
+
     def _load_pid_settings(self):
         '''
         Reads persisted P/I/D/FF0/FF1/FF2 gains from REB_Settings_v1.ini
@@ -1269,33 +1348,43 @@ class HandlerClass:
     def _apply_measurement_system_labels(self, system):
         '''
         Sets the feed-rate/indexing-distance unit labels on the main panel
-        and the scale unit labels on the Settings tab (each channel's
-        Feed_UOM/IdxDist_UOM/Scale_UOM trio) to match the given system
-        ("Metric" or "Imperial") for channels *currently* assigned a
-        linear letter, or to the fixed angular text ("deg / min"/"deg"/
-        "pulses / deg") for channels currently assigned an angular one -
-        degrees aren't metric or imperial, so an angular channel's labels
-        don't change when the operator toggles measurement system, but
-        still need to be set at least once (a channel reassigned away
-        from its shipped-default type wouldn't otherwise get correct
-        text - the .ui file's own static default only matches that
-        channel's *default* letter, e.g. X's Scale_UOM defaults to
-        "pulses / in", wrong if X's channel is now assigned an angular
-        letter). Whichever labels this component doesn't own
+        and the scale/max-vel/max-accel unit labels on the Settings tab
+        (each channel's Feed_UOM/IdxDist_UOM/Scale_UOM/Max_Vel_UOM/
+        Max_Accel_UOM set) to match the given system ("Metric" or
+        "Imperial") for channels *currently* assigned a linear letter, or
+        to the fixed angular text ("deg / min"/"deg"/"pulses\n/ deg"/
+        "deg\n/ sec"/"deg\n/ sec²") for channels currently assigned an
+        angular one - degrees aren't metric or imperial, so an angular
+        channel's labels don't change when the operator toggles
+        measurement system, but still need to be set at least once (a
+        channel reassigned away from its shipped-default type wouldn't
+        otherwise get correct text - the .ui file's own static default
+        only matches that channel's *default* letter, e.g. X's Scale_UOM
+        defaults to "pulses\n/ in", wrong if X's channel is now assigned
+        an angular letter). Scale_UOM/Max_Vel_UOM/Max_Accel_UOM are set
+        two lines at a time (embedded "\n") to match the .ui file's own
+        static defaults for the labels this function doesn't reach
+        (A/C/Sp0/Sp1 - see EXTRA_SETTINGS_LETTERS); Feed_UOM/IdxDist_UOM
+        stay single-line, matching REB_Panel_v1.ui's static defaults for
+        those widgets. Whichever labels this component doesn't own
         (builder.get_object returns None) are silently skipped - same
         no-op-in-the-wrong-component pattern as _load_scale_settings/
         _load_axis_comments.
         '''
         if system == "Metric":
-            linear_feed_uom, linear_dist_uom, linear_scale_uom = "mm / min", "mm", "pulses / mm"
+            linear_feed_uom, linear_dist_uom, linear_scale_uom = "mm / min", "mm", "pulses\n/ mm"
+            linear_vel_uom, linear_accel_uom = "mm\n/ sec", "mm\n/ sec²"
         else:
-            linear_feed_uom, linear_dist_uom, linear_scale_uom = "in / min", "in", "pulses / in"
+            linear_feed_uom, linear_dist_uom, linear_scale_uom = "in / min", "in", "pulses\n/ in"
+            linear_vel_uom, linear_accel_uom = "in\n/ sec", "in\n/ sec²"
 
         for axis_id in CHANNEL_DEFAULT_LETTER.values():
             if _axis_type_for_letter(CURRENT_LETTER[axis_id]) == "ANGULAR":
-                feed_uom, dist_uom, scale_uom = "deg / min", "deg", "pulses / deg"
+                feed_uom, dist_uom, scale_uom = "deg / min", "deg", "pulses\n/ deg"
+                vel_uom, accel_uom = "deg\n/ sec", "deg\n/ sec²"
             else:
                 feed_uom, dist_uom, scale_uom = linear_feed_uom, linear_dist_uom, linear_scale_uom
+                vel_uom, accel_uom = linear_vel_uom, linear_accel_uom
 
             feed_label = self.builder.get_object(axis_id + "_Feed_UOM")
             if feed_label is not None:
@@ -1308,6 +1397,14 @@ class HandlerClass:
             scale_label = self.builder.get_object(axis_id + "_Scale_UOM")
             if scale_label is not None:
                 scale_label.set_text(scale_uom)
+
+            max_vel_label = self.builder.get_object(axis_id + "_Max_Vel_UOM")
+            if max_vel_label is not None:
+                max_vel_label.set_text(vel_uom)
+
+            max_accel_label = self.builder.get_object(axis_id + "_Max_Accel_UOM")
+            if max_accel_label is not None:
+                max_accel_label.set_text(accel_uom)
 
     def _load_measurement_system(self):
         '''
@@ -1833,6 +1930,14 @@ class HandlerClass:
             if backlash_widget is not None:
                 axis_entry["backlash"] = backlash_widget.get_value()
 
+            max_vel_widget = self.builder.get_object(axis_id + "_Set_Max_Vel")
+            if max_vel_widget is not None:
+                axis_entry["max_vel"] = max_vel_widget.get_value()
+
+            max_accel_widget = self.builder.get_object(axis_id + "_Set_Max_Accel")
+            if max_accel_widget is not None:
+                axis_entry["max_accel"] = max_accel_widget.get_value()
+
             if axis_id in PID_AXES or axis_id in EXTRA_SETTINGS_LETTERS:
                 values = self._read_pid_gains(lambda param, axis_id=axis_id: axis_id + "_Set_" + param)
                 if values:
@@ -1846,7 +1951,7 @@ class HandlerClass:
                         axis_entry.setdefault(block_tag, {}).update(values)
 
         reb_settings_io.save_settings(settings)
-        print("Saved live scale/backlash/PID values to " + SETTINGS_PATH)
+        print("Saved live scale/backlash/max vel/max accel/PID values to " + SETTINGS_PATH)
 
 #######################################################################
 # Settings_Save_As
@@ -2087,9 +2192,10 @@ class HandlerClass:
         def get_axis_entry(axis_id):
             return data["axes"].setdefault(axis_id, {})
 
-        # Each selected axis exports Scale, Backlash, and Stepper Motor
-        # Tuning/PID together as one unit - see _run_export_selection_dialog
-        # for why these three no longer get independent checkboxes.
+        # Each selected axis exports Scale, Backlash, Max Vel/Max Accel,
+        # and Stepper Motor Tuning/PID together as one unit - see
+        # _run_export_selection_dialog for why these no longer get
+        # independent checkboxes.
         exported = []
         for axis_id in selected.get("axes", ()):
             spin = self.builder.get_object(axis_id + "_Set_Scale")
@@ -2101,6 +2207,16 @@ class HandlerClass:
             if backlash_spin is not None:
                 get_axis_entry(axis_id)["backlash"] = backlash_spin.get_value()
                 exported.append(axis_id + " Backlash")
+
+            max_vel_spin = self.builder.get_object(axis_id + "_Set_Max_Vel")
+            if max_vel_spin is not None:
+                get_axis_entry(axis_id)["max_vel"] = max_vel_spin.get_value()
+                exported.append(axis_id + " Max Vel")
+
+            max_accel_spin = self.builder.get_object(axis_id + "_Set_Max_Accel")
+            if max_accel_spin is not None:
+                get_axis_entry(axis_id)["max_accel"] = max_accel_spin.get_value()
+                exported.append(axis_id + " Max Accel")
 
             if axis_id in PID_AXES or axis_id in EXTRA_SETTINGS_LETTERS:
                 self._export_pid_block(get_axis_entry(axis_id), "pid",
@@ -2449,6 +2565,30 @@ class HandlerClass:
                     if backlash is not None:
                         spin.set_value(backlash)  # fires <Axis>_Set_Backlash: halcmd setp/mark dirty
                         imported.append(axis_id + " Backlash")
+
+            if "max_vel" in axis_entry:
+                spin = self.builder.get_object(axis_id + "_Set_Max_Vel")
+                if spin is not None:
+                    try:
+                        max_vel = float(axis_entry["max_vel"])
+                    except (TypeError, ValueError):
+                        print("Skipping " + axis_id + " max_vel - not a number: " + str(axis_entry["max_vel"]))
+                        max_vel = None
+                    if max_vel is not None:
+                        spin.set_value(max_vel)  # fires <Axis>_Set_Max_Vel: halcmd setp
+                        imported.append(axis_id + " Max Vel")
+
+            if "max_accel" in axis_entry:
+                spin = self.builder.get_object(axis_id + "_Set_Max_Accel")
+                if spin is not None:
+                    try:
+                        max_accel = float(axis_entry["max_accel"])
+                    except (TypeError, ValueError):
+                        print("Skipping " + axis_id + " max_accel - not a number: " + str(axis_entry["max_accel"]))
+                        max_accel = None
+                    if max_accel is not None:
+                        spin.set_value(max_accel)  # fires <Axis>_Set_Max_Accel: halcmd setp
+                        imported.append(axis_id + " Max Accel")
 
             # Comment (device name - see Export_Settings/the General
             # tab's Device Names list): only COMMENT_AXES have a live
@@ -4012,6 +4152,13 @@ class HandlerClass:
         # with these widgets.
         self._load_backlash_settings()
 
+        # Restore persisted Max Vel/Max Accel values (REB_Settings_v1.ini)
+        # into the Settings tab's spin buttons and the live stepgen
+        # maxvel/maxaccel HAL params. No-ops in every component other
+        # than the Settings tab (REBCnfg), which is the only one with
+        # these widgets.
+        self._load_max_vel_accel_settings()
+
         # Restore persisted per-axis user comments (REB_Settings_v1.ini)
         # into the main panel's comment fields. No-ops in every
         # component other than the main panel (gladevcp), which is the
@@ -4333,6 +4480,78 @@ def _axis_set_move_dist(axis):
     handler.__name__ = axis + "_Set_Move_Dist"
     return handler
 
+def _stepgen_step_rate_ceiling(stepgen_ch):
+    '''
+    Returns the hardware step-rate ceiling (steps/sec) for the given
+    stepgen channel, derived from its live steplen/stepspace HAL params
+    (nanoseconds, set from [JOINT_n]STEPLEN/STEPSPACE in REB.hal at
+    startup and not editable from this UI) via
+    1 / (STEPLEN + STEPSPACE) - the same formula worked by hand in
+    REB.ini's STEPGEN_MAXVEL comments (e.g. [JOINT_0]: "STEPLEN+STEPSPACE
+    = 5000ns/step the hardware ceiling is 1/5000ns = 200,000 steps/sec").
+    Returns None if steplen+stepspace sum to zero.
+    '''
+    steplen = hal.get_value("hm2_7i92.0.stepgen." + stepgen_ch + ".steplen")
+    stepspace = hal.get_value("hm2_7i92.0.stepgen." + stepgen_ch + ".stepspace")
+    total_ns = steplen + stepspace
+    if total_ns <= 0:
+        return None
+    return 1e9 / total_ns
+
+def _warn_if_max_vel_exceeds_ceiling(self, widget, axis, stepgen_ch, scale, max_vel_widget):
+    '''
+    Warns and clamps when scale (steps/unit, just-committed) and the
+    Max Vel spin button's current value together would ask the stepgen
+    for more steps/sec than its steplen+stepspace timing can produce.
+    LinuxCNC doesn't error in this case, it silently clips the
+    stepgen's actual speed at the hardware ceiling (see the "maxvel is
+    too big" style warning this is meant to preempt) - rather than
+    leave the field showing a value the hardware can't actually honor,
+    this pushes the calculated safe maximum back into max_vel_widget,
+    which (via its own "value-changed" signal, already wired to
+    _axis_set_max/_axis_set_max_letter) sends the corrected value to
+    the live HAL maxvel pin the same way a manual edit would - no
+    separate HAL write needed here. Only called for Max Vel, not Max
+    Accel - there's no equivalent stepgen step-rate limit tied to
+    acceleration.
+    '''
+    if scale == 0:
+        return
+    ceiling = _stepgen_step_rate_ceiling(stepgen_ch)
+    if ceiling is None:
+        return
+    max_vel = max_vel_widget.get_value()
+    if abs(scale) * max_vel <= ceiling:
+        return
+
+    # Round down (not to nearest) so the clamped value can't itself
+    # still exceed the ceiling after rounding - the set_value() below
+    # reenters this same check via max_vel_widget's own "value-changed"
+    # signal, and a second popup there would be confusing.
+    digits = max_vel_widget.get_digits()
+    factor = 10 ** digits
+    safe_max_vel = int((ceiling / abs(scale)) * factor) / factor
+
+    uom_widget = self.builder.get_object(axis + "_Max_Vel_UOM")
+    uom = uom_widget.get_label().replace("\n", " ") if uom_widget is not None else "units/sec"
+    dialog = Gtk.MessageDialog(
+        transient_for=widget.get_toplevel(),
+        flags=0,
+        message_type=Gtk.MessageType.WARNING,
+        buttons=Gtk.ButtonsType.OK,
+        text=axis + ": Max Velocity was too high for this Scale",
+    )
+    dialog.format_secondary_text(
+        "At a Scale of {:g}, the stepgen hardware can drive at most {:.4f} {} "
+        "(step-rate ceiling {:.0f} steps/sec, from STEPLEN+STEPSPACE). "
+        "Max Velocity has been reduced from {:g} {} to {:.4f} {} to match."
+        .format(abs(scale), safe_max_vel, uom, ceiling, max_vel, uom, safe_max_vel, uom)
+    )
+    dialog.run()
+    dialog.destroy()
+
+    max_vel_widget.set_value(safe_max_vel)
+
 def _axis_set_scale(axis):
     stepgen_ch = AXIS_STEPGEN[axis]
     hal_pin = "hm2_7i92.0.stepgen." + stepgen_ch + ".position-scale"
@@ -4395,6 +4614,11 @@ def _axis_set_scale(axis):
             print("Error setting " + hal_pin + ": " + e.stderr)
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
+
+        max_vel_widget = self.builder.get_object(axis + "_Set_Max_Vel")
+        if max_vel_widget is not None:
+            _warn_if_max_vel_exceeds_ceiling(
+                self, widget, axis, stepgen_ch, scale, max_vel_widget)
     handler.__name__ = axis + "_Set_Scale"
     return handler
 
@@ -4485,6 +4709,11 @@ def _axis_set_scale_letter(letter):
             print("Error setting " + hal_pin + ": " + e.stderr)
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
+
+        max_vel_widget = self.builder.get_object(letter + "_Set_Max_Vel")
+        if max_vel_widget is not None:
+            _warn_if_max_vel_exceeds_ceiling(
+                self, widget, letter, AXIS_STEPGEN[internal_id], scale, max_vel_widget)
     handler.__name__ = letter + "_Set_Scale"
     return handler
 
@@ -4561,6 +4790,96 @@ def _axis_set_backlash_letter(letter):
 
 for _letter in EXTRA_SETTINGS_LETTERS:
     setattr(HandlerClass, _letter + "_Set_Backlash", _axis_set_backlash_letter(_letter))
+del _letter
+
+def _axis_set_max(axis, param):
+    '''
+    Generic value-changed handler for a single channel's Max Vel/Max
+    Accel spin button: pushes the new value straight to the live
+    hm2_7i92.0.stepgen.NN.maxvel/.maxaccel HAL param (the stepgen
+    hardware limit - see reb_settings_io.py's _default_axis_entry for
+    why this, not [JOINT_n]MAX_VELOCITY/MAX_ACCELERATION, is what these
+    widgets control). param is "Vel" or "Accel". Like backlash (and
+    unlike scale), no need to disable the axis first - changing a
+    stepgen's own speed/accel ceiling doesn't jump position or
+    invalidate an in-progress move.
+
+    REB_Settings_v1.ini itself is not written here - same as scale/
+    backlash/PID, that only happens at shutdown (REB_Scale_Persist.py
+    reading the live HAL pins), not on every keystroke/spin-click.
+    '''
+    hal_suffix = ".maxvel" if param == "Vel" else ".maxaccel"
+    hal_pin = "hm2_7i92.0.stepgen." + AXIS_STEPGEN[axis] + hal_suffix
+    def handler(self, widget):
+        value = widget.get_value()
+        try:
+            subprocess.run(
+                ["halcmd", "setp", hal_pin, str(value)],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            print("Set " + hal_pin + " = " + str(value))
+        except subprocess.CalledProcessError as e:
+            print("Error setting " + hal_pin + ": " + e.stderr)
+        except FileNotFoundError:
+            print("halcmd not found - is the LinuxCNC environment sourced?")
+
+        if param == "Vel":
+            scale_widget = self.builder.get_object(axis + "_Set_Scale")
+            if scale_widget is not None:
+                _warn_if_max_vel_exceeds_ceiling(
+                    self, widget, axis, AXIS_STEPGEN[axis], scale_widget.get_value(), widget)
+    handler.__name__ = axis + "_Set_Max_" + param
+    return handler
+
+for _axis in AXIS_STEPGEN:
+    setattr(HandlerClass, _axis + "_Set_Max_Vel", _axis_set_max(_axis, "Vel"))
+    setattr(HandlerClass, _axis + "_Set_Max_Accel", _axis_set_max(_axis, "Accel"))
+del _axis
+
+def _axis_set_max_letter(letter, param):
+    '''
+    Value-changed handler for A_Set_Max_Vel/A_Set_Max_Accel/
+    C_Set_Max_Vel/C_Set_Max_Accel (see EXTRA_SETTINGS_LETTERS) - mirrors
+    _axis_set_max, but letter has no fixed channel of its own, so the
+    live stepgen pin is resolved through CURRENT_LETTER_INTERNAL_ID/
+    AXIS_STEPGEN at call time, same as _axis_set_scale_letter/
+    _axis_set_backlash_letter.
+    '''
+    hal_suffix = ".maxvel" if param == "Vel" else ".maxaccel"
+    def handler(self, widget):
+        internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
+        if internal_id is None:
+            print(letter + " is not currently assigned to a channel - value kept, no live HAL write")
+            return
+
+        hal_pin = "hm2_7i92.0.stepgen." + AXIS_STEPGEN[internal_id] + hal_suffix
+        value = widget.get_value()
+        try:
+            subprocess.run(
+                ["halcmd", "setp", hal_pin, str(value)],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            print("Set " + hal_pin + " = " + str(value) + " (" + letter + ")")
+        except subprocess.CalledProcessError as e:
+            print("Error setting " + hal_pin + ": " + e.stderr)
+        except FileNotFoundError:
+            print("halcmd not found - is the LinuxCNC environment sourced?")
+
+        if param == "Vel":
+            scale_widget = self.builder.get_object(letter + "_Set_Scale")
+            if scale_widget is not None:
+                _warn_if_max_vel_exceeds_ceiling(
+                    self, widget, letter, AXIS_STEPGEN[internal_id], scale_widget.get_value(), widget)
+    handler.__name__ = letter + "_Set_Max_" + param
+    return handler
+
+for _letter in EXTRA_SETTINGS_LETTERS:
+    setattr(HandlerClass, _letter + "_Set_Max_Vel", _axis_set_max_letter(_letter, "Vel"))
+    setattr(HandlerClass, _letter + "_Set_Max_Accel", _axis_set_max_letter(_letter, "Accel"))
 del _letter
 
 def _channel_axis_changed(channel_id):

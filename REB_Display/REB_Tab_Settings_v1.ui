@@ -97,6 +97,16 @@
     <property name="step-increment">1</property>
     <property name="page-increment">10</property>
   </object>
+  <object class="GtkAdjustment" id="A_Set_Max_Accel_adj">
+    <property name="upper">200</property>
+    <property name="step-increment">0.10</property>
+    <property name="page-increment">1</property>
+  </object>
+  <object class="GtkAdjustment" id="A_Set_Max_Vel_adj">
+    <property name="upper">1000</property>
+    <property name="step-increment">0.10</property>
+    <property name="page-increment">1</property>
+  </object>
   <object class="GtkAdjustment" id="A_Set_P_adj">
     <property name="upper">100</property>
     <property name="step-increment">1</property>
@@ -138,6 +148,16 @@
     <property name="step-increment">1</property>
     <property name="page-increment">10</property>
   </object>
+  <object class="GtkAdjustment" id="B_Set_Max_Accel_adj">
+    <property name="upper">200</property>
+    <property name="step-increment">0.10</property>
+    <property name="page-increment">1</property>
+  </object>
+  <object class="GtkAdjustment" id="B_Set_Max_Vel_adj">
+    <property name="upper">1000</property>
+    <property name="step-increment">0.10</property>
+    <property name="page-increment">1</property>
+  </object>
   <object class="GtkAdjustment" id="B_Set_P_adj">
     <property name="upper">100</property>
     <property name="step-increment">1</property>
@@ -178,6 +198,16 @@
     <property name="upper">100</property>
     <property name="step-increment">1</property>
     <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="C_Set_Max_Accel_adj">
+    <property name="upper">200</property>
+    <property name="step-increment">0.10</property>
+    <property name="page-increment">1</property>
+  </object>
+  <object class="GtkAdjustment" id="C_Set_Max_Vel_adj">
+    <property name="upper">1000</property>
+    <property name="step-increment">0.10</property>
+    <property name="page-increment">1</property>
   </object>
   <object class="GtkAdjustment" id="C_Set_P_adj">
     <property name="upper">100</property>
@@ -282,6 +312,16 @@
     <property name="step-increment">1</property>
     <property name="page-increment">10</property>
   </object>
+  <object class="GtkAdjustment" id="Sp0_Set_Max_Accel_adj">
+    <property name="upper">50</property>
+    <property name="step-increment">0.01</property>
+    <property name="page-increment">0.10</property>
+  </object>
+  <object class="GtkAdjustment" id="Sp0_Set_Max_Vel_adj">
+    <property name="upper">50</property>
+    <property name="step-increment">0.01</property>
+    <property name="page-increment">0.10</property>
+  </object>
   <object class="GtkAdjustment" id="Sp0_Set_P_Pos_adj">
     <property name="upper">100</property>
     <property name="step-increment">1</property>
@@ -353,6 +393,16 @@
     <property name="step-increment">1</property>
     <property name="page-increment">10</property>
   </object>
+  <object class="GtkAdjustment" id="Sp1_Set_Max_Accel_adj">
+    <property name="upper">50</property>
+    <property name="step-increment">0.01</property>
+    <property name="page-increment">0.10</property>
+  </object>
+  <object class="GtkAdjustment" id="Sp1_Set_Max_Vel_adj">
+    <property name="upper">50</property>
+    <property name="step-increment">0.01</property>
+    <property name="page-increment">0.10</property>
+  </object>
   <object class="GtkAdjustment" id="Sp1_Set_P_Pos_adj">
     <property name="upper">100</property>
     <property name="step-increment">1</property>
@@ -399,6 +449,16 @@
     <property name="step-increment">1</property>
     <property name="page-increment">10</property>
   </object>
+  <object class="GtkAdjustment" id="U_Set_Max_Accel_adj">
+    <property name="upper">200</property>
+    <property name="step-increment">0.10</property>
+    <property name="page-increment">1</property>
+  </object>
+  <object class="GtkAdjustment" id="U_Set_Max_Vel_adj">
+    <property name="upper">10</property>
+    <property name="step-increment">0.001</property>
+    <property name="page-increment">0.01</property>
+  </object>
   <object class="GtkAdjustment" id="U_Set_P_adj">
     <property name="upper">100</property>
     <property name="step-increment">1</property>
@@ -439,6 +499,16 @@
     <property name="upper">100</property>
     <property name="step-increment">1</property>
     <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="V_Set_Max_Accel_adj">
+    <property name="upper">200</property>
+    <property name="step-increment">0.10</property>
+    <property name="page-increment">1</property>
+  </object>
+  <object class="GtkAdjustment" id="V_Set_Max_Vel_adj">
+    <property name="upper">10</property>
+    <property name="step-increment">0.001</property>
+    <property name="page-increment">0.01</property>
   </object>
   <object class="GtkAdjustment" id="V_Set_P_adj">
     <property name="upper">100</property>
@@ -481,6 +551,16 @@
     <property name="step-increment">1</property>
     <property name="page-increment">10</property>
   </object>
+  <object class="GtkAdjustment" id="W_Set_Max_Accel_adj">
+    <property name="upper">200</property>
+    <property name="step-increment">0.10</property>
+    <property name="page-increment">1</property>
+  </object>
+  <object class="GtkAdjustment" id="W_Set_Max_Vel_adj">
+    <property name="upper">10</property>
+    <property name="step-increment">0.001</property>
+    <property name="page-increment">0.01</property>
+  </object>
   <object class="GtkAdjustment" id="W_Set_P_adj">
     <property name="upper">100</property>
     <property name="step-increment">1</property>
@@ -522,6 +602,16 @@
     <property name="step-increment">1</property>
     <property name="page-increment">10</property>
   </object>
+  <object class="GtkAdjustment" id="X_Set_Max_Accel_adj">
+    <property name="upper">200</property>
+    <property name="step-increment">0.10</property>
+    <property name="page-increment">1</property>
+  </object>
+  <object class="GtkAdjustment" id="X_Set_Max_Vel_adj">
+    <property name="upper">10</property>
+    <property name="step-increment">0.001</property>
+    <property name="page-increment">0.01</property>
+  </object>
   <object class="GtkAdjustment" id="X_Set_P_adj">
     <property name="upper">100</property>
     <property name="step-increment">1</property>
@@ -562,6 +652,16 @@
     <property name="upper">100</property>
     <property name="step-increment">1</property>
     <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="Z_Set_Max_Accel_adj">
+    <property name="upper">200</property>
+    <property name="step-increment">0.10</property>
+    <property name="page-increment">1</property>
+  </object>
+  <object class="GtkAdjustment" id="Z_Set_Max_Vel_adj">
+    <property name="upper">10</property>
+    <property name="step-increment">0.001</property>
+    <property name="page-increment">0.01</property>
   </object>
   <object class="GtkAdjustment" id="Z_Set_P_adj">
     <property name="upper">100</property>
@@ -1515,7 +1615,7 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                             <property name="halign">start</property>
                             <property name="valign">start</property>
                             <property name="hexpand">True</property>
-                            <property name="label" translatable="yes">Axis Scaling</property>
+                            <property name="label" translatable="yes">Axis Scaling/Speed</property>
                             <property name="justify">center</property>
                             <attributes>
                               <attribute name="font-desc" value="DejaVu Serif 20"/>
@@ -1534,7 +1634,7 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                             <property name="visible">True</property>
                             <property name="can-focus">False</property>
                             <child>
-                              <!-- n-columns=3 n-rows=15 -->
+                              <!-- n-columns=7 n-rows=15 -->
                               <object class="GtkGrid">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
@@ -1622,7 +1722,7 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                   <packing>
                                     <property name="left-attach">0</property>
                                     <property name="top-attach">11</property>
-                                    <property name="width">3</property>
+                                    <property name="width">7</property>
                                   </packing>
                                 </child>
                                 <child>
@@ -1721,7 +1821,7 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                   <packing>
                                     <property name="left-attach">0</property>
                                     <property name="top-attach">4</property>
-                                    <property name="width">3</property>
+                                    <property name="width">7</property>
                                   </packing>
                                 </child>
                                 <child>
@@ -1770,7 +1870,7 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                   <packing>
                                     <property name="left-attach">0</property>
                                     <property name="top-attach">1</property>
-                                    <property name="width">3</property>
+                                    <property name="width">7</property>
                                   </packing>
                                 </child>
                                 <child>
@@ -1799,6 +1899,96 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                   </packing>
                                 </child>
                                 <child>
+                                  <object class="HAL_SpinButton" id="X_Set_Max_Vel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="can-default">True</property>
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">5</property>
+                                    <property name="margin-start">5</property>
+                                    <property name="margin-top">2</property>
+                                    <property name="margin-bottom">2</property>
+                                    <property name="text" translatable="yes">0.400</property>
+                                    <property name="overwrite-mode">True</property>
+                                    <property name="input-purpose">number</property>
+                                    <property name="adjustment">X_Set_Max_Vel_adj</property>
+                                    <property name="climb-rate">0.009999999776482582</property>
+                                    <property name="digits">3</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">0.40</property>
+                                    <signal name="value-changed" handler="X_Set_Max_Vel" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">3</property>
+                                    <property name="top-attach">5</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="X_Max_Vel_UOM">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">4</property>
+                                    <property name="margin-start">4</property>
+                                    <property name="label" translatable="yes">in
+/ sec</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">4</property>
+                                    <property name="top-attach">5</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="HAL_SpinButton" id="X_Set_Max_Accel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="can-default">True</property>
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">5</property>
+                                    <property name="margin-start">5</property>
+                                    <property name="margin-top">2</property>
+                                    <property name="margin-bottom">2</property>
+                                    <property name="text" translatable="yes">30.00</property>
+                                    <property name="overwrite-mode">True</property>
+                                    <property name="input-purpose">number</property>
+                                    <property name="adjustment">X_Set_Max_Accel_adj</property>
+                                    <property name="climb-rate">0.009999999776482582</property>
+                                    <property name="digits">2</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">30</property>
+                                    <signal name="value-changed" handler="X_Set_Max_Accel" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">5</property>
+                                    <property name="top-attach">5</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="X_Max_Accel_UOM">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">4</property>
+                                    <property name="margin-start">4</property>
+                                    <property name="label" translatable="yes">in
+/ sec²</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">6</property>
+                                    <property name="top-attach">5</property>
+                                  </packing>
+                                </child>
+                                <child>
                                   <object class="GtkLabel" id="X_Scale_UOM">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
@@ -1806,7 +1996,8 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                     <property name="valign">center</property>
                                     <property name="margin-left">4</property>
                                     <property name="margin-start">4</property>
-                                    <property name="label" translatable="yes">pulses / in</property>
+                                    <property name="label" translatable="yes">pulses
+/ in</property>
                                     <attributes>
                                       <attribute name="font-desc" value="DejaVu Serif 10"/>
                                     </attributes>
@@ -1830,6 +2021,40 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                   </object>
                                   <packing>
                                     <property name="left-attach">1</property>
+                                    <property name="top-attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">center</property>
+                                    <property name="valign">end</property>
+                                    <property name="label" translatable="yes">Max Vel</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                      <attribute name="weight" value="bold"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">3</property>
+                                    <property name="top-attach">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">center</property>
+                                    <property name="valign">end</property>
+                                    <property name="label" translatable="yes">Max Accel</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                      <attribute name="weight" value="bold"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">5</property>
                                     <property name="top-attach">0</property>
                                   </packing>
                                 </child>
@@ -1859,6 +2084,96 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                   </packing>
                                 </child>
                                 <child>
+                                  <object class="HAL_SpinButton" id="Z_Set_Max_Vel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="can-default">True</property>
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">5</property>
+                                    <property name="margin-start">5</property>
+                                    <property name="margin-top">2</property>
+                                    <property name="margin-bottom">2</property>
+                                    <property name="text" translatable="yes">0.400</property>
+                                    <property name="overwrite-mode">True</property>
+                                    <property name="input-purpose">number</property>
+                                    <property name="adjustment">Z_Set_Max_Vel_adj</property>
+                                    <property name="climb-rate">0.009999999776482582</property>
+                                    <property name="digits">3</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">0.40</property>
+                                    <signal name="value-changed" handler="Z_Set_Max_Vel" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">3</property>
+                                    <property name="top-attach">7</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="Z_Max_Vel_UOM">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">4</property>
+                                    <property name="margin-start">4</property>
+                                    <property name="label" translatable="yes">in
+/ sec</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">4</property>
+                                    <property name="top-attach">7</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="HAL_SpinButton" id="Z_Set_Max_Accel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="can-default">True</property>
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">5</property>
+                                    <property name="margin-start">5</property>
+                                    <property name="margin-top">2</property>
+                                    <property name="margin-bottom">2</property>
+                                    <property name="text" translatable="yes">30.00</property>
+                                    <property name="overwrite-mode">True</property>
+                                    <property name="input-purpose">number</property>
+                                    <property name="adjustment">Z_Set_Max_Accel_adj</property>
+                                    <property name="climb-rate">0.009999999776482582</property>
+                                    <property name="digits">2</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">30</property>
+                                    <signal name="value-changed" handler="Z_Set_Max_Accel" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">5</property>
+                                    <property name="top-attach">7</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="Z_Max_Accel_UOM">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">4</property>
+                                    <property name="margin-start">4</property>
+                                    <property name="label" translatable="yes">in
+/ sec²</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">6</property>
+                                    <property name="top-attach">7</property>
+                                  </packing>
+                                </child>
+                                <child>
                                   <object class="HAL_SpinButton" id="U_Set_Scale">
                                     <property name="visible">True</property>
                                     <property name="can-focus">True</property>
@@ -1880,6 +2195,96 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                   </object>
                                   <packing>
                                     <property name="left-attach">1</property>
+                                    <property name="top-attach">8</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="HAL_SpinButton" id="U_Set_Max_Vel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="can-default">True</property>
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">5</property>
+                                    <property name="margin-start">5</property>
+                                    <property name="margin-top">2</property>
+                                    <property name="margin-bottom">2</property>
+                                    <property name="text" translatable="yes">0.400</property>
+                                    <property name="overwrite-mode">True</property>
+                                    <property name="input-purpose">number</property>
+                                    <property name="adjustment">U_Set_Max_Vel_adj</property>
+                                    <property name="climb-rate">0.009999999776482582</property>
+                                    <property name="digits">3</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">0.40</property>
+                                    <signal name="value-changed" handler="U_Set_Max_Vel" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">3</property>
+                                    <property name="top-attach">8</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="U_Max_Vel_UOM">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">4</property>
+                                    <property name="margin-start">4</property>
+                                    <property name="label" translatable="yes">in
+/ sec</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">4</property>
+                                    <property name="top-attach">8</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="HAL_SpinButton" id="U_Set_Max_Accel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="can-default">True</property>
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">5</property>
+                                    <property name="margin-start">5</property>
+                                    <property name="margin-top">2</property>
+                                    <property name="margin-bottom">2</property>
+                                    <property name="text" translatable="yes">30.00</property>
+                                    <property name="overwrite-mode">True</property>
+                                    <property name="input-purpose">number</property>
+                                    <property name="adjustment">U_Set_Max_Accel_adj</property>
+                                    <property name="climb-rate">0.009999999776482582</property>
+                                    <property name="digits">2</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">30</property>
+                                    <signal name="value-changed" handler="U_Set_Max_Accel" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">5</property>
+                                    <property name="top-attach">8</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="U_Max_Accel_UOM">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">4</property>
+                                    <property name="margin-start">4</property>
+                                    <property name="label" translatable="yes">in
+/ sec²</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">6</property>
                                     <property name="top-attach">8</property>
                                   </packing>
                                 </child>
@@ -1910,6 +2315,96 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                   </packing>
                                 </child>
                                 <child>
+                                  <object class="HAL_SpinButton" id="V_Set_Max_Vel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="can-default">True</property>
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">5</property>
+                                    <property name="margin-start">5</property>
+                                    <property name="margin-top">2</property>
+                                    <property name="margin-bottom">2</property>
+                                    <property name="text" translatable="yes">0.400</property>
+                                    <property name="overwrite-mode">True</property>
+                                    <property name="input-purpose">number</property>
+                                    <property name="adjustment">V_Set_Max_Vel_adj</property>
+                                    <property name="climb-rate">0.009999999776482582</property>
+                                    <property name="digits">3</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">0.40</property>
+                                    <signal name="value-changed" handler="V_Set_Max_Vel" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">3</property>
+                                    <property name="top-attach">9</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="V_Max_Vel_UOM">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">4</property>
+                                    <property name="margin-start">4</property>
+                                    <property name="label" translatable="yes">in
+/ sec</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">4</property>
+                                    <property name="top-attach">9</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="HAL_SpinButton" id="V_Set_Max_Accel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="can-default">True</property>
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">5</property>
+                                    <property name="margin-start">5</property>
+                                    <property name="margin-top">2</property>
+                                    <property name="margin-bottom">2</property>
+                                    <property name="text" translatable="yes">30.00</property>
+                                    <property name="overwrite-mode">True</property>
+                                    <property name="input-purpose">number</property>
+                                    <property name="adjustment">V_Set_Max_Accel_adj</property>
+                                    <property name="climb-rate">0.009999999776482582</property>
+                                    <property name="digits">2</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">30</property>
+                                    <signal name="value-changed" handler="V_Set_Max_Accel" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">5</property>
+                                    <property name="top-attach">9</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="V_Max_Accel_UOM">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">4</property>
+                                    <property name="margin-start">4</property>
+                                    <property name="label" translatable="yes">in
+/ sec²</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">6</property>
+                                    <property name="top-attach">9</property>
+                                  </packing>
+                                </child>
+                                <child>
                                   <object class="HAL_SpinButton" id="W_Set_Scale">
                                     <property name="visible">True</property>
                                     <property name="can-focus">True</property>
@@ -1932,6 +2427,96 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                   </object>
                                   <packing>
                                     <property name="left-attach">1</property>
+                                    <property name="top-attach">10</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="HAL_SpinButton" id="W_Set_Max_Vel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="can-default">True</property>
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">5</property>
+                                    <property name="margin-start">5</property>
+                                    <property name="margin-top">2</property>
+                                    <property name="margin-bottom">2</property>
+                                    <property name="text" translatable="yes">0.400</property>
+                                    <property name="overwrite-mode">True</property>
+                                    <property name="input-purpose">number</property>
+                                    <property name="adjustment">W_Set_Max_Vel_adj</property>
+                                    <property name="climb-rate">0.009999999776482582</property>
+                                    <property name="digits">3</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">0.40</property>
+                                    <signal name="value-changed" handler="W_Set_Max_Vel" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">3</property>
+                                    <property name="top-attach">10</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="W_Max_Vel_UOM">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">4</property>
+                                    <property name="margin-start">4</property>
+                                    <property name="label" translatable="yes">in
+/ sec</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">4</property>
+                                    <property name="top-attach">10</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="HAL_SpinButton" id="W_Set_Max_Accel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="can-default">True</property>
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">5</property>
+                                    <property name="margin-start">5</property>
+                                    <property name="margin-top">2</property>
+                                    <property name="margin-bottom">2</property>
+                                    <property name="text" translatable="yes">30.00</property>
+                                    <property name="overwrite-mode">True</property>
+                                    <property name="input-purpose">number</property>
+                                    <property name="adjustment">W_Set_Max_Accel_adj</property>
+                                    <property name="climb-rate">0.009999999776482582</property>
+                                    <property name="digits">2</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">30</property>
+                                    <signal name="value-changed" handler="W_Set_Max_Accel" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">5</property>
+                                    <property name="top-attach">10</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="W_Max_Accel_UOM">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">4</property>
+                                    <property name="margin-start">4</property>
+                                    <property name="label" translatable="yes">in
+/ sec²</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">6</property>
                                     <property name="top-attach">10</property>
                                   </packing>
                                 </child>
@@ -1961,6 +2546,96 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                   </packing>
                                 </child>
                                 <child>
+                                  <object class="HAL_SpinButton" id="A_Set_Max_Vel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="can-default">True</property>
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">5</property>
+                                    <property name="margin-start">5</property>
+                                    <property name="margin-top">2</property>
+                                    <property name="margin-bottom">2</property>
+                                    <property name="text" translatable="yes">100.00</property>
+                                    <property name="overwrite-mode">True</property>
+                                    <property name="input-purpose">number</property>
+                                    <property name="adjustment">A_Set_Max_Vel_adj</property>
+                                    <property name="climb-rate">0.009999999776482582</property>
+                                    <property name="digits">2</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">100</property>
+                                    <signal name="value-changed" handler="A_Set_Max_Vel" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">3</property>
+                                    <property name="top-attach">12</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="A_Max_Vel_UOM">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">4</property>
+                                    <property name="margin-start">4</property>
+                                    <property name="label" translatable="yes">deg
+/ sec</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">4</property>
+                                    <property name="top-attach">12</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="HAL_SpinButton" id="A_Set_Max_Accel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="can-default">True</property>
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">5</property>
+                                    <property name="margin-start">5</property>
+                                    <property name="margin-top">2</property>
+                                    <property name="margin-bottom">2</property>
+                                    <property name="text" translatable="yes">20.00</property>
+                                    <property name="overwrite-mode">True</property>
+                                    <property name="input-purpose">number</property>
+                                    <property name="adjustment">A_Set_Max_Accel_adj</property>
+                                    <property name="climb-rate">0.009999999776482582</property>
+                                    <property name="digits">2</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">20</property>
+                                    <signal name="value-changed" handler="A_Set_Max_Accel" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">5</property>
+                                    <property name="top-attach">12</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="A_Max_Accel_UOM">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">4</property>
+                                    <property name="margin-start">4</property>
+                                    <property name="label" translatable="yes">deg
+/ sec²</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">6</property>
+                                    <property name="top-attach">12</property>
+                                  </packing>
+                                </child>
+                                <child>
                                   <object class="HAL_SpinButton" id="B_Set_Scale">
                                     <property name="visible">True</property>
                                     <property name="can-focus">True</property>
@@ -1982,6 +2657,96 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                   </object>
                                   <packing>
                                     <property name="left-attach">1</property>
+                                    <property name="top-attach">13</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="HAL_SpinButton" id="B_Set_Max_Vel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="can-default">True</property>
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">5</property>
+                                    <property name="margin-start">5</property>
+                                    <property name="margin-top">2</property>
+                                    <property name="margin-bottom">2</property>
+                                    <property name="text" translatable="yes">100.00</property>
+                                    <property name="overwrite-mode">True</property>
+                                    <property name="input-purpose">number</property>
+                                    <property name="adjustment">B_Set_Max_Vel_adj</property>
+                                    <property name="climb-rate">0.009999999776482582</property>
+                                    <property name="digits">2</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">100</property>
+                                    <signal name="value-changed" handler="B_Set_Max_Vel" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">3</property>
+                                    <property name="top-attach">13</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="B_Max_Vel_UOM">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">4</property>
+                                    <property name="margin-start">4</property>
+                                    <property name="label" translatable="yes">deg
+/ sec</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">4</property>
+                                    <property name="top-attach">13</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="HAL_SpinButton" id="B_Set_Max_Accel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="can-default">True</property>
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">5</property>
+                                    <property name="margin-start">5</property>
+                                    <property name="margin-top">2</property>
+                                    <property name="margin-bottom">2</property>
+                                    <property name="text" translatable="yes">20.00</property>
+                                    <property name="overwrite-mode">True</property>
+                                    <property name="input-purpose">number</property>
+                                    <property name="adjustment">B_Set_Max_Accel_adj</property>
+                                    <property name="climb-rate">0.009999999776482582</property>
+                                    <property name="digits">2</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">20</property>
+                                    <signal name="value-changed" handler="B_Set_Max_Accel" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">5</property>
+                                    <property name="top-attach">13</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="B_Max_Accel_UOM">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">4</property>
+                                    <property name="margin-start">4</property>
+                                    <property name="label" translatable="yes">deg
+/ sec²</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">6</property>
                                     <property name="top-attach">13</property>
                                   </packing>
                                 </child>
@@ -2011,6 +2776,96 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                   </packing>
                                 </child>
                                 <child>
+                                  <object class="HAL_SpinButton" id="C_Set_Max_Vel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="can-default">True</property>
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">5</property>
+                                    <property name="margin-start">5</property>
+                                    <property name="margin-top">2</property>
+                                    <property name="margin-bottom">2</property>
+                                    <property name="text" translatable="yes">100.00</property>
+                                    <property name="overwrite-mode">True</property>
+                                    <property name="input-purpose">number</property>
+                                    <property name="adjustment">C_Set_Max_Vel_adj</property>
+                                    <property name="climb-rate">0.009999999776482582</property>
+                                    <property name="digits">2</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">100</property>
+                                    <signal name="value-changed" handler="C_Set_Max_Vel" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">3</property>
+                                    <property name="top-attach">14</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="C_Max_Vel_UOM">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">4</property>
+                                    <property name="margin-start">4</property>
+                                    <property name="label" translatable="yes">deg
+/ sec</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">4</property>
+                                    <property name="top-attach">14</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="HAL_SpinButton" id="C_Set_Max_Accel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="can-default">True</property>
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">5</property>
+                                    <property name="margin-start">5</property>
+                                    <property name="margin-top">2</property>
+                                    <property name="margin-bottom">2</property>
+                                    <property name="text" translatable="yes">20.00</property>
+                                    <property name="overwrite-mode">True</property>
+                                    <property name="input-purpose">number</property>
+                                    <property name="adjustment">C_Set_Max_Accel_adj</property>
+                                    <property name="climb-rate">0.009999999776482582</property>
+                                    <property name="digits">2</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">20</property>
+                                    <signal name="value-changed" handler="C_Set_Max_Accel" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">5</property>
+                                    <property name="top-attach">14</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="C_Max_Accel_UOM">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">4</property>
+                                    <property name="margin-start">4</property>
+                                    <property name="label" translatable="yes">deg
+/ sec²</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">6</property>
+                                    <property name="top-attach">14</property>
+                                  </packing>
+                                </child>
+                                <child>
                                   <object class="HAL_SpinButton" id="Sp0_Set_Scale">
                                     <property name="visible">True</property>
                                     <property name="can-focus">True</property>
@@ -2032,6 +2887,96 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                   </object>
                                   <packing>
                                     <property name="left-attach">1</property>
+                                    <property name="top-attach">2</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="HAL_SpinButton" id="Sp0_Set_Max_Vel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="can-default">True</property>
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">5</property>
+                                    <property name="margin-start">5</property>
+                                    <property name="margin-top">2</property>
+                                    <property name="margin-bottom">2</property>
+                                    <property name="text" translatable="yes">3.000</property>
+                                    <property name="overwrite-mode">True</property>
+                                    <property name="input-purpose">number</property>
+                                    <property name="adjustment">Sp0_Set_Max_Vel_adj</property>
+                                    <property name="climb-rate">0.009999999776482582</property>
+                                    <property name="digits">3</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">3</property>
+                                    <signal name="value-changed" handler="Sp0_Set_Max_Vel" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">3</property>
+                                    <property name="top-attach">2</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="Sp0_Max_Vel_UOM">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">4</property>
+                                    <property name="margin-start">4</property>
+                                    <property name="label" translatable="yes">rev
+/ sec</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">4</property>
+                                    <property name="top-attach">2</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="HAL_SpinButton" id="Sp0_Set_Max_Accel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="can-default">True</property>
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">5</property>
+                                    <property name="margin-start">5</property>
+                                    <property name="margin-top">2</property>
+                                    <property name="margin-bottom">2</property>
+                                    <property name="text" translatable="yes">1.000</property>
+                                    <property name="overwrite-mode">True</property>
+                                    <property name="input-purpose">number</property>
+                                    <property name="adjustment">Sp0_Set_Max_Accel_adj</property>
+                                    <property name="climb-rate">0.009999999776482582</property>
+                                    <property name="digits">3</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">1</property>
+                                    <signal name="value-changed" handler="Sp0_Set_Max_Accel" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">5</property>
+                                    <property name="top-attach">2</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="Sp0_Max_Accel_UOM">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">4</property>
+                                    <property name="margin-start">4</property>
+                                    <property name="label" translatable="yes">rev
+/ sec²</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">6</property>
                                     <property name="top-attach">2</property>
                                   </packing>
                                 </child>
@@ -2061,6 +3006,96 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                   </packing>
                                 </child>
                                 <child>
+                                  <object class="HAL_SpinButton" id="Sp1_Set_Max_Vel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="can-default">True</property>
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">5</property>
+                                    <property name="margin-start">5</property>
+                                    <property name="margin-top">2</property>
+                                    <property name="margin-bottom">2</property>
+                                    <property name="text" translatable="yes">3.000</property>
+                                    <property name="overwrite-mode">True</property>
+                                    <property name="input-purpose">number</property>
+                                    <property name="adjustment">Sp1_Set_Max_Vel_adj</property>
+                                    <property name="climb-rate">0.009999999776482582</property>
+                                    <property name="digits">3</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">3</property>
+                                    <signal name="value-changed" handler="Sp1_Set_Max_Vel" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">3</property>
+                                    <property name="top-attach">3</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="Sp1_Max_Vel_UOM">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">4</property>
+                                    <property name="margin-start">4</property>
+                                    <property name="label" translatable="yes">rev
+/ sec</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">4</property>
+                                    <property name="top-attach">3</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="HAL_SpinButton" id="Sp1_Set_Max_Accel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="can-default">True</property>
+                                    <property name="halign">end</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">5</property>
+                                    <property name="margin-start">5</property>
+                                    <property name="margin-top">2</property>
+                                    <property name="margin-bottom">2</property>
+                                    <property name="text" translatable="yes">1.000</property>
+                                    <property name="overwrite-mode">True</property>
+                                    <property name="input-purpose">number</property>
+                                    <property name="adjustment">Sp1_Set_Max_Accel_adj</property>
+                                    <property name="climb-rate">0.009999999776482582</property>
+                                    <property name="digits">3</property>
+                                    <property name="numeric">True</property>
+                                    <property name="value">1</property>
+                                    <signal name="value-changed" handler="Sp1_Set_Max_Accel" swapped="no"/>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">5</property>
+                                    <property name="top-attach">3</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="Sp1_Max_Accel_UOM">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-left">4</property>
+                                    <property name="margin-start">4</property>
+                                    <property name="label" translatable="yes">rev
+/ sec²</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">6</property>
+                                    <property name="top-attach">3</property>
+                                  </packing>
+                                </child>
+                                <child>
                                   <object class="GtkLabel" id="Z_Scale_UOM">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
@@ -2068,7 +3103,8 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                     <property name="valign">center</property>
                                     <property name="margin-left">4</property>
                                     <property name="margin-start">4</property>
-                                    <property name="label" translatable="yes">pulses / in</property>
+                                    <property name="label" translatable="yes">pulses
+/ in</property>
                                     <attributes>
                                       <attribute name="font-desc" value="DejaVu Serif 10"/>
                                     </attributes>
@@ -2086,7 +3122,8 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                     <property name="valign">center</property>
                                     <property name="margin-left">4</property>
                                     <property name="margin-start">4</property>
-                                    <property name="label" translatable="yes">pulses / in</property>
+                                    <property name="label" translatable="yes">pulses
+/ in</property>
                                     <attributes>
                                       <attribute name="font-desc" value="DejaVu Serif 10"/>
                                     </attributes>
@@ -2104,7 +3141,8 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                     <property name="valign">center</property>
                                     <property name="margin-left">4</property>
                                     <property name="margin-start">4</property>
-                                    <property name="label" translatable="yes">pulses / in</property>
+                                    <property name="label" translatable="yes">pulses
+/ in</property>
                                     <attributes>
                                       <attribute name="font-desc" value="DejaVu Serif 10"/>
                                     </attributes>
@@ -2122,7 +3160,8 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                     <property name="valign">center</property>
                                     <property name="margin-left">4</property>
                                     <property name="margin-start">4</property>
-                                    <property name="label" translatable="yes">pulses / in</property>
+                                    <property name="label" translatable="yes">pulses
+/ in</property>
                                     <attributes>
                                       <attribute name="font-desc" value="DejaVu Serif 10"/>
                                     </attributes>
@@ -2140,7 +3179,8 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                     <property name="valign">center</property>
                                     <property name="margin-left">4</property>
                                     <property name="margin-start">4</property>
-                                    <property name="label" translatable="yes">pulses / deg</property>
+                                    <property name="label" translatable="yes">pulses
+/ deg</property>
                                     <attributes>
                                       <attribute name="font-desc" value="DejaVu Serif 10"/>
                                     </attributes>
@@ -2158,7 +3198,8 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                     <property name="valign">center</property>
                                     <property name="margin-left">4</property>
                                     <property name="margin-start">4</property>
-                                    <property name="label" translatable="yes">pulses / deg</property>
+                                    <property name="label" translatable="yes">pulses
+/ deg</property>
                                     <attributes>
                                       <attribute name="font-desc" value="DejaVu Serif 10"/>
                                     </attributes>
@@ -2176,7 +3217,8 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                     <property name="valign">center</property>
                                     <property name="margin-left">4</property>
                                     <property name="margin-start">4</property>
-                                    <property name="label" translatable="yes">pulses / deg</property>
+                                    <property name="label" translatable="yes">pulses
+/ deg</property>
                                     <attributes>
                                       <attribute name="font-desc" value="DejaVu Serif 10"/>
                                     </attributes>
@@ -2194,7 +3236,8 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                     <property name="valign">center</property>
                                     <property name="margin-left">4</property>
                                     <property name="margin-start">4</property>
-                                    <property name="label" translatable="yes">pulses / rev</property>
+                                    <property name="label" translatable="yes">pulses
+/ rev</property>
                                     <attributes>
                                       <attribute name="font-desc" value="DejaVu Serif 10"/>
                                     </attributes>
@@ -2212,7 +3255,8 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                     <property name="valign">center</property>
                                     <property name="margin-left">4</property>
                                     <property name="margin-start">4</property>
-                                    <property name="label" translatable="yes">pulses / rev</property>
+                                    <property name="label" translatable="yes">pulses
+/ rev</property>
                                     <attributes>
                                       <attribute name="font-desc" value="DejaVu Serif 10"/>
                                     </attributes>
@@ -2234,6 +3278,24 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                                 <child>
                                   <placeholder/>
                                 </child>
+                                <child>
+                                  <placeholder/>
+                                </child>
+                                <child>
+                                  <placeholder/>
+                                </child>
+                                <child>
+                                  <placeholder/>
+                                </child>
+                                <child>
+                                  <placeholder/>
+                                </child>
+                                <child>
+                                  <placeholder/>
+                                </child>
+                                <child>
+                                  <placeholder/>
+                                </child>
                               </object>
                               <packing>
                                 <property name="expand">False</property>
@@ -2242,201 +3304,39 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                               </packing>
                             </child>
                             <child>
-                              <object class="GtkSeparator">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="margin-start">10</property>
-                                <property name="margin-end">10</property>
-                                <property name="vexpand">True</property>
-                                <property name="orientation">vertical</property>
-                              </object>
-                              <packing>
-                                <property name="expand">False</property>
-                                <property name="fill">True</property>
-                                <property name="position">1</property>
-                              </packing>
-                            </child>
-                            <child>
                               <object class="GtkBox" id="Comments Box">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
                                 <property name="orientation">vertical</property>
                                 <child>
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="halign">center</property>
-                                    <property name="valign">end</property>
-                                    <property name="label" translatable="yes">Comments</property>
-                                    <attributes>
-                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
-                                      <attribute name="weight" value="bold"/>
-                                    </attributes>
-                                  </object>
-                                  <packing>
-                                    <property name="expand">False</property>
-                                    <property name="fill">True</property>
-                                    <property name="position">0</property>
-                                  </packing>
+                                  <placeholder/>
                                 </child>
                                 <child>
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="halign">start</property>
-                                    <property name="valign">start</property>
-                                    <property name="margin-left">4</property>
-                                    <property name="margin-right">4</property>
-                                    <property name="margin-start">4</property>
-                                    <property name="margin-end">4</property>
-                                    <property name="label" translatable="yes">These fields determine how far devices connected to the drivers move for a given command. The numbers may range into hundreds of thousands for devices with gear ratios. Negative numbers are accepted to change the direction of travel.
-</property>
-                                    <property name="wrap">True</property>
-                                    <attributes>
-                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
-                                    </attributes>
-                                  </object>
-                                  <packing>
-                                    <property name="expand">False</property>
-                                    <property name="fill">True</property>
-                                    <property name="position">1</property>
-                                  </packing>
+                                  <placeholder/>
                                 </child>
                                 <child>
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="halign">start</property>
-                                    <property name="margin-start">4</property>
-                                    <property name="margin-end">4</property>
-                                    <property name="label" translatable="yes">Setting the Values</property>
-                                    <attributes>
-                                      <attribute name="font-desc" value="DejaVu Serif 12"/>
-                                      <attribute name="weight" value="bold"/>
-                                      <attribute name="foreground" value="#1a1a5f5fb4b4"/>
-                                    </attributes>
-                                  </object>
-                                  <packing>
-                                    <property name="expand">False</property>
-                                    <property name="fill">True</property>
-                                    <property name="position">2</property>
-                                  </packing>
+                                  <placeholder/>
                                 </child>
                                 <child>
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="halign">start</property>
-                                    <property name="valign">start</property>
-                                    <property name="margin-left">4</property>
-                                    <property name="margin-right">4</property>
-                                    <property name="margin-start">4</property>
-                                    <property name="margin-end">4</property>
-                                    <property name="label" translatable="yes">The best manner for setting these is to direct your machine to move a certain distance (e.g., 1 inch or 10 degrees), and then change this value as necessary to achieve the requested movement.  For example, if you directed it to move 1 inch, and it moves 1.1 inches, then divide the setting by 1.1.  You may have to go thru a few iterations of this to get it perfect.
-
-For the spindles, 360° is a good starting point.  For rotary axes, 10° is a good starting point.
-</property>
-                                    <property name="wrap">True</property>
-                                    <attributes>
-                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
-                                    </attributes>
-                                  </object>
-                                  <packing>
-                                    <property name="expand">False</property>
-                                    <property name="fill">True</property>
-                                    <property name="position">3</property>
-                                  </packing>
+                                  <placeholder/>
                                 </child>
                                 <child>
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="halign">start</property>
-                                    <property name="margin-start">4</property>
-                                    <property name="margin-end">4</property>
-                                    <property name="label" translatable="yes">Reversing the Direction</property>
-                                    <attributes>
-                                      <attribute name="font-desc" value="DejaVu Serif 12"/>
-                                      <attribute name="weight" value="bold"/>
-                                      <attribute name="foreground" value="#1a1a5f5fb4b4"/>
-                                    </attributes>
-                                  </object>
-                                  <packing>
-                                    <property name="expand">False</property>
-                                    <property name="fill">True</property>
-                                    <property name="position">4</property>
-                                  </packing>
+                                  <placeholder/>
                                 </child>
                                 <child>
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="halign">start</property>
-                                    <property name="valign">start</property>
-                                    <property name="margin-left">4</property>
-                                    <property name="margin-right">4</property>
-                                    <property name="margin-start">4</property>
-                                    <property name="margin-end">4</property>
-                                    <property name="label" translatable="yes">If the axis is running in the wrong direction, reverse the polarity of the number (i.e., make a + into a -, or vice versa).
-</property>
-                                    <property name="wrap">True</property>
-                                    <attributes>
-                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
-                                    </attributes>
-                                  </object>
-                                  <packing>
-                                    <property name="expand">False</property>
-                                    <property name="fill">True</property>
-                                    <property name="position">5</property>
-                                  </packing>
+                                  <placeholder/>
                                 </child>
                                 <child>
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="halign">start</property>
-                                    <property name="margin-start">4</property>
-                                    <property name="margin-end">4</property>
-                                    <property name="label" translatable="yes">Good Practice</property>
-                                    <attributes>
-                                      <attribute name="font-desc" value="DejaVu Serif 12"/>
-                                      <attribute name="weight" value="bold"/>
-                                      <attribute name="foreground" value="#1a1a5f5fb4b4"/>
-                                    </attributes>
-                                  </object>
-                                  <packing>
-                                    <property name="expand">False</property>
-                                    <property name="fill">True</property>
-                                    <property name="position">6</property>
-                                  </packing>
+                                  <placeholder/>
                                 </child>
                                 <child>
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="halign">start</property>
-                                    <property name="valign">start</property>
-                                    <property name="margin-left">4</property>
-                                    <property name="margin-right">4</property>
-                                    <property name="margin-start">4</property>
-                                    <property name="margin-end">4</property>
-                                    <property name="label" translatable="yes">Add a label to each device with the values used by that device.  Then, when using that device, you will have the needed data at the ready.</property>
-                                    <property name="wrap">True</property>
-                                    <attributes>
-                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
-                                    </attributes>
-                                  </object>
-                                  <packing>
-                                    <property name="expand">False</property>
-                                    <property name="fill">True</property>
-                                    <property name="position">7</property>
-                                  </packing>
+                                  <placeholder/>
                                 </child>
                               </object>
                               <packing>
                                 <property name="expand">False</property>
                                 <property name="fill">True</property>
-                                <property name="position">2</property>
+                                <property name="position">1</property>
                               </packing>
                             </child>
                           </object>
@@ -2657,6 +3557,160 @@ from File</property>
                             <property name="can-focus">False</property>
                             <property name="halign">start</property>
                             <property name="valign">start</property>
+                            <property name="margin-left">4</property>
+                            <property name="margin-right">4</property>
+                            <property name="margin-start">4</property>
+                            <property name="margin-end">4</property>
+                            <property name="label" translatable="yes">These fields determine how far devices connected to the drivers move for a given command. The numbers may range into hundreds of thousands for devices with gear ratios. Negative numbers are accepted to change the direction of travel.
+</property>
+                            <property name="wrap">True</property>
+                            <attributes>
+                              <attribute name="font-desc" value="DejaVu Serif 10"/>
+                            </attributes>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">7</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="halign">start</property>
+                            <property name="margin-start">4</property>
+                            <property name="margin-end">4</property>
+                            <property name="label" translatable="yes">Setting the Values</property>
+                            <attributes>
+                              <attribute name="font-desc" value="DejaVu Serif 12"/>
+                              <attribute name="weight" value="bold"/>
+                              <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                            </attributes>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">8</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="halign">start</property>
+                            <property name="valign">start</property>
+                            <property name="margin-left">4</property>
+                            <property name="margin-right">4</property>
+                            <property name="margin-start">4</property>
+                            <property name="margin-end">4</property>
+                            <property name="label" translatable="yes">The best manner for setting these is to direct your machine to move a certain distance (e.g., 1 inch or 10 degrees), and then change this value as necessary to achieve the requested movement.  For example, if you directed it to move 1 inch, and it moves 1.1 inches, then divide the setting by 1.1.  You may have to go thru a few iterations of this to get it perfect.
+
+For the spindles, 360° is a good starting point.  For rotary axes, 10° is a good starting point.
+</property>
+                            <property name="wrap">True</property>
+                            <attributes>
+                              <attribute name="font-desc" value="DejaVu Serif 10"/>
+                            </attributes>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">9</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="halign">start</property>
+                            <property name="margin-start">4</property>
+                            <property name="margin-end">4</property>
+                            <property name="label" translatable="yes">Reversing the Direction</property>
+                            <attributes>
+                              <attribute name="font-desc" value="DejaVu Serif 12"/>
+                              <attribute name="weight" value="bold"/>
+                              <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                            </attributes>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">10</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="halign">start</property>
+                            <property name="valign">start</property>
+                            <property name="margin-left">4</property>
+                            <property name="margin-right">4</property>
+                            <property name="margin-start">4</property>
+                            <property name="margin-end">4</property>
+                            <property name="label" translatable="yes">If the axis is running in the wrong direction, reverse the polarity of the number (i.e., make a + into a -, or vice versa).
+</property>
+                            <property name="wrap">True</property>
+                            <attributes>
+                              <attribute name="font-desc" value="DejaVu Serif 10"/>
+                            </attributes>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">11</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="halign">start</property>
+                            <property name="margin-start">4</property>
+                            <property name="margin-end">4</property>
+                            <property name="label" translatable="yes">Good Practice</property>
+                            <attributes>
+                              <attribute name="font-desc" value="DejaVu Serif 12"/>
+                              <attribute name="weight" value="bold"/>
+                              <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                            </attributes>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">12</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="halign">start</property>
+                            <property name="valign">start</property>
+                            <property name="margin-left">4</property>
+                            <property name="margin-right">4</property>
+                            <property name="margin-start">4</property>
+                            <property name="margin-end">4</property>
+                            <property name="label" translatable="yes">Add a label to each device with the values used by that device.  Then, when using that device, you will have the needed data at the ready.
+</property>
+                            <property name="wrap">True</property>
+                            <attributes>
+                              <attribute name="font-desc" value="DejaVu Serif 10"/>
+                            </attributes>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">13</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkLabel">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="halign">start</property>
+                            <property name="valign">start</property>
                             <property name="margin-start">4</property>
                             <property name="margin-end">4</property>
                             <property name="margin-bottom">10</property>
@@ -2669,7 +3723,7 @@ from File</property>
                           <packing>
                             <property name="expand">False</property>
                             <property name="fill">False</property>
-                            <property name="position">7</property>
+                            <property name="position">14</property>
                           </packing>
                         </child>
                         <child>
@@ -2689,7 +3743,7 @@ from File</property>
                           <packing>
                             <property name="expand">False</property>
                             <property name="fill">True</property>
-                            <property name="position">8</property>
+                            <property name="position">15</property>
                           </packing>
                         </child>
                       </object>
@@ -2702,7 +3756,7 @@ from File</property>
                       <object class="GtkLabel" id="Settings_Tab_Axis_Tuning_Label">
                         <property name="visible">True</property>
                         <property name="can-focus">False</property>
-                        <property name="label" translatable="yes">Axis Scaling</property>
+                        <property name="label" translatable="yes">Axis Scaling/Speed</property>
                       </object>
                       <packing>
                         <property name="position">1</property>

@@ -160,6 +160,17 @@ def get_scale(stepgen_ch):
     )
     return float(result.stdout.strip())
 
+def get_stepgen_max(stepgen_ch, param):
+    hal_suffix = ".maxvel" if param == "max_vel" else ".maxaccel"
+    hal_pin = "hm2_7i92.0.stepgen." + stepgen_ch + hal_suffix
+    result = subprocess.run(
+        ["halcmd", "getp", hal_pin],
+        check=True,
+        capture_output=True,
+        text=True
+    )
+    return float(result.stdout.strip())
+
 def get_pid_gain(hal_component, param):
     hal_pin = hal_component + "." + PID_PARAM_PIN[param]
     result = subprocess.run(
@@ -227,6 +238,44 @@ def main():
 
         axes.setdefault(letter, {})["scale"] = value
         print("Saved " + letter + " scale = " + str(value))
+
+    for axis_id, stepgen_ch in AXIS_STEPGEN.items():
+        if axis_id in CURRENT_LETTER and CURRENT_LETTER[axis_id] != axis_id.lower():
+            # Same borrowed-letter reasoning as the scale loop above -
+            # the live maxvel/maxaccel pins here reflect the borrowing
+            # letter's tuning, not axis_id's own.
+            continue
+
+        for param in ("max_vel", "max_accel"):
+            try:
+                value = get_stepgen_max(stepgen_ch, param)
+            except subprocess.CalledProcessError as e:
+                print("Error reading " + param + " for axis " + axis_id + ": " + e.stderr)
+                continue
+            except FileNotFoundError:
+                print("halcmd not found - is the LinuxCNC environment sourced?")
+                sys.exit(1)
+
+            axes.setdefault(axis_id, {})[param] = value
+            print("Saved " + axis_id + " " + param + " = " + str(value))
+
+    for letter in EXTRA_SETTINGS_LETTERS:
+        internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
+        if internal_id is None:
+            continue
+
+        for param in ("max_vel", "max_accel"):
+            try:
+                value = get_stepgen_max(AXIS_STEPGEN[internal_id], param)
+            except subprocess.CalledProcessError as e:
+                print("Error reading " + param + " for axis " + letter + ": " + e.stderr)
+                continue
+            except FileNotFoundError:
+                print("halcmd not found - is the LinuxCNC environment sourced?")
+                sys.exit(1)
+
+            axes.setdefault(letter, {})[param] = value
+            print("Saved " + letter + " " + param + " = " + str(value))
 
     for axis_id, hal_component in PID_AXES.items():
         if CURRENT_LETTER[axis_id] != axis_id.lower():
