@@ -67,8 +67,8 @@
   <requires lib="gtk+" version="3.24"/>
   <requires lib="gladevcp" version="0.0"/>
   <object class="GtkAdjustment" id="B_Feed_Rate">
-    <property name="lower">-600</property>
-    <property name="upper">600</property>
+    <property name="lower">-6000</property>
+    <property name="upper">6000</property>
     <property name="value">1</property>
     <property name="step-increment">0.01</property>
     <property name="page-increment">0.10</property>

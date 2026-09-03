@@ -9,8 +9,8 @@ rest of the file is left untouched.
 
 Also persists each axis's/spindle loop's live P/I/D/FF0/FF1/FF2 pid.*
 gains the same way, into that axis's "pid" entry (or "pid_pos"/
-"pid_vel" for the two spindle loops) - see PID_AXES/PID_SPINDLE_LOOPS
-below. These gains are set live from REB_Settings_v1.ini by
+"pid_vel" for the two spindle loops) - see CURRENT_LETTER_INTERNAL_ID/
+PID_SPINDLE_LOOPS below. These gains are set live from REB_Settings_v1.ini by
 REB_main.py's _load_pid_settings() at Settings-tab load and by each PID
 spin button's value-changed handler while running (see REB.hal for why
 they're no longer set from REB.ini directly), so this is the only place
@@ -120,22 +120,16 @@ CURRENT_LETTER = {
     for internal_id, channel_id in DEFAULT_LETTER_CHANNEL.items()
 }
 
-# Internal id -> HAL `pid` component instance driving that axis's PID
-# loop right now (see CURRENT_LETTER above for why this can't be a
-# static dict).
-PID_AXES = {internal_id: "pid." + letter for internal_id, letter in CURRENT_LETTER.items()}
-
 # Reverse of CURRENT_LETTER - mirrors REB_main.py's constant of the same
 # name (see AXIS_STEPGEN above for why these are duplicated across
 # scripts). Currently-assigned axis letter (uppercase) -> internal id of
-# whichever physical channel is driving it right now, if any.
+# whichever physical channel is driving it right now, if any. This is
+# the sole source of truth main() uses to resolve every one of the 8
+# AXIS_SELECTION_LETTERS to its live channel (see main()'s own docstring
+# for the bug this fixed - PID_AXES/EXTRA_SETTINGS_LETTERS, formerly
+# used for a "native vs extra letter" split, are no longer needed).
 CURRENT_LETTER_INTERNAL_ID = {letter.upper(): internal_id for internal_id, letter in CURRENT_LETTER.items()}
 
-# Settings-tab Axis Scaling rows with no fixed physical channel of their
-# own - mirrors REB_main.py's constant of the same name. Persisted as
-# "A"/"C" entries in the axes dict, independent of the six physical
-# channels' own entries - see main() below.
-EXTRA_SETTINGS_LETTERS = ("A", "C")
 PID_SPINDLE_LOOPS = {
     "Sp0": {"Pos": "pid.p0", "Vel": "pid.s0"},
     "Sp1": {"Pos": "pid.p1", "Vel": "pid.s1"},
@@ -192,24 +186,27 @@ def get_backlash(joint_num):
     return float(result.stdout.strip())
 
 def main():
+    '''
+    Fixed 3 September 2026: every read-back below is now keyed by
+    LETTER (all 8 AXIS_SELECTION_LETTERS, resolved through
+    CURRENT_LETTER_INTERNAL_ID), not by internal id with a "borrowed
+    letter, skip" exception for EXTRA_SETTINGS_LETTERS only. The old
+    split meant a channel wearing a borrowed *native* letter (e.g.
+    channel 00 reassigned to letter B, native to channel 05) was
+    invisible to BOTH the internal-id loop (skipped, since channel 00's
+    own internal id "W" no longer matches its current letter) AND the
+    EXTRA_SETTINGS_LETTERS loop (B isn't A or C) - so its live scale/
+    max_vel/max_accel/PID/backlash were silently never persisted at
+    all. Sp0/Sp1 (never reassignable) are still handled separately,
+    unconditionally, by their own fixed internal id - see REB_main.py's
+    _load_scale_settings for the load-side half of this same fix.
+    '''
     settings = reb_settings_io.load_settings()
     axes = settings.setdefault("axes", {})
 
-    for axis_id, stepgen_ch in AXIS_STEPGEN.items():
-        if axis_id in CURRENT_LETTER and CURRENT_LETTER[axis_id] != axis_id.lower():
-            # This channel is currently wearing a borrowed letter
-            # (EXTRA_SETTINGS_LETTERS below) - the live pin reflects that
-            # letter's tuning, not axis_id's own. Reading it back here
-            # would stomp axis_id's own persisted scale with the
-            # borrowed letter's value; leave it untouched instead - see
-            # REB_main.py's _load_scale_settings for the load-side half
-            # of this same fix. axis_id not in CURRENT_LETTER means
-            # Sp0/Sp1 (never reassignable), which always own their own
-            # live pin unconditionally.
-            continue
-
+    for axis_id in ("Sp0", "Sp1"):
         try:
-            value = get_scale(stepgen_ch)
+            value = get_scale(AXIS_STEPGEN[axis_id])
         except subprocess.CalledProcessError as e:
             print("Error reading scale for axis " + axis_id + ": " + e.stderr)
             continue
@@ -220,7 +217,7 @@ def main():
         axes.setdefault(axis_id, {})["scale"] = value
         print("Saved " + axis_id + " scale = " + str(value))
 
-    for letter in EXTRA_SETTINGS_LETTERS:
+    for letter in AXIS_SELECTION_LETTERS:
         internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
         if internal_id is None:
             # Not currently assigned to any channel this session -
@@ -239,16 +236,10 @@ def main():
         axes.setdefault(letter, {})["scale"] = value
         print("Saved " + letter + " scale = " + str(value))
 
-    for axis_id, stepgen_ch in AXIS_STEPGEN.items():
-        if axis_id in CURRENT_LETTER and CURRENT_LETTER[axis_id] != axis_id.lower():
-            # Same borrowed-letter reasoning as the scale loop above -
-            # the live maxvel/maxaccel pins here reflect the borrowing
-            # letter's tuning, not axis_id's own.
-            continue
-
+    for axis_id in ("Sp0", "Sp1"):
         for param in ("max_vel", "max_accel"):
             try:
-                value = get_stepgen_max(stepgen_ch, param)
+                value = get_stepgen_max(AXIS_STEPGEN[axis_id], param)
             except subprocess.CalledProcessError as e:
                 print("Error reading " + param + " for axis " + axis_id + ": " + e.stderr)
                 continue
@@ -259,7 +250,7 @@ def main():
             axes.setdefault(axis_id, {})[param] = value
             print("Saved " + axis_id + " " + param + " = " + str(value))
 
-    for letter in EXTRA_SETTINGS_LETTERS:
+    for letter in AXIS_SELECTION_LETTERS:
         internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
         if internal_id is None:
             continue
@@ -277,28 +268,7 @@ def main():
             axes.setdefault(letter, {})[param] = value
             print("Saved " + letter + " " + param + " = " + str(value))
 
-    for axis_id, hal_component in PID_AXES.items():
-        if CURRENT_LETTER[axis_id] != axis_id.lower():
-            # Same reasoning as the identical check in the scale loop
-            # above - hal_component here is currently driven by a
-            # borrowed letter's tuning, not axis_id's own.
-            continue
-
-        values = {}
-        try:
-            for param in PID_PARAMS:
-                values[param] = get_pid_gain(hal_component, param)
-        except subprocess.CalledProcessError as e:
-            print("Error reading PID gains for axis " + axis_id + ": " + e.stderr)
-            continue
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
-            sys.exit(1)
-
-        axes.setdefault(axis_id, {}).setdefault("pid", {}).update(values)
-        print("Saved " + axis_id + " PID gains = " + str(values))
-
-    for letter in EXTRA_SETTINGS_LETTERS:
+    for letter in AXIS_SELECTION_LETTERS:
         internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
         if internal_id is None:
             continue
@@ -335,17 +305,9 @@ def main():
             axes.setdefault(spindle_id, {}).setdefault(block_tag, {}).update(values)
             print("Saved " + spindle_id + " " + suffix + " PID gains = " + str(values))
 
-    for axis_id, joint_num in JOINT_NUMBER.items():
-        if axis_id in CURRENT_LETTER and CURRENT_LETTER[axis_id] != axis_id.lower():
-            # Same reasoning as the identical check in the scale loop
-            # above (axis_id not in CURRENT_LETTER means Sp0/Sp1, which
-            # always own their own live pin) - joint_num's live backlash
-            # currently reflects a borrowed letter's tuning, not
-            # axis_id's own.
-            continue
-
+    for axis_id in ("Sp0", "Sp1"):
         try:
-            value = get_backlash(joint_num)
+            value = get_backlash(JOINT_NUMBER[axis_id])
         except subprocess.CalledProcessError as e:
             print("Error reading backlash for axis " + axis_id + ": " + e.stderr)
             continue
@@ -356,7 +318,7 @@ def main():
         axes.setdefault(axis_id, {})["backlash"] = value
         print("Saved " + axis_id + " backlash = " + str(value))
 
-    for letter in EXTRA_SETTINGS_LETTERS:
+    for letter in AXIS_SELECTION_LETTERS:
         internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
         if internal_id is None:
             continue

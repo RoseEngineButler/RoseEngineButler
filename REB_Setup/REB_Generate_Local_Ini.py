@@ -170,6 +170,42 @@ def _axis_type_for_letter(letter):
     return "ANGULAR" if letter in ("A", "B", "C") else "LINEAR"
 
 
+# Channel id -> the Type _axis_type_for_letter(CHANNEL_DEFAULT_LETTER[id])
+# gives - this codebase's shipped-default Type per channel. TYPE is now
+# an independent, per-channel operator choice via the Axis Selection
+# tab's Type combo (REBset_v1.ini's channel_types, see
+# _read_channel_types below) - a channel can be any letter with either
+# type, freely combined - so this is used only to detect "nothing
+# changed from shipped defaults" in _overlay_axis_assignment.
+DEFAULT_CHANNEL_TYPES = {
+    channel_id: _axis_type_for_letter(letter)
+    for channel_id, letter in CHANNEL_DEFAULT_LETTER.items()
+}
+
+
+def _read_channel_types(settings, assignments):
+    '''
+    Reads REBset_v1.ini's channel_types dict (written by the Axis
+    Selection tab - REB_Display/REB_main.py's _save_channel_types),
+    falling back to whatever each channel's currently-assigned letter
+    (per `assignments`) would imply under the old letter-derived rule
+    for any channel that's missing or unrecognized - same "absent ->
+    shipped default" convention as _read_channel_assignments. Unlike
+    letters, types are never duplicate-checked - two channels sharing a
+    Type is perfectly valid.
+    '''
+    types = {
+        channel_id: _axis_type_for_letter(assignments.get(channel_id, CHANNEL_DEFAULT_LETTER[channel_id]))
+        for channel_id in CHANNEL_DEFAULT_LETTER
+    }
+
+    for channel_id, axis_type in settings.get("channel_types", {}).items():
+        if channel_id in types and axis_type in ("LINEAR", "ANGULAR"):
+            types[channel_id] = axis_type
+
+    return types
+
+
 def _read_channel_assignments(settings):
     '''
     Reads REBset_v1.ini's channel_assignments dict (written by the Axis
@@ -223,18 +259,23 @@ def _set_key_in_section(text, section_name, key, value):
     return text[:match.start(1)] + new_section_text + text[match.end(1):]
 
 
-def _overlay_axis_assignment(text, assignments):
+def _overlay_axis_assignment(text, assignments, types):
     '''
     Rewrites REB.ini's [AXIS_<letter>] section headers, TYPE/UNITS keys,
     and [KINS]/[TRAJ]/[DISPLAY] coordinate-order keys to match the
     persisted channel -> axis letter assignment (REBset_v1.ini's
     <channel_assignments>, written by the Axis Selection tab - see
-    _read_channel_assignments). Must run BEFORE _overlay_measurement_
-    system below: a channel whose type just changed to/from ANGULAR
-    needs its UNITS key set to DEGREE/a linear placeholder here FIRST,
-    so that overlay's INCH/MM-only regex (which deliberately never
-    touches DEGREE) can then correct the placeholder to the machine's
-    actual current measurement system on the same pass.
+    _read_channel_assignments) and the independently persisted channel
+    -> Type assignment (<channel_types> - see _read_channel_types). A
+    channel's TYPE no longer follows from its letter - it's whatever
+    the operator chose on the Type combo - so letter and type are each
+    checked and rewritten independently below. Must run BEFORE
+    _overlay_measurement_system below: a channel whose type just
+    changed to/from ANGULAR needs its UNITS key set to DEGREE/a linear
+    placeholder here FIRST, so that overlay's INCH/MM-only regex (which
+    deliberately never touches DEGREE) can then correct the placeholder
+    to the machine's actual current measurement system on the same
+    pass.
 
     Leaves MIN_LIMIT/MAX_LIMIT/MAX_VELOCITY/MAX_ACCELERATION/
     STEPGEN_MAXVEL/STEPGEN_MAXACCEL/PID gains/backlash untouched - those
@@ -250,27 +291,29 @@ def _overlay_axis_assignment(text, assignments):
     read at the top of main() - so which channel is processed first
     never matters.
     '''
-    if assignments == CHANNEL_DEFAULT_LETTER:
+    if assignments == CHANNEL_DEFAULT_LETTER and types == DEFAULT_CHANNEL_TYPES:
         return text, None
 
     changes = []
     for channel_id, default_letter in CHANNEL_DEFAULT_LETTER.items():
         new_letter = assignments[channel_id]
-        if new_letter == default_letter:
+        new_type = types[channel_id]
+        default_type = DEFAULT_CHANNEL_TYPES[channel_id]
+        if new_letter == default_letter and new_type == default_type:
             continue
 
         joint_num = CHANNEL_JOINT_NUMBER[channel_id]
-        new_type = _axis_type_for_letter(new_letter)
 
-        text, n = re.subn(
-            r'(?m)^\[AXIS_' + re.escape(default_letter) + r'\]',
-            '[AXIS_' + new_letter + ']',
-            text,
-            count=1,
-        )
-        if n == 0:
-            print("Could not find [AXIS_" + default_letter + "] in REB.ini")
-            continue
+        if new_letter != default_letter:
+            text, n = re.subn(
+                r'(?m)^\[AXIS_' + re.escape(default_letter) + r'\]',
+                '[AXIS_' + new_letter + ']',
+                text,
+                count=1,
+            )
+            if n == 0:
+                print("Could not find [AXIS_" + default_letter + "] in REB.ini")
+                continue
 
         text = _set_key_in_section(text, "AXIS_" + new_letter, "TYPE", new_type)
         text = _set_key_in_section(text, "JOINT_" + str(joint_num), "TYPE", new_type)
@@ -283,7 +326,14 @@ def _overlay_axis_assignment(text, assignments):
         units = "DEGREE" if new_type == "ANGULAR" else "INCH"
         text = _set_key_in_section(text, "JOINT_" + str(joint_num), "UNITS", units)
 
-        changes.append(channel_id + ": " + default_letter + " -> " + new_letter)
+        change = channel_id + ": "
+        if new_letter != default_letter:
+            change += default_letter + " -> " + new_letter
+        else:
+            change += default_letter + " (unchanged)"
+        if new_type != default_type:
+            change += ", " + default_type + " -> " + new_type
+        changes.append(change)
 
     # Rebuild the [KINS]/[TRAJ]/[DISPLAY] coordinate-order keys: the Nth
     # letter is whichever channel is joint N (fixed - CHANNEL_JOINT_NUMBER),
@@ -704,6 +754,7 @@ def main():
 
     settings = reb_settings_io.load_settings()
     assignments = _read_channel_assignments(settings)
+    types = _read_channel_types(settings, assignments)
 
     # Regenerate REB.local.hal/REB_PostGUI_v1.local.hal FIRST and abort
     # immediately if it fails (see generate_local_hal_files) - if the
@@ -720,7 +771,7 @@ def main():
 
     # Must run before _overlay_measurement_system below - see
     # _overlay_axis_assignment's docstring for why.
-    text, axis_result = _overlay_axis_assignment(text, assignments)
+    text, axis_result = _overlay_axis_assignment(text, assignments, types)
     if axis_result:
         changes, coordinates, n1, n2, n3 = axis_result
         print("Overlaid axis assignment: " + ", ".join(changes))
