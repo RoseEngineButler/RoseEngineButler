@@ -103,16 +103,31 @@ CHANNEL_DEFAULT_LETTER = {
 DEFAULT_LETTER_CHANNEL = {v: k for k, v in CHANNEL_DEFAULT_LETTER.items()}
 
 # The 8 letters selectable on the Axis Selection tab (Y removed - not
-# used on this machine). A/B/C are angular, the rest linear - see
-# _axis_type_for_letter and REB_Setup/REB_Generate_Local_Ini.py's
-# _overlay_axis_assignment.
+# used on this machine).
 AXIS_SELECTION_LETTERS = ("X", "Z", "U", "V", "W", "A", "B", "C")
 
+# Fallback only, used to seed a channel's default Type the first time
+# REBset_v1.ini's channel_types is read with nothing yet persisted for
+# it (pre-upgrade file, or a channel whose type was never explicitly
+# set) - NOT the live source of truth. TYPE is an independent, per-
+# channel operator choice via the Axis Selection tab's Type combo (see
+# CURRENT_TYPE below) - a channel can be any letter with either type,
+# freely combined. Mirrors REB_Setup/REB_Generate_Local_Ini.py's and
+# REB_Display/reb_settings_io.py's own copies of this same rule.
 def _axis_type_for_letter(letter):
     # CURRENT_LETTER's values are lowercase (see below) and most call
     # sites pass those straight through without their own .upper() -
     # case-fold here so this stays correct regardless of caller casing.
     return "ANGULAR" if letter.upper() in ("A", "B", "C") else "LINEAR"
+
+# Channel id -> the Type _axis_type_for_letter(CHANNEL_DEFAULT_LETTER[id])
+# gives - i.e. this codebase's shipped-default Type per channel, used by
+# REB_Setup/REB_Generate_Local_Ini.py to detect "nothing changed" and by
+# _read_persisted_channel_types below as the very first fallback layer.
+DEFAULT_CHANNEL_TYPES = {
+    channel_id: _axis_type_for_letter(letter)
+    for channel_id, letter in CHANNEL_DEFAULT_LETTER.items()
+}
 
 # Letter -> the same foreground color REB_Panel_v1.ui's original per-axis
 # DRO/jog labels already use for that letter (X/U share one color, Z/W
@@ -179,16 +194,24 @@ AXIS_JOG_IMAGE = {
     "C": ("Axis-Cpos.png", "Axis-Cneg.png"),
 }
 
-# Type -> numeric range/precision profile for a channel's Feed and Idx
-# (jog-increment) adjustments. Matches the values already shared
-# identically across all 5 linear channels' adjustments today (Feed
-# -10..10 step 0.01 digits 3; Idx 0..25 step 0.01 digits 3) and B's own
-# (Feed -600..600 step 0.01 digits 3; Idx 0..720 step 0.10 digits 1) -
-# applied by _load_panel_axis_controls so a reassigned channel's
-# controls behave correctly for its new type, not its old one.
+# Type -> numeric range/precision/default profile for a channel's Feed
+# and Idx (jog-increment) adjustments. "feed" is (lower, upper, step,
+# digits, default_value). Angular feed range is +/-6000 deg/min (100
+# deg/sec, Rich's requested working max speed - 27 August 2026) with a
+# 360 deg/min default value (Rich, 3 September 2026); linear stays
+# +/-10 in-or-mm/min with a 1 default, matching every linear channel's
+# original shipped value. Idx has no default_value entry - its initial
+# value (0) is fine for both types, only Feed's misleadingly-low static
+# "1" default (REB_Panel_v1.ui) needed fixing here. Applied by
+# _load_panel_axis_controls so a reassigned channel's controls behave
+# correctly for its new type, not its old one - this is the actual
+# runtime source of truth for these ranges; REB_Panel_v1.ui's own
+# GtkAdjustment lower/upper/value properties are overwritten by this
+# profile the moment the main panel component loads, so they matter
+# only until then.
 TYPE_ADJUSTMENT_PROFILE = {
-    "LINEAR":  {"feed": (-10, 10, 0.01, 3), "idx": (25, 0.01, 3)},
-    "ANGULAR": {"feed": (-600, 600, 0.01, 3), "idx": (720, 0.10, 2)},
+    "LINEAR":  {"feed": (-10, 10, 0.01, 3, 1), "idx": (25, 0.01, 3)},
+    "ANGULAR": {"feed": (-6000, 6000, 0.01, 3, 360), "idx": (720, 0.10, 2)},
 }
 
 def _save_channel_assignments(assignments):
@@ -233,6 +256,47 @@ def _read_persisted_channel_assignments():
         return dict(CHANNEL_DEFAULT_LETTER)
 
     return assignments
+
+def _save_channel_types(types, assignments):
+    '''
+    Persists the Axis Selection tab's per-channel Type choices into
+    REBset_v1.ini's "channel_types" dict. types is a dict of channel id
+    ("00".."05") -> "LINEAR"/"ANGULAR"; any channel missing from it
+    falls back to whatever its currently-assigned letter would imply
+    under the old letter-derived rule (_axis_type_for_letter), via
+    assignments - not DEFAULT_CHANNEL_TYPES, since a channel already
+    reassigned away from its default letter should fall back to a type
+    matching its *current* letter, not its shipped one.
+    '''
+    settings = reb_settings_io.load_settings()
+    settings["channel_types"] = {
+        channel_id: types.get(
+            channel_id,
+            _axis_type_for_letter(assignments.get(channel_id, CHANNEL_DEFAULT_LETTER[channel_id])))
+        for channel_id in sorted(CHANNEL_DEFAULT_LETTER)
+    }
+    reb_settings_io.save_settings(settings)
+    print("Saved channel types: " + str(settings["channel_types"]))
+
+def _read_persisted_channel_types(assignments):
+    '''
+    Reads the persisted channel -> Type map, falling back to whatever
+    each channel's currently-assigned letter (per `assignments`) would
+    imply under the old letter-derived rule for any channel whose entry
+    is missing or unrecognized - same "absent -> shipped default"
+    convention as _read_persisted_channel_assignments. Unlike letters,
+    types are never duplicate-checked - two channels sharing a Type is
+    perfectly valid.
+    '''
+    types = {
+        channel_id: _axis_type_for_letter(assignments.get(channel_id, CHANNEL_DEFAULT_LETTER[channel_id]))
+        for channel_id in CHANNEL_DEFAULT_LETTER
+    }
+    stored = reb_settings_io.load_settings().get("channel_types", {})
+    for channel_id, axis_type in stored.items():
+        if channel_id in types and axis_type in ("LINEAR", "ANGULAR"):
+            types[channel_id] = axis_type
+    return types
 
 # Axis id (as used in REB_Settings_v1.ini and the Settings tab spin
 # buttons) -> hm2_7i92.0 stepgen channel. Verified against the actual
@@ -295,6 +359,24 @@ _CHANNEL_ASSIGNMENTS_AT_STARTUP = _read_persisted_channel_assignments()
 # callers needing a spindle's pid component use PID_SPINDLE_LOOPS instead.
 CURRENT_LETTER = {
     internal_id: _CHANNEL_ASSIGNMENTS_AT_STARTUP.get(channel_id, internal_id).lower()
+    for internal_id, channel_id in DEFAULT_LETTER_CHANNEL.items()
+}
+
+# This session's channel -> Type assignment, read once at module import
+# alongside _CHANNEL_ASSIGNMENTS_AT_STARTUP above, for the same reason:
+# the Axis Selection tab's Type combo shows the identical "restart
+# required" popup as the letter combo, so a running session's Type
+# can't change without a restart either.
+_CHANNEL_TYPES_AT_STARTUP = _read_persisted_channel_types(_CHANNEL_ASSIGNMENTS_AT_STARTUP)
+
+# Internal id -> this session's actual current Type ("LINEAR"/"ANGULAR").
+# The live source of truth everywhere TYPE matters at runtime (feed/idx
+# adjustment ranges, deg-vs-inch unit labels, jog-increment G-code
+# amount) - replaces the old _axis_type_for_letter(CURRENT_LETTER[...])
+# derivation now that Type is independently chosen per channel, not
+# implied by the letter.
+CURRENT_TYPE = {
+    internal_id: _CHANNEL_TYPES_AT_STARTUP[channel_id]
     for internal_id, channel_id in DEFAULT_LETTER_CHANNEL.items()
 }
 
@@ -896,6 +978,20 @@ class HandlerClass:
         tab's spin buttons (X_Set_Scale etc.) - every other tab/panel
         also using REB_main.py will find that widget missing and
         return immediately.
+
+        Sp0/Sp1 (never reassignable - no letter concept applies) always
+        own their own live pin unconditionally. The 6 reassignable
+        channels are instead handled uniformly by LETTER (not internal
+        id) below, resolving the live channel through CURRENT_LETTER_
+        INTERNAL_ID for all 8 AXIS_SELECTION_LETTERS - fixed 3 September
+        2026: this used to split "native" letters (X/Z/B/U/V/W, pushed
+        to their own internal id's fixed stepgen channel regardless of
+        what letter that channel currently wore) from "extra" letters
+        (A/C, resolved dynamically), which meant a channel wearing a
+        borrowed *native* letter (e.g. channel 00 reassigned to letter
+        B) never got its scale restored at all - see
+        _axis_set_scale_letter's docstring for the live-edit half of
+        this same bug.
         '''
         if self.builder.get_object("X_Set_Scale") is None:
             return
@@ -903,7 +999,7 @@ class HandlerClass:
         settings = reb_settings_io.load_settings()
         axes = settings.get("axes", {})
 
-        for axis_id, stepgen_ch in AXIS_STEPGEN.items():
+        for axis_id in ("Sp0", "Sp1"):
             axis_entry = axes.get(axis_id)
             if axis_entry is None or "scale" not in axis_entry:
                 print("No stored scale found for axis " + axis_id
@@ -916,23 +1012,7 @@ class HandlerClass:
             if widget is not None:
                 widget.set_value(value)
 
-            if axis_id in CURRENT_LETTER and CURRENT_LETTER[axis_id] != axis_id.lower():
-                # This channel is currently wearing a borrowed letter
-                # (EXTRA_SETTINGS_LETTERS below) - that letter's own
-                # block, not this internal id's, owns the live pin right
-                # now. Pushing this value here would just get overwritten
-                # by the EXTRA_SETTINGS_LETTERS pass below anyway, and -
-                # more importantly - leaving the live pin alone means
-                # REB_Scale_Persist.py's shutdown read-back (mirrors this
-                # same check) won't capture the *other* letter's value
-                # and stomp this axis_id's own persisted scale with it.
-                # axis_id not in CURRENT_LETTER means Sp0/Sp1 (never
-                # reassignable - CURRENT_LETTER only covers the six
-                # Axis-Selection-tab channels), which always own their
-                # own live pin unconditionally.
-                continue
-
-            hal_pin = "hm2_7i92.0.stepgen." + stepgen_ch + ".position-scale"
+            hal_pin = "hm2_7i92.0.stepgen." + AXIS_STEPGEN[axis_id] + ".position-scale"
             try:
                 subprocess.run(
                     ["halcmd", "setp", hal_pin, str(value)],
@@ -946,11 +1026,11 @@ class HandlerClass:
             except FileNotFoundError:
                 print("halcmd not found - is the LinuxCNC environment sourced?")
 
-        # EXTRA_SETTINGS_LETTERS (A/C): letter-keyed, no fixed channel of
-        # their own - always load the persisted value into the spin
-        # button, but only push it live if this letter is currently
-        # assigned to a channel this session (CURRENT_LETTER_INTERNAL_ID).
-        for letter in EXTRA_SETTINGS_LETTERS:
+        # All 8 letters (X,Z,U,V,W,A,B,C): letter-keyed - always load the
+        # persisted value into the spin button, but only push it live if
+        # this letter is currently assigned to a channel this session
+        # (CURRENT_LETTER_INTERNAL_ID).
+        for letter in AXIS_SELECTION_LETTERS:
             axis_entry = axes.get(letter)
             if axis_entry is None or "scale" not in axis_entry:
                 print("No stored scale found for axis " + letter
@@ -990,11 +1070,12 @@ class HandlerClass:
         REB_Settings_v1.ini and applies them to the Settings tab's Max
         Vel/Max Accel spin buttons and the real stepgen maxvel/maxaccel
         HAL params (hm2_7i92.0.stepgen.NN.maxvel/.maxaccel) - mirrors
-        _load_scale_settings above exactly (same stepgen-channel-based
-        pin, same borrowed-letter skip logic), just pushing two values
-        per axis instead of one. These are the stepgen hardware limits,
-        not [JOINT_n]MAX_VELOCITY/MAX_ACCELERATION - see
-        reb_settings_io.py's _default_axis_entry for why.
+        _load_scale_settings above exactly (same per-letter resolution
+        via CURRENT_LETTER_INTERNAL_ID, same Sp0/Sp1-are-fixed
+        exception), just pushing two values per axis instead of one.
+        These are the stepgen hardware limits, not [JOINT_n]MAX_
+        VELOCITY/MAX_ACCELERATION - see reb_settings_io.py's
+        _default_axis_entry for why.
 
         Only runs in the component that actually owns the Settings
         tab's spin buttons (X_Set_Max_Vel etc.) - every other tab/panel
@@ -1040,22 +1121,15 @@ class HandlerClass:
                 except FileNotFoundError:
                     print("halcmd not found - is the LinuxCNC environment sourced?")
 
-        for axis_id, stepgen_ch in AXIS_STEPGEN.items():
+        for axis_id in ("Sp0", "Sp1"):
             axis_entry = axes.get(axis_id)
             if axis_entry is None:
                 continue
-            # Same borrowed-letter reasoning as _load_scale_settings:
-            # skip the live HAL push (but not the spin-button restore
-            # loop above - restore() already handles that) when this
-            # channel is currently wearing a different letter.
-            if axis_id in CURRENT_LETTER and CURRENT_LETTER[axis_id] != axis_id.lower():
-                restore(axis_id, None, axis_entry)
-                continue
-            restore(axis_id, stepgen_ch, axis_entry)
+            restore(axis_id, AXIS_STEPGEN[axis_id], axis_entry)
 
-        # EXTRA_SETTINGS_LETTERS (A/C): letter-keyed, no fixed channel of
-        # their own - same pattern as _load_scale_settings.
-        for letter in EXTRA_SETTINGS_LETTERS:
+        # All 8 letters (X,Z,U,V,W,A,B,C): letter-keyed, same pattern as
+        # _load_scale_settings.
+        for letter in AXIS_SELECTION_LETTERS:
             axis_entry = axes.get(letter)
             if axis_entry is None:
                 continue
@@ -1069,7 +1143,12 @@ class HandlerClass:
         (each axis's <pid> block, or <pid_pos>/<pid_vel> for the two
         spindle loops) and applies them to the Settings tab's PID spin
         buttons and the live pid.* HAL gain pins - mirrors
-        _load_scale_settings above for the axis stepgen scales.
+        _load_scale_settings above for the axis stepgen scales (same
+        per-letter resolution via CURRENT_LETTER_INTERNAL_ID for all 8
+        AXIS_SELECTION_LETTERS, fixed 3 September 2026 - see that
+        function's docstring for the bug this replaced: the previous
+        PID_AXES-based loop here, keyed by internal id, never restored
+        a channel's gains at all once it wore a borrowed native letter).
         REB_Scale_Persist.py is what writes these back into
         REB_Settings_v1.ini at shutdown, the same as it already does
         for scale.
@@ -1140,15 +1219,6 @@ class HandlerClass:
                 except FileNotFoundError:
                     print("halcmd not found - is the LinuxCNC environment sourced?")
 
-        for axis_id, component in PID_AXES.items():
-            # push_live=False whenever this channel is currently wearing
-            # a borrowed letter (EXTRA_SETTINGS_LETTERS below owns the
-            # live pid.* component in that case) - same reasoning as
-            # _load_scale_settings's identical check.
-            apply(axis_id, "pid", component,
-                  lambda param, axis_id=axis_id: axis_id + "_Set_" + param,
-                  push_live=(CURRENT_LETTER[axis_id] == axis_id.lower()))
-
         for spindle_id, loops in PID_SPINDLE_LOOPS.items():
             for suffix, component in loops.items():
                 block_tag = "pid_pos" if suffix == "Pos" else "pid_vel"
@@ -1156,13 +1226,13 @@ class HandlerClass:
                       lambda param, spindle_id=spindle_id, suffix=suffix:
                           spindle_id + "_Set_" + param + "_" + suffix)
 
-        # EXTRA_SETTINGS_LETTERS (A/C): letter-keyed, no fixed channel of
-        # their own - the live pid.<letter> component is named after the
-        # letter itself (REB_Generate_Local_Ini.py renames each channel's
-        # pid component to match its current assignment), so it only
-        # exists at all while this letter is currently assigned to a
-        # channel (CURRENT_LETTER_INTERNAL_ID) - see _pid_set_letter.
-        for letter in EXTRA_SETTINGS_LETTERS:
+        # All 8 letters (X,Z,U,V,W,A,B,C): letter-keyed, no fixed channel
+        # of their own - the live pid.<letter> component is named after
+        # the letter itself (REB_Generate_Local_Ini.py renames each
+        # channel's pid component to match its current assignment), so
+        # it only exists at all while this letter is currently assigned
+        # to a channel (CURRENT_LETTER_INTERNAL_ID) - see _pid_set_letter.
+        for letter in AXIS_SELECTION_LETTERS:
             apply(letter, "pid", "pid." + letter.lower(),
                   lambda param, letter=letter: letter + "_Set_" + param,
                   push_live=letter in CURRENT_LETTER_INTERNAL_ID)
@@ -1173,9 +1243,11 @@ class HandlerClass:
         REB_Settings_v1.ini (each axis's <backlash> element) and applies
         them to the Settings tab's Backlash spin buttons and the live
         joint.N.backlash HAL parameters - mirrors _load_scale_settings
-        above. REB_Scale_Persist.py is what writes these back into
-        REB_Settings_v1.ini at shutdown, the same as it already does for
-        scale and PID gains.
+        above (same per-letter resolution via CURRENT_LETTER_INTERNAL_ID
+        for all 8 AXIS_SELECTION_LETTERS, fixed 3 September 2026 - see
+        that function's docstring). REB_Scale_Persist.py is what writes
+        these back into REB_Settings_v1.ini at shutdown, the same as it
+        already does for scale and PID gains.
 
         Only runs in the component that actually owns the Settings tab's
         Backlash spin buttons (X_Set_Backlash etc.) - every other tab/
@@ -1188,7 +1260,7 @@ class HandlerClass:
         settings = reb_settings_io.load_settings()
         axes = settings.get("axes", {})
 
-        for axis_id, joint_num in JOINT_NUMBER.items():
+        for axis_id in ("Sp0", "Sp1"):
             axis_entry = axes.get(axis_id)
             if axis_entry is None or "backlash" not in axis_entry:
                 print("No stored backlash found for axis " + axis_id
@@ -1201,14 +1273,7 @@ class HandlerClass:
             if widget is not None:
                 widget.set_value(value)
 
-            if axis_id in CURRENT_LETTER and CURRENT_LETTER[axis_id] != axis_id.lower():
-                # This channel is currently wearing a borrowed letter -
-                # same reasoning as the identical check in
-                # _load_scale_settings. axis_id not in CURRENT_LETTER
-                # means Sp0/Sp1, which always own their own live pin.
-                continue
-
-            hal_pin = "joint." + str(joint_num) + ".backlash"
+            hal_pin = "joint." + str(JOINT_NUMBER[axis_id]) + ".backlash"
             try:
                 subprocess.run(
                     ["halcmd", "setp", hal_pin, str(value)],
@@ -1222,12 +1287,12 @@ class HandlerClass:
             except FileNotFoundError:
                 print("halcmd not found - is the LinuxCNC environment sourced?")
 
-        # EXTRA_SETTINGS_LETTERS (A/C): letter-keyed, no fixed joint
+        # All 8 letters (X,Z,U,V,W,A,B,C): letter-keyed, no fixed joint
         # number of their own - always load the persisted value into the
         # spin button, but only push it live if this letter is currently
         # assigned to a channel this session (CURRENT_LETTER_INTERNAL_ID),
         # same pattern as _load_scale_settings.
-        for letter in EXTRA_SETTINGS_LETTERS:
+        for letter in AXIS_SELECTION_LETTERS:
             axis_entry = axes.get(letter)
             if axis_entry is None or "backlash" not in axis_entry:
                 print("No stored backlash found for axis " + letter
@@ -1379,7 +1444,7 @@ class HandlerClass:
             linear_vel_uom, linear_accel_uom = "in\n/ sec", "in\n/ sec²"
 
         for axis_id in CHANNEL_DEFAULT_LETTER.values():
-            if _axis_type_for_letter(CURRENT_LETTER[axis_id]) == "ANGULAR":
+            if CURRENT_TYPE[axis_id] == "ANGULAR":
                 feed_uom, dist_uom, scale_uom = "deg / min", "deg", "pulses\n/ deg"
                 vel_uom, accel_uom = "deg\n/ sec", "deg\n/ sec²"
             else:
@@ -1475,11 +1540,11 @@ class HandlerClass:
 
         Called both by _load_channel_assignments (startup) and by
         Channel_0N_Axis_Changed itself (every time one combo's choice
-        changes). Also refreshes each row's Type label (Channel_0N_Type)
-        to match its combo's current letter - Type is a property of
-        whichever letter is assigned right now, not of the channel, so
-        it has to be recomputed here rather than set once. No-ops
-        outside the component that owns these widgets.
+        changes). Does NOT touch Channel_0N_Type - Type is now an
+        independent per-channel choice (see _rebuild_all_channel_type_
+        combos), not derived from the letter, so it never needs
+        recomputing when only the letter changes. No-ops outside the
+        component that owns these widgets.
         '''
         if self.builder.get_object("Channel_00_Axis") is None:
             return
@@ -1496,9 +1561,28 @@ class HandlerClass:
                 combo.append_text(letter)
             combo.set_active(AXIS_SELECTION_LETTERS.index(current))
 
-            type_label = self.builder.get_object("Channel_" + channel_id + "_Type")
-            if type_label is not None:
-                type_label.set_text(_axis_type_for_letter(current).capitalize())
+    def _rebuild_all_channel_type_combos(self):
+        '''
+        Populates every Channel_0N_Type combo with "Linear"/"Angular"
+        and reselects that combo's own currently-persisted Type. Unlike
+        _rebuild_all_channel_combo_items, this only ever needs to run
+        once at load (_load_channel_assignments) - a single channel's
+        Type change never affects any other channel's combo, since
+        Type carries no duplicate-uniqueness constraint the way letters
+        do. No-ops outside the component that owns these widgets.
+        '''
+        if self.builder.get_object("Channel_00_Type") is None:
+            return
+
+        for channel_id in CHANNEL_DEFAULT_LETTER:
+            combo = self.builder.get_object("Channel_" + channel_id + "_Type")
+            if combo is None:
+                continue
+
+            combo.remove_all()
+            combo.append_text("Linear")
+            combo.append_text("Angular")
+            combo.set_active(0 if self._channel_types[channel_id] == "LINEAR" else 1)
 
     def _update_duplicate_warnings(self):
         '''
@@ -1542,19 +1626,25 @@ class HandlerClass:
     def _load_channel_assignments(self):
         '''
         Reads the persisted channel -> axis letter assignment
-        (REBset_v1.ini's <channel_assignments> block) and populates the
-        Axis Selection tab's six combos, if this component owns them.
-        No-ops outside that component, same pattern as
-        _load_measurement_system.
+        (REBset_v1.ini's <channel_assignments> block) and channel ->
+        Type assignment (<channel_types>), and populates the Axis
+        Selection tab's six letter combos and six Type combos, if this
+        component owns them. No-ops outside that component, same
+        pattern as _load_measurement_system.
         '''
         if self.builder.get_object("Channel_00_Axis") is None:
             return
 
         self._channel_assignments = _read_persisted_channel_assignments()
+        self._channel_types = _read_persisted_channel_types(self._channel_assignments)
 
         self._applying_channel_assignments = True
         self._rebuild_all_channel_combo_items()
         self._applying_channel_assignments = False
+
+        self._applying_channel_types = True
+        self._rebuild_all_channel_type_combos()
+        self._applying_channel_types = False
 
         # _read_persisted_channel_assignments already falls back to the
         # shipped defaults rather than ever returning a duplicate, so
@@ -1581,6 +1671,7 @@ class HandlerClass:
             return
 
         assignments = _read_persisted_channel_assignments()
+        types = _read_persisted_channel_types(assignments)
         for channel_id, letter in assignments.items():
             axis_label = self.builder.get_object("Panel_Channel_" + channel_id + "_Axis")
             if axis_label is not None:
@@ -1600,13 +1691,13 @@ class HandlerClass:
 
             type_label = self.builder.get_object("Panel_Channel_" + channel_id + "_Type")
             if type_label is not None:
-                type_label.set_text(_axis_type_for_letter(letter).capitalize())
+                type_label.set_text(types[channel_id].capitalize())
 
     def _load_panel_axis_controls(self):
         '''
         Configures each of the 6 channel rows' *interactive* controls to
         match its CURRENTLY assigned letter and type (CURRENT_LETTER/
-        _axis_type_for_letter), if this component owns the main panel's
+        CURRENT_TYPE), if this component owns the main panel's
         widgets - the working counterpart to _load_panel_axis_display's
         read-only table above. For each channel: sets the col-0 letter
         label's text/color (AXIS_LETTER_COLOR, same styling approach as
@@ -1614,9 +1705,9 @@ class HandlerClass:
         one matching the assigned letter specifically, not just its type
         (AXIS_JOG_IMAGE - a linear channel reassigned from X to V still
         needs V's icon, not X's, since the icon encodes physical +/-
-        direction); reconfigures the Feed/Idx adjustments' numeric range
-        and precision to the assigned type's profile
-        (TYPE_ADJUSTMENT_PROFILE); and shows whichever of the two
+        direction); reconfigures the Feed/Idx adjustments' numeric range,
+        precision, and (Feed only) default value to the assigned type's
+        profile (TYPE_ADJUSTMENT_PROFILE); and shows whichever of the two
         column-11 widgets matches the type (deg/div radio pair if
         angular, the static unit label if linear) while hiding the
         other. Unit-label *text* (Feed_UOM/IdxDist_UOM/Scale_UOM) is
@@ -1640,7 +1731,7 @@ class HandlerClass:
 
         for axis in CHANNEL_DEFAULT_LETTER.values():
             letter = CURRENT_LETTER[axis].upper()
-            angular = _axis_type_for_letter(CURRENT_LETTER[axis]) == "ANGULAR"
+            angular = CURRENT_TYPE[axis] == "ANGULAR"
 
             letter_label = self.builder.get_object(axis + "_Letter")
             if letter_label is not None:
@@ -1669,10 +1760,11 @@ class HandlerClass:
 
             feed_adj = self.builder.get_object(axis + "_Feed_Rate")
             if feed_adj is not None:
-                feed_lower, feed_upper, feed_step, _ = profile["feed"]
+                feed_lower, feed_upper, feed_step, _, feed_default = profile["feed"]
                 feed_adj.set_lower(feed_lower)
                 feed_adj.set_upper(feed_upper)
                 feed_adj.set_step_increment(feed_step)
+                feed_adj.set_value(feed_default)
             feed_spin = self.builder.get_object(axis + "_Feed")
             if feed_spin is not None:
                 feed_spin.set_digits(profile["feed"][3])
@@ -4075,6 +4167,11 @@ class HandlerClass:
         # combos.
         self._applying_channel_assignments = False
 
+        # Same suppression as above, for _load_channel_assignments (and
+        # _rebuild_all_channel_type_combos) driving the six Axis
+        # Selection Type combos.
+        self._applying_channel_types = False
+
         _install_depress_css()
 
         # Independent pins this component owns, used to force each
@@ -4279,22 +4376,22 @@ class HandlerClass:
         # X/Z/U/V/W/B - CHANNEL_DEFAULT_LETTER's values), read/written by
         # the generated Idx_Fwd/Idx_Rev/Set_Feed/etc. methods below via
         # getattr/setattr. Defaults are picked from this SESSION's actual
-        # current type (CURRENT_LETTER/_axis_type_for_letter), not the
-        # internal id's own historical type - a channel reassigned to an
-        # angular letter needs angular-shaped defaults even though its
-        # internal id is, say, "X". Idx_Deg/Idx_DegDiv are harmless to set
-        # on a currently-linear channel - they simply go unused until (if
-        # ever) that channel becomes angular after a future restart, the
-        # same moment this whole block re-runs with fresh CURRENT_LETTER
-        # values anyway. Sp0/Sp1 keep their own hand-written state above -
+        # current type (CURRENT_TYPE), not the internal id's own
+        # historical type - a channel reassigned to Angular needs
+        # angular-shaped defaults even though its internal id is, say,
+        # "X". Idx_Deg/Idx_DegDiv are harmless to set on a currently-
+        # linear channel - they simply go unused until (if ever) that
+        # channel becomes angular after a future restart, the same
+        # moment this whole block re-runs with fresh CURRENT_TYPE values
+        # anyway. Sp0/Sp1 keep their own hand-written state above -
         # genuinely different shape (Idx_Bool checkboxes, no Move_Dist).
         for axis in CHANNEL_DEFAULT_LETTER.values():
-            if _axis_type_for_letter(CURRENT_LETTER[axis]) == "ANGULAR":
-                setattr(self, axis + "_Feed", 10.0)
+            if CURRENT_TYPE[axis] == "ANGULAR":
+                setattr(self, axis + "_Feed", TYPE_ADJUSTMENT_PROFILE["ANGULAR"]["feed"][4])
                 setattr(self, axis + "_Idx_Dist", 90.0)
                 setattr(self, axis + "_Idx_Deg", 90.0)
             else:
-                setattr(self, axis + "_Feed", 1.0)
+                setattr(self, axis + "_Feed", TYPE_ADJUSTMENT_PROFILE["LINEAR"]["feed"][4])
                 setattr(self, axis + "_Idx_Dist", 0.0)
                 setattr(self, axis + "_Idx_Deg", 0.0)
             setattr(self, axis + "_Idx_DegDiv", "Deg")
@@ -4320,9 +4417,9 @@ class HandlerClass:
 #
 # Channels are no longer permanently linear or angular - which shape a
 # given channel's controls behave as is decided at CALL TIME by
-# _axis_type_for_letter(CURRENT_LETTER[axis]), since the operator can
-# reassign any channel to any letter via the Axis Selection tab (taking
-# effect on next restart, same as everywhere else this matters). Widget
+# CURRENT_TYPE[axis], since the operator can independently set any
+# channel's letter and Type via the Axis Selection tab (taking effect
+# on next restart, same as everywhere else this matters). Widget
 # ids themselves are NEVER renamed - REB_Panel_v1.ui's buttons still
 # have the ids they've always had; only B's jog buttons/Feed widget use
 # a different naming pattern than the rest (JOG_NEG_HANDLER/
@@ -4386,7 +4483,7 @@ def _axis_idx_move(axis, handler_name, gcode_sign):
                 c.mode(linuxcnc.MODE_MDI)
                 c.wait_complete()
 
-            angular = _axis_type_for_letter(CURRENT_LETTER[axis]) == "ANGULAR"
+            angular = CURRENT_TYPE[axis] == "ANGULAR"
             amount = getattr(self, axis + "_Idx_Deg") if angular else getattr(self, axis + "_Idx_Dist")
             feed = getattr(self, axis + "_Feed")
             # The G-code axis word must be the CURRENTLY assigned letter
@@ -4434,7 +4531,7 @@ def _axis_set_idx_dist(axis):
         print("FUNCTION " + axis + "_Set_Idx_Dist")
         value = widget.get_value()
         setattr(self, axis + "_Idx_Dist", value)
-        if _axis_type_for_letter(CURRENT_LETTER[axis]) == "ANGULAR":
+        if CURRENT_TYPE[axis] == "ANGULAR":
             if getattr(self, axis + "_Idx_DegDiv") == "Deg":
                 setattr(self, axis + "_Idx_Deg", round(value, 1))
             else:
@@ -4552,76 +4649,6 @@ def _warn_if_max_vel_exceeds_ceiling(self, widget, axis, stepgen_ch, scale, max_
 
     max_vel_widget.set_value(safe_max_vel)
 
-def _axis_set_scale(axis):
-    stepgen_ch = AXIS_STEPGEN[axis]
-    hal_pin = "hm2_7i92.0.stepgen." + stepgen_ch + ".position-scale"
-    status_pin = "gladevcp." + axis + "_ENA-light"
-    def handler(self, widget):
-        print("=================================================")
-        print("FUNCTION " + axis + "_Set_Scale")
-
-        # Cancel any in-progress move (e.g. <Axis>_Idx_Plus/Minus) before
-        # this scale change lands - a large change to position-scale
-        # while a coordinated move is still executing could otherwise
-        # leave the physical axis somewhere unexpected once the new
-        # scale takes effect (same class of risk as the Run Operation
-        # spindle case - see conversation). This guards an independently
-        # running G-code program or another MDI source, not this same
-        # click handler's own MDI call - that can't be concurrent, since
-        # c.mdi()/c.wait_complete() block the GTK loop this click needs
-        # to be processed by.
-        c.abort()
-        c.wait_complete()
-
-        scale = round(widget.get_value(), 1)
-
-        # <Axis>_ENA-light belongs to the main panel's HAL component
-        # ("gladevcp"); read it cross-component via halcmd. To disable
-        # the axis, drive this component's own <Axis>_Ena_Override pin
-        # (ANDed with the panel button in REB_PostGUI_v1.hal) instead of
-        # trying to write another component's pin directly.
-        try:
-            result = subprocess.run(
-                ["halcmd", "getp", status_pin],
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            is_enabled = result.stdout.strip().upper() in ("TRUE", "1")
-            print(status_pin + " = " + result.stdout.strip())
-
-            if is_enabled:
-                print(axis + " axis is enabled - disabling")
-                self.halcomp[axis + '_Ena_Override'] = False
-            else:
-                print(axis + " axis is already disabled")
-        except subprocess.CalledProcessError as e:
-            print("Error checking " + status_pin + ": " + e.stderr)
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
-
-        # Send the new scale to the axis's stepgen via halcmd.
-        cmd = ["halcmd", "setp", hal_pin, str(scale)]
-        try:
-            result = subprocess.run(
-                cmd,
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            print("Set " + hal_pin + " = " + str(scale))
-        except subprocess.CalledProcessError as e:
-            print("Error setting " + hal_pin + ": " + e.stderr)
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
-
-        max_vel_widget = self.builder.get_object(axis + "_Set_Max_Vel")
-        if max_vel_widget is not None:
-            _warn_if_max_vel_exceeds_ceiling(
-                self, widget, axis, stepgen_ch, scale, max_vel_widget)
-    handler.__name__ = axis + "_Set_Scale"
-    return handler
-
 def _axis_set_ena(axis):
     def handler(self, widget, *args):
         _clear_ena_override(axis)
@@ -4645,20 +4672,39 @@ for _axis in CHANNEL_DEFAULT_LETTER.values():
     setattr(HandlerClass, _axis + "_Set_Idx_Dist", _axis_set_idx_dist(_axis))
     setattr(HandlerClass, _axis + "_Set_Idx_DegDiv", _axis_set_idx_degdiv(_axis))
     setattr(HandlerClass, _axis + "_Set_Move_Dist", _axis_set_move_dist(_axis))
-    setattr(HandlerClass, _axis + "_Set_Scale", _axis_set_scale(_axis))
+    # No _Set_Scale binding here - Scale is bound per LETTER, not per
+    # internal id, in the unified AXIS_SELECTION_LETTERS loop below (see
+    # _axis_set_scale_letter's docstring for why: the widget labeled
+    # e.g. "B" must always mean "whichever channel currently wears
+    # letter B," not "channel 05, forever" - a real bug found live 3
+    # September 2026 when channel 00 was reassigned to letter B and its
+    # Scale edits were silently landing on channel 05's stepgen instead).
 del _axis
 
 def _axis_set_scale_letter(letter):
     '''
-    Value-changed handler for the Settings tab's A_Set_Scale/C_Set_Scale
-    spin buttons (see EXTRA_SETTINGS_LETTERS) - mirrors _axis_set_scale
-    above, but letter has no fixed internal id/channel of its own, so
-    the live stepgen pin (and the ENA-light/override pins used to
-    disable the axis first) are resolved through
-    CURRENT_LETTER_INTERNAL_ID/AXIS_STEPGEN at call time instead of a
-    closure-captured constant. If this letter isn't currently assigned
-    to any channel, the value is simply kept (and persisted at shutdown
-    by REB_Scale_Persist.py) with no live HAL write to make.
+    Value-changed handler for one of the Settings tab's 8 letter-labeled
+    Scale spin buttons (<letter>_Set_Scale, letter in
+    AXIS_SELECTION_LETTERS) - bound uniformly for all 8 letters, not
+    just EXTRA_SETTINGS_LETTERS (A/C) as it originally was. The live
+    stepgen pin (and the ENA-light/override pins used to disable the
+    axis first) are resolved through CURRENT_LETTER_INTERNAL_ID/
+    AXIS_STEPGEN at call time, rather than a closure-captured constant -
+    this is the fix for a real bug found live 3 September 2026: the
+    previous per-internal-id handler (_axis_set_scale, now deleted)
+    always targeted its own internal id's stepgen channel regardless of
+    what letter that channel currently wore, so e.g. editing the "B"
+    row (after channel 00 was reassigned to letter B) silently wrote to
+    channel 05's stepgen instead of channel 00's - and, worse, could
+    silently clobber whatever channel 05's *actual* current letter had
+    live, mid-session. If this letter isn't currently assigned to any
+    channel, the value is simply kept (and persisted at shutdown by
+    REB_Scale_Persist.py) with no live HAL write to make.
+
+    scale is rounded to 3 decimal places, matching this widget's own
+    "digits" property in the .ui file (previously rounded to 1 decimal,
+    silently truncating a legitimately 3-decimal value like a
+    gear-ratio-derived pulses/deg scale - e.g. 17.778 became 17.8).
     '''
     def handler(self, widget):
         print("=================================================")
@@ -4672,7 +4718,7 @@ def _axis_set_scale_letter(letter):
         c.abort()
         c.wait_complete()
 
-        scale = round(widget.get_value(), 1)
+        scale = round(widget.get_value(), 3)
         hal_pin = "hm2_7i92.0.stepgen." + AXIS_STEPGEN[internal_id] + ".position-scale"
         status_pin = "gladevcp." + internal_id + "_ENA-light"
 
@@ -4717,19 +4763,27 @@ def _axis_set_scale_letter(letter):
     handler.__name__ = letter + "_Set_Scale"
     return handler
 
-for _letter in EXTRA_SETTINGS_LETTERS:
+for _letter in AXIS_SELECTION_LETTERS:
     setattr(HandlerClass, _letter + "_Set_Scale", _axis_set_scale_letter(_letter))
 del _letter
 
 def _axis_set_backlash(axis):
     '''
-    Generic value-changed handler for a single axis's/spindle's
-    Backlash spin button: pushes the new value straight to the live
-    joint.N.backlash HAL parameter (motion's own per-joint backlash
-    compensation - see JOINT_NUMBER above). Unlike _axis_set_scale,
-    there's no need to disable the axis first - same reasoning as
-    _pid_set below: a backlash change is safe to make on the fly, it
-    doesn't invalidate an in-progress move the way a scale change can.
+    Value-changed handler for Sp0_Set_Backlash/Sp1_Set_Backlash only -
+    the spindles are never reassignable (no letter concept applies), so
+    their own JOINT_NUMBER entry is always correct with no letter
+    resolution needed. The six reassignable channels are instead bound
+    to _axis_set_backlash_letter below, uniformly for all 8 letters -
+    this function used to also serve them (closure-capturing
+    JOINT_NUMBER[axis] once, keyed by internal id), which was a bug:
+    the closure never tracked which channel actually wears a given
+    letter later, matching the identical bug just fixed for Scale (see
+    _axis_set_scale_letter's docstring).
+
+    Unlike _axis_set_scale_letter, there's no need to disable the axis
+    first - same reasoning as _pid_set below: a backlash change is safe
+    to make on the fly, it doesn't invalidate an in-progress move the
+    way a scale change can.
 
     REB_Settings_v1.ini itself is not written here - same as scale/PID,
     that only happens at shutdown (REB_Scale_Persist.py reading the
@@ -4753,17 +4807,20 @@ def _axis_set_backlash(axis):
     handler.__name__ = axis + "_Set_Backlash"
     return handler
 
-for _axis_id in JOINT_NUMBER:
+for _axis_id in ("Sp0", "Sp1"):
     setattr(HandlerClass, _axis_id + "_Set_Backlash", _axis_set_backlash(_axis_id))
 del _axis_id
 
 def _axis_set_backlash_letter(letter):
     '''
-    Value-changed handler for A_Set_Backlash/C_Set_Backlash (see
-    EXTRA_SETTINGS_LETTERS) - mirrors _axis_set_backlash, but letter has
-    no fixed joint number of its own, so the live joint.N.backlash pin is
-    resolved through CURRENT_LETTER_INTERNAL_ID/JOINT_NUMBER at call
-    time, same as _axis_set_scale_letter does for Scale.
+    Value-changed handler for one of the Settings tab's 8 letter-labeled
+    Backlash spin buttons (<letter>_Set_Backlash, letter in
+    AXIS_SELECTION_LETTERS) - bound uniformly for all 8 letters, not
+    just EXTRA_SETTINGS_LETTERS (A/C) as it originally was (see
+    _axis_set_scale_letter's docstring for the bug this generalization
+    fixes). letter has no fixed joint number of its own, so the live
+    joint.N.backlash pin is resolved through CURRENT_LETTER_INTERNAL_ID/
+    JOINT_NUMBER at call time.
     '''
     def handler(self, widget):
         internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
@@ -4788,14 +4845,24 @@ def _axis_set_backlash_letter(letter):
     handler.__name__ = letter + "_Set_Backlash"
     return handler
 
-for _letter in EXTRA_SETTINGS_LETTERS:
+for _letter in AXIS_SELECTION_LETTERS:
     setattr(HandlerClass, _letter + "_Set_Backlash", _axis_set_backlash_letter(_letter))
 del _letter
 
 def _axis_set_max(axis, param):
     '''
-    Generic value-changed handler for a single channel's Max Vel/Max
-    Accel spin button: pushes the new value straight to the live
+    Value-changed handler for Sp0/Sp1's Max Vel/Max Accel spin buttons
+    only - the spindles are never reassignable (no letter concept
+    applies), so AXIS_STEPGEN[axis] is always correct with no letter
+    resolution needed. The six reassignable channels are instead bound
+    to _axis_set_max_letter below, uniformly for all 8 letters - this
+    function used to also serve them (closure-capturing
+    AXIS_STEPGEN[axis] once, keyed by internal id), which was a bug:
+    the closure never tracked which channel actually wears a given
+    letter later, matching the identical bug just fixed for Scale (see
+    _axis_set_scale_letter's docstring).
+
+    Pushes the new value straight to the live
     hm2_7i92.0.stepgen.NN.maxvel/.maxaccel HAL param (the stepgen
     hardware limit - see reb_settings_io.py's _default_axis_entry for
     why this, not [JOINT_n]MAX_VELOCITY/MAX_ACCELERATION, is what these
@@ -4833,19 +4900,21 @@ def _axis_set_max(axis, param):
     handler.__name__ = axis + "_Set_Max_" + param
     return handler
 
-for _axis in AXIS_STEPGEN:
+for _axis in ("Sp0", "Sp1"):
     setattr(HandlerClass, _axis + "_Set_Max_Vel", _axis_set_max(_axis, "Vel"))
     setattr(HandlerClass, _axis + "_Set_Max_Accel", _axis_set_max(_axis, "Accel"))
 del _axis
 
 def _axis_set_max_letter(letter, param):
     '''
-    Value-changed handler for A_Set_Max_Vel/A_Set_Max_Accel/
-    C_Set_Max_Vel/C_Set_Max_Accel (see EXTRA_SETTINGS_LETTERS) - mirrors
-    _axis_set_max, but letter has no fixed channel of its own, so the
-    live stepgen pin is resolved through CURRENT_LETTER_INTERNAL_ID/
-    AXIS_STEPGEN at call time, same as _axis_set_scale_letter/
-    _axis_set_backlash_letter.
+    Value-changed handler for one of the Settings tab's 8 letter-labeled
+    Max Vel/Max Accel spin buttons (<letter>_Set_Max_Vel/_Accel, letter
+    in AXIS_SELECTION_LETTERS) - bound uniformly for all 8 letters, not
+    just EXTRA_SETTINGS_LETTERS (A/C) as it originally was (see
+    _axis_set_scale_letter's docstring for the bug this generalization
+    fixes). letter has no fixed channel of its own, so the live stepgen
+    pin is resolved through CURRENT_LETTER_INTERNAL_ID/AXIS_STEPGEN at
+    call time, same as _axis_set_scale_letter/_axis_set_backlash_letter.
     '''
     hal_suffix = ".maxvel" if param == "Vel" else ".maxaccel"
     def handler(self, widget):
@@ -4877,15 +4946,15 @@ def _axis_set_max_letter(letter, param):
     handler.__name__ = letter + "_Set_Max_" + param
     return handler
 
-for _letter in EXTRA_SETTINGS_LETTERS:
+for _letter in AXIS_SELECTION_LETTERS:
     setattr(HandlerClass, _letter + "_Set_Max_Vel", _axis_set_max_letter(_letter, "Vel"))
     setattr(HandlerClass, _letter + "_Set_Max_Accel", _axis_set_max_letter(_letter, "Accel"))
 del _letter
 
 def _channel_axis_changed(channel_id):
     '''
-    Generic "changed" handler for one Axis Selection combo. Records the
-    new choice and refreshes every combo/Type label
+    Generic "changed" handler for one Axis Selection letter combo.
+    Records the new choice and refreshes every combo
     (_rebuild_all_channel_combo_items) - every letter is always
     selectable now, duplicates are no longer prevented at the dropdown.
     Instead, _update_duplicate_warnings flags every channel currently
@@ -4930,6 +4999,41 @@ for _channel_id in CHANNEL_DEFAULT_LETTER:
     setattr(HandlerClass, "Channel_" + _channel_id + "_Axis_Changed", _channel_axis_changed(_channel_id))
 del _channel_id
 
+def _channel_type_changed(channel_id):
+    '''
+    Generic "changed" handler for one Axis Selection Type combo.
+    Unlike the letter combo, Type carries no cross-channel duplicate
+    constraint (two channels sharing a Type is fine), so this saves
+    immediately on every change with no gating - simpler than
+    _channel_axis_changed above.
+    '''
+    def handler(self, widget):
+        if self._applying_channel_types:
+            return
+
+        text = widget.get_active_text()
+        if text is None:
+            return
+        axis_type = text.upper()
+        if axis_type not in ("LINEAR", "ANGULAR"):
+            return
+
+        self._channel_types[channel_id] = axis_type
+
+        _save_channel_types(self._channel_types, self._channel_assignments)
+        _show_restart_required_popup(
+            widget,
+            "The axis type change will not take effect until you exit "
+            "and restart LinuxCNC. Make sure this channel's physical "
+            "hardware actually matches Linear/Angular before restarting."
+        )
+    handler.__name__ = "Channel_" + channel_id + "_Type_Changed"
+    return handler
+
+for _channel_id in CHANNEL_DEFAULT_LETTER:
+    setattr(HandlerClass, "Channel_" + _channel_id + "_Type_Changed", _channel_type_changed(_channel_id))
+del _channel_id
+
 def _pid_set(hal_pin):
     '''
     Generic value-changed handler for a single P/I/D/FF0/FF1/FF2 spin
@@ -4959,26 +5063,35 @@ def _pid_set(hal_pin):
             print("halcmd not found - is the LinuxCNC environment sourced?")
     return handler
 
-for _axis_id, _component in PID_AXES.items():
-    for _param in PID_PARAMS:
-        _widget_id = _axis_id + "_Set_" + _param
-        _handler = _pid_set(_component + "." + PID_PARAM_PIN[_param])
-        _handler.__name__ = _widget_id
-        setattr(HandlerClass, _widget_id, _handler)
-del _axis_id, _component, _param, _widget_id, _handler
+# No PID_AXES-based binding loop here for the 6 reassignable channels
+# (X/Z/B/U/V/W widgets) - PID is instead bound per LETTER, uniformly
+# for all 8 letters, via _pid_set_letter below (same fix as Scale/Max
+# Vel/Backlash - see _axis_set_scale_letter's docstring). PID_AXES
+# itself is kept and still used elsewhere (e.g. the Export/Save-
+# Settings snapshot's "is this a reassignable axis id" membership
+# check) - just no longer as a live-HAL-pin source here.
 
 def _pid_set_letter(letter, param):
     '''
-    Value-changed handler for A_Set_<param>/C_Set_<param> (see
-    EXTRA_SETTINGS_LETTERS) - unlike _pid_set's fixed-at-load-time pin,
-    the live pid.* component here is named after the LETTER ITSELF
+    Value-changed handler for one of the Settings tab's 8 letter-labeled
+    PID spin buttons (<letter>_Set_<param>, letter in
+    AXIS_SELECTION_LETTERS) - bound uniformly for all 8 letters, not
+    just EXTRA_SETTINGS_LETTERS (A/C) as it originally was. The 6
+    reassignable channels used to be bound via PID_AXES/_pid_set
+    instead, keyed by internal id (e.g. widget "B_Set_P" always meaning
+    channel 05's own live component, whatever it's currently named) -
+    that's a real UX mismatch with every other Settings-tab control
+    fixed 3 September 2026 (see _axis_set_scale_letter's docstring):
+    "B" should mean whichever channel currently wears letter B, the
+    same as Scale/Max Vel/Max Accel/Backlash now do, not "channel 05
+    forever." Unlike _pid_set's fixed-at-load-time pin, the live pid.*
+    component here is named after the LETTER ITSELF
     (REB_Generate_Local_Ini.py renames each channel's pid component to
-    match its current assignment - see PID_AXES above), so no channel
-    indirection is needed to build the pin name, only a check that some
-    channel is actually using this letter right now
-    (CURRENT_LETTER_INTERNAL_ID), since the component doesn't exist at
-    all otherwise - same gating _axis_set_scale_letter/
-    _axis_set_backlash_letter use.
+    match its current assignment), so no channel indirection is needed
+    to build the pin name, only a check that some channel is actually
+    using this letter right now (CURRENT_LETTER_INTERNAL_ID), since the
+    component doesn't exist at all otherwise - same gating
+    _axis_set_scale_letter/_axis_set_backlash_letter use.
     '''
     hal_pin = "pid." + letter.lower() + "." + PID_PARAM_PIN[param]
     def handler(self, widget):
@@ -5001,7 +5114,7 @@ def _pid_set_letter(letter, param):
     handler.__name__ = letter + "_Set_" + param
     return handler
 
-for _letter in EXTRA_SETTINGS_LETTERS:
+for _letter in AXIS_SELECTION_LETTERS:
     for _param in PID_PARAMS:
         setattr(HandlerClass, _letter + "_Set_" + _param, _pid_set_letter(_letter, _param))
 del _letter, _param

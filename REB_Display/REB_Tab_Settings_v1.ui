@@ -915,15 +915,12 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                       </packing>
                                     </child>
                                     <child>
-                                      <object class="GtkLabel" id="Channel_02_Type">
+                                      <object class="GtkComboBoxText" id="Channel_02_Type">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
                                         <property name="halign">center</property>
                                         <property name="valign">center</property>
-                                        <property name="label" translatable="yes">Linear</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
-                                        </attributes>
+                                        <signal name="changed" handler="Channel_02_Type_Changed" swapped="no"/>
                                       </object>
                                       <packing>
                                         <property name="expand">False</property>
@@ -995,15 +992,12 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                       </packing>
                                     </child>
                                     <child>
-                                      <object class="GtkLabel" id="Channel_03_Type">
+                                      <object class="GtkComboBoxText" id="Channel_03_Type">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
                                         <property name="halign">center</property>
                                         <property name="valign">center</property>
-                                        <property name="label" translatable="yes">Linear</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
-                                        </attributes>
+                                        <signal name="changed" handler="Channel_03_Type_Changed" swapped="no"/>
                                       </object>
                                       <packing>
                                         <property name="expand">False</property>
@@ -1076,15 +1070,12 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                       </packing>
                                     </child>
                                     <child>
-                                      <object class="GtkLabel" id="Channel_00_Type">
+                                      <object class="GtkComboBoxText" id="Channel_00_Type">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
                                         <property name="halign">center</property>
                                         <property name="valign">center</property>
-                                        <property name="label" translatable="yes">Linear</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
-                                        </attributes>
+                                        <signal name="changed" handler="Channel_00_Type_Changed" swapped="no"/>
                                       </object>
                                       <packing>
                                         <property name="expand">False</property>
@@ -1156,15 +1147,12 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                       </packing>
                                     </child>
                                     <child>
-                                      <object class="GtkLabel" id="Channel_05_Type">
+                                      <object class="GtkComboBoxText" id="Channel_05_Type">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
                                         <property name="halign">center</property>
                                         <property name="valign">center</property>
-                                        <property name="label" translatable="yes">Angular</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
-                                        </attributes>
+                                        <signal name="changed" handler="Channel_05_Type_Changed" swapped="no"/>
                                       </object>
                                       <packing>
                                         <property name="expand">False</property>
@@ -1255,15 +1243,12 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                       </packing>
                                     </child>
                                     <child>
-                                      <object class="GtkLabel" id="Channel_04_Type">
+                                      <object class="GtkComboBoxText" id="Channel_04_Type">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
                                         <property name="halign">center</property>
                                         <property name="valign">center</property>
-                                        <property name="label" translatable="yes">Linear</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
-                                        </attributes>
+                                        <signal name="changed" handler="Channel_04_Type_Changed" swapped="no"/>
                                       </object>
                                       <packing>
                                         <property name="expand">False</property>
@@ -1335,15 +1320,12 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                       </packing>
                                     </child>
                                     <child>
-                                      <object class="GtkLabel" id="Channel_01_Type">
+                                      <object class="GtkComboBoxText" id="Channel_01_Type">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
                                         <property name="halign">center</property>
                                         <property name="valign">center</property>
-                                        <property name="label" translatable="yes">Linear</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
-                                        </attributes>
+                                        <signal name="changed" handler="Channel_01_Type_Changed" swapped="no"/>
                                       </object>
                                       <packing>
                                         <property name="expand">False</property>
