@@ -119,7 +119,6 @@ PID_PARAMS = ("P", "I", "D", "FF0", "FF1", "FF2")
 # generic_example.settings.ini, and REB.ini's [JOINT_n]/[SPINDLE_n]
 # comments) - what a brand-new axis entry should start from.
 _DEFAULT_PID = {"P": 5, "I": 1, "D": 1.2, "FF0": 0, "FF1": 1, "FF2": 0}
-_DEFAULT_A_PID = {"P": 5, "I": 1, "D": 1.2, "FF0": 2, "FF1": 1, "FF2": 0}
 _DEFAULT_SPINDLE_PID_POS = {"P": 2, "I": 1, "D": 1.2, "FF0": 0, "FF1": 0, "FF2": 0}
 _DEFAULT_SPINDLE_PID_VEL = {"P": 35.1, "I": 20, "D": 1.2, "FF0": 1, "FF1": 0, "FF2": 0}
 
@@ -219,7 +218,7 @@ def _default_axis_entry(axis_id, channel_assignments, channel_types):
         "max_vel": _DEFAULT_ROTARY_MAX_VEL if angular else _DEFAULT_LINEAR_MAX_VEL,
         "max_accel": _DEFAULT_ROTARY_MAX_ACCEL if angular else _DEFAULT_LINEAR_MAX_ACCEL,
         "usercomment": "",
-        "pid": dict(_DEFAULT_A_PID if axis_id == "A" else _DEFAULT_PID),
+        "pid": dict(_DEFAULT_PID),
     }
 
 
