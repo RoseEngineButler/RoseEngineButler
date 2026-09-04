@@ -170,42 +170,6 @@ def _axis_type_for_letter(letter):
     return "ANGULAR" if letter in ("A", "B", "C") else "LINEAR"
 
 
-# Channel id -> the Type _axis_type_for_letter(CHANNEL_DEFAULT_LETTER[id])
-# gives - this codebase's shipped-default Type per channel. TYPE is now
-# an independent, per-channel operator choice via the Axis Selection
-# tab's Type combo (REBset_v1.ini's channel_types, see
-# _read_channel_types below) - a channel can be any letter with either
-# type, freely combined - so this is used only to detect "nothing
-# changed from shipped defaults" in _overlay_axis_assignment.
-DEFAULT_CHANNEL_TYPES = {
-    channel_id: _axis_type_for_letter(letter)
-    for channel_id, letter in CHANNEL_DEFAULT_LETTER.items()
-}
-
-
-def _read_channel_types(settings, assignments):
-    '''
-    Reads REBset_v1.ini's channel_types dict (written by the Axis
-    Selection tab - REB_Display/REB_main.py's _save_channel_types),
-    falling back to whatever each channel's currently-assigned letter
-    (per `assignments`) would imply under the old letter-derived rule
-    for any channel that's missing or unrecognized - same "absent ->
-    shipped default" convention as _read_channel_assignments. Unlike
-    letters, types are never duplicate-checked - two channels sharing a
-    Type is perfectly valid.
-    '''
-    types = {
-        channel_id: _axis_type_for_letter(assignments.get(channel_id, CHANNEL_DEFAULT_LETTER[channel_id]))
-        for channel_id in CHANNEL_DEFAULT_LETTER
-    }
-
-    for channel_id, axis_type in settings.get("channel_types", {}).items():
-        if channel_id in types and axis_type in ("LINEAR", "ANGULAR"):
-            types[channel_id] = axis_type
-
-    return types
-
-
 def _read_channel_assignments(settings):
     '''
     Reads REBset_v1.ini's channel_assignments dict (written by the Axis
@@ -235,9 +199,18 @@ def _set_key_in_section(text, section_name, key, value):
     starting with `[`, or end of file) - so this can't touch a
     same-named key in a different section (TYPE, for instance, appears
     in every [AXIS_*] and [JOINT_n] section).
+
+    The header match is anchored to the start of a line ((?m)^) - a
+    real section header always is one, and without the anchor this
+    could instead match a `[section_name]`-shaped substring inside a
+    comment (confirmed live: REB.ini has prose comments that reference
+    "[AXIS_B]" by name as a cross-reference, e.g. "...see [AXIS_B]
+    above" - harmless for [JOINT_n] specifically, since nothing
+    currently references a JOINT_n section that way, but the anchor
+    costs nothing and removes the fragility either way).
     '''
     section_pattern = re.compile(
-        r'(\[' + re.escape(section_name) + r'\].*?)(?=\n\[|\Z)',
+        r'(?m)(^\[' + re.escape(section_name) + r'\].*?)(?=\n\[|\Z)',
         re.DOTALL,
     )
     match = section_pattern.search(text)
@@ -259,63 +232,143 @@ def _set_key_in_section(text, section_name, key, value):
     return text[:match.start(1)] + new_section_text + text[match.end(1):]
 
 
-def _overlay_axis_assignment(text, assignments, types):
+def _overlay_axis_assignment(text, assignments):
     '''
     Rewrites REB.ini's [AXIS_<letter>] section headers, TYPE/UNITS keys,
     and [KINS]/[TRAJ]/[DISPLAY] coordinate-order keys to match the
     persisted channel -> axis letter assignment (REBset_v1.ini's
     <channel_assignments>, written by the Axis Selection tab - see
-    _read_channel_assignments) and the independently persisted channel
-    -> Type assignment (<channel_types> - see _read_channel_types). A
-    channel's TYPE no longer follows from its letter - it's whatever
-    the operator chose on the Type combo - so letter and type are each
-    checked and rewritten independently below. Must run BEFORE
-    _overlay_measurement_system below: a channel whose type just
-    changed to/from ANGULAR needs its UNITS key set to DEGREE/a linear
-    placeholder here FIRST, so that overlay's INCH/MM-only regex (which
-    deliberately never touches DEGREE) can then correct the placeholder
-    to the machine's actual current measurement system on the same
-    pass.
+    _read_channel_assignments). TYPE follows directly from the new
+    letter (_axis_type_for_letter) - a channel can't be independently
+    typed since the brief 3-4 September 2026 TYPE-decoupling feature
+    was retired. Must run BEFORE _overlay_measurement_system below: a
+    channel whose type just changed to/from ANGULAR needs its UNITS key
+    set to DEGREE/a linear placeholder here FIRST, so that overlay's
+    INCH/MM-only regex (which deliberately never touches DEGREE) can
+    then correct the placeholder to the machine's actual current
+    measurement system on the same pass.
 
     Leaves MIN_LIMIT/MAX_LIMIT/MAX_VELOCITY/MAX_ACCELERATION/
     STEPGEN_MAXVEL/STEPGEN_MAXACCEL/PID gains/backlash untouched - those
-    are physical-channel tuning values the operator retunes via the
-    Settings tab after physically reconfiguring hardware; this only
+    are physical-channel tuning values the operator retunes via
+    REB_Settings after physically reconfiguring hardware; this only
     fixes labeling/typing/kinematics, not motion tuning.
 
-    Safe against channels swapping letters with each other: every
-    section-header rename below searches for that channel's *default*
-    letter (unique per channel, and never itself the target of an
-    earlier rename in this same loop, since renames only ever produce
-    the *new*, not the *default*, letters) against the pristine text
-    read at the top of main() - so which channel is processed first
-    never matters.
+    Safe against ANY combination of channels swapping/cycling letters
+    with each other (found live 4 September 2026 that it previously
+    wasn't - see below) because every [AXIS_*] section's start/end
+    position is located, ONCE, against the pristine ORIGINAL text before
+    any section is renamed - never by a fresh mid-loop search - and all
+    the resulting replacement texts are spliced back in a single pass
+    afterward, from the end of the document backwards (so an earlier
+    splice can never shift the recorded position of one not yet
+    applied). [JOINT_n] sections are safe to edit with a plain per-
+    channel loop throughout, since they're keyed by a fixed joint
+    number that never collides with another channel - only the letter-
+    keyed [AXIS_*] lookup needed this two-phase treatment.
+
+    This replaces an earlier version of this function (introduced
+    itself as a fix, same day) that searched for each channel's
+    [AXIS_<default_letter>] section by that channel's *default* letter
+    scoped to one isolated span, believing that sufficed - it doesn't:
+    with two channels directly swapping letters (e.g. channel 00's W
+    -> B at the same time channel 05's B -> W), processing channel 00
+    first renames its section to [AXIS_B], and channel 05's own
+    default-letter search for "[AXIS_B]" run afterward can then match
+    channel 00's freshly-renamed section instead of channel 05's still-
+    untouched original one, if channel 00's section happens to appear
+    earlier in the document - silently corrupting one axis's TYPE while
+    leaving the other's stuck wrong, confirmed live with exactly this
+    W<->B swap. Locating every span up front, before any rename
+    happens, removes the ordering dependency entirely - it no longer
+    matters which channel is processed first, or whether any letters
+    are exchanged between them.
     '''
-    if assignments == CHANNEL_DEFAULT_LETTER and types == DEFAULT_CHANNEL_TYPES:
+    if assignments == CHANNEL_DEFAULT_LETTER:
         return text, None
 
+    # Phase 1: locate every channel's [AXIS_<default_letter>] section
+    # span against the untouched original text, before any splicing.
+    # Anchored to start-of-line ((?m)^) so this can only match a real
+    # section header, never a `[AXIS_<letter>]`-shaped substring inside
+    # a comment - REB.ini has prose comments that reference "[AXIS_B]"
+    # by name as a cross-reference (e.g. "...see [AXIS_B] above").
+    # Those particular comments happen to sit after AXIS_B's own real
+    # header, so an unanchored search here was never actually wrong for
+    # today's file - but the exact same unanchored pattern, re-run
+    # against the *edited* output text to verify this fix, did grab one
+    # of those comments instead of AXIS_B's real (relocated) header,
+    # once the swap below moved the section elsewhere in the document
+    # (confirmed live 4 September 2026, while testing the swap-ordering
+    # fix this function's docstring describes). Anchoring here removes
+    # that latent fragility entirely rather than relying on today's
+    # comment placement staying lucky.
+    sections = {}
+    for channel_id, default_letter in CHANNEL_DEFAULT_LETTER.items():
+        axis_section_pattern = re.compile(
+            r'(?m)(^\[AXIS_' + re.escape(default_letter) + r'\].*?)(?=\n\[|\Z)',
+            re.DOTALL,
+        )
+        axis_match = axis_section_pattern.search(text)
+        if not axis_match:
+            print("Could not find [AXIS_" + default_letter + "] in REB.ini")
+            continue
+        sections[channel_id] = (axis_match.start(1), axis_match.end(1), axis_match.group(1))
+
+    # Phase 2: for each channel that actually needs a change, build its
+    # replacement section text (rename header + set TYPE) from that
+    # channel's own untouched span - no interaction with any other
+    # channel's edit is possible here, since none have been applied yet.
+    changed_channels = []
     changes = []
+    edits = []
     for channel_id, default_letter in CHANNEL_DEFAULT_LETTER.items():
         new_letter = assignments[channel_id]
-        new_type = types[channel_id]
-        default_type = DEFAULT_CHANNEL_TYPES[channel_id]
-        if new_letter == default_letter and new_type == default_type:
+        if new_letter == default_letter or channel_id not in sections:
             continue
 
+        new_type = _axis_type_for_letter(new_letter)
+        default_type = _axis_type_for_letter(default_letter)
+        start, end, axis_section_text = sections[channel_id]
+
+        axis_section_text = re.sub(
+            r'(?m)^\[AXIS_' + re.escape(default_letter) + r'\]',
+            '[AXIS_' + new_letter + ']',
+            axis_section_text,
+            count=1,
+        )
+
+        axis_section_text, n = re.subn(
+            r'(?m)^(TYPE\s*= )\S+',
+            lambda m: m.group(1) + new_type,
+            axis_section_text,
+            count=1,
+        )
+        if n == 0:
+            print("Could not find TYPE in [AXIS_" + default_letter + "]")
+
+        edits.append((start, end, axis_section_text))
+        changed_channels.append(channel_id)
+
+        change = channel_id + ": " + default_letter + " -> " + new_letter
+        if new_type != default_type:
+            change += ", " + default_type + " -> " + new_type
+        changes.append(change)
+
+    # Phase 3: splice every section's replacement text back into the
+    # document, from the end backwards, so applying one edit can never
+    # shift the still-original positions recorded in `edits` for any
+    # edit not yet applied.
+    for start, end, new_section_text in sorted(edits, key=lambda e: e[0], reverse=True):
+        text = text[:start] + new_section_text + text[end:]
+
+    # [JOINT_n] TYPE/UNITS: safe as a plain per-channel loop on the now-
+    # AXIS_-updated text - joint numbers are fixed per channel and never
+    # collide the way letters can (see docstring).
+    for channel_id in changed_channels:
+        new_letter = assignments[channel_id]
+        new_type = _axis_type_for_letter(new_letter)
         joint_num = CHANNEL_JOINT_NUMBER[channel_id]
-
-        if new_letter != default_letter:
-            text, n = re.subn(
-                r'(?m)^\[AXIS_' + re.escape(default_letter) + r'\]',
-                '[AXIS_' + new_letter + ']',
-                text,
-                count=1,
-            )
-            if n == 0:
-                print("Could not find [AXIS_" + default_letter + "] in REB.ini")
-                continue
-
-        text = _set_key_in_section(text, "AXIS_" + new_letter, "TYPE", new_type)
         text = _set_key_in_section(text, "JOINT_" + str(joint_num), "TYPE", new_type)
 
         # UNITS lives only in [JOINT_n]. DEGREE if now angular; otherwise
@@ -325,15 +378,6 @@ def _overlay_axis_assignment(text, assignments, types):
         # function's own docstring.
         units = "DEGREE" if new_type == "ANGULAR" else "INCH"
         text = _set_key_in_section(text, "JOINT_" + str(joint_num), "UNITS", units)
-
-        change = channel_id + ": "
-        if new_letter != default_letter:
-            change += default_letter + " -> " + new_letter
-        else:
-            change += default_letter + " (unchanged)"
-        if new_type != default_type:
-            change += ", " + default_type + " -> " + new_type
-        changes.append(change)
 
     # Rebuild the [KINS]/[TRAJ]/[DISPLAY] coordinate-order keys: the Nth
     # letter is whichever channel is joint N (fixed - CHANNEL_JOINT_NUMBER),
@@ -754,7 +798,6 @@ def main():
 
     settings = reb_settings_io.load_settings()
     assignments = _read_channel_assignments(settings)
-    types = _read_channel_types(settings, assignments)
 
     # Regenerate REB.local.hal/REB_PostGUI_v1.local.hal FIRST and abort
     # immediately if it fails (see generate_local_hal_files) - if the
@@ -771,7 +814,7 @@ def main():
 
     # Must run before _overlay_measurement_system below - see
     # _overlay_axis_assignment's docstring for why.
-    text, axis_result = _overlay_axis_assignment(text, assignments, types)
+    text, axis_result = _overlay_axis_assignment(text, assignments)
     if axis_result:
         changes, coordinates, n1, n2, n3 = axis_result
         print("Overlaid axis assignment: " + ", ".join(changes))

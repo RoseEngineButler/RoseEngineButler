@@ -106,28 +106,19 @@ DEFAULT_LETTER_CHANNEL = {v: k for k, v in CHANNEL_DEFAULT_LETTER.items()}
 # used on this machine).
 AXIS_SELECTION_LETTERS = ("X", "Z", "U", "V", "W", "A", "B", "C")
 
-# Fallback only, used to seed a channel's default Type the first time
-# REBset_v1.ini's channel_types is read with nothing yet persisted for
-# it (pre-upgrade file, or a channel whose type was never explicitly
-# set) - NOT the live source of truth. TYPE is an independent, per-
-# channel operator choice via the Axis Selection tab's Type combo (see
-# CURRENT_TYPE below) - a channel can be any letter with either type,
-# freely combined. Mirrors REB_Setup/REB_Generate_Local_Ini.py's and
+# The axis letter -> Type rule: A/B/C are angular, everything else is
+# linear. Was briefly an independent, per-channel operator choice via
+# the Axis Selection tab's Type combo (REBset_v1.ini's "channel_types"
+# field) between 3 and 4 September 2026; that feature was retired the
+# same week it shipped (nothing in the current UI can ever set an
+# independent type again), so this is now simply the one and only
+# source of truth. Mirrors REB_Setup/REB_Generate_Local_Ini.py's and
 # REB_Display/reb_settings_io.py's own copies of this same rule.
 def _axis_type_for_letter(letter):
     # CURRENT_LETTER's values are lowercase (see below) and most call
     # sites pass those straight through without their own .upper() -
     # case-fold here so this stays correct regardless of caller casing.
     return "ANGULAR" if letter.upper() in ("A", "B", "C") else "LINEAR"
-
-# Channel id -> the Type _axis_type_for_letter(CHANNEL_DEFAULT_LETTER[id])
-# gives - i.e. this codebase's shipped-default Type per channel, used by
-# REB_Setup/REB_Generate_Local_Ini.py to detect "nothing changed" and by
-# _read_persisted_channel_types below as the very first fallback layer.
-DEFAULT_CHANNEL_TYPES = {
-    channel_id: _axis_type_for_letter(letter)
-    for channel_id, letter in CHANNEL_DEFAULT_LETTER.items()
-}
 
 # Letter -> the same foreground color REB_Panel_v1.ui's original per-axis
 # DRO/jog labels already use for that letter (X/U share one color, Z/W
@@ -257,46 +248,7 @@ def _read_persisted_channel_assignments():
 
     return assignments
 
-def _save_channel_types(types, assignments):
-    '''
-    Persists the Axis Selection tab's per-channel Type choices into
-    REBset_v1.ini's "channel_types" dict. types is a dict of channel id
-    ("00".."05") -> "LINEAR"/"ANGULAR"; any channel missing from it
-    falls back to whatever its currently-assigned letter would imply
-    under the old letter-derived rule (_axis_type_for_letter), via
-    assignments - not DEFAULT_CHANNEL_TYPES, since a channel already
-    reassigned away from its default letter should fall back to a type
-    matching its *current* letter, not its shipped one.
-    '''
-    settings = reb_settings_io.load_settings()
-    settings["channel_types"] = {
-        channel_id: types.get(
-            channel_id,
-            _axis_type_for_letter(assignments.get(channel_id, CHANNEL_DEFAULT_LETTER[channel_id])))
-        for channel_id in sorted(CHANNEL_DEFAULT_LETTER)
-    }
-    reb_settings_io.save_settings(settings)
-    print("Saved channel types: " + str(settings["channel_types"]))
 
-def _read_persisted_channel_types(assignments):
-    '''
-    Reads the persisted channel -> Type map, falling back to whatever
-    each channel's currently-assigned letter (per `assignments`) would
-    imply under the old letter-derived rule for any channel whose entry
-    is missing or unrecognized - same "absent -> shipped default"
-    convention as _read_persisted_channel_assignments. Unlike letters,
-    types are never duplicate-checked - two channels sharing a Type is
-    perfectly valid.
-    '''
-    types = {
-        channel_id: _axis_type_for_letter(assignments.get(channel_id, CHANNEL_DEFAULT_LETTER[channel_id]))
-        for channel_id in CHANNEL_DEFAULT_LETTER
-    }
-    stored = reb_settings_io.load_settings().get("channel_types", {})
-    for channel_id, axis_type in stored.items():
-        if channel_id in types and axis_type in ("LINEAR", "ANGULAR"):
-            types[channel_id] = axis_type
-    return types
 
 # Axis id (as used in REB_Settings_v1.ini and the Settings tab spin
 # buttons) -> hm2_7i92.0 stepgen channel. Verified against the actual
@@ -362,28 +314,23 @@ CURRENT_LETTER = {
     for internal_id, channel_id in DEFAULT_LETTER_CHANNEL.items()
 }
 
-# This session's channel -> Type assignment, read once at module import
-# alongside _CHANNEL_ASSIGNMENTS_AT_STARTUP above, for the same reason:
-# the Axis Selection tab's Type combo shows the identical "restart
-# required" popup as the letter combo, so a running session's Type
-# can't change without a restart either.
-_CHANNEL_TYPES_AT_STARTUP = _read_persisted_channel_types(_CHANNEL_ASSIGNMENTS_AT_STARTUP)
-
-# Internal id -> this session's actual current Type ("LINEAR"/"ANGULAR").
-# The live source of truth everywhere TYPE matters at runtime (feed/idx
-# adjustment ranges, deg-vs-inch unit labels, jog-increment G-code
-# amount) - replaces the old _axis_type_for_letter(CURRENT_LETTER[...])
-# derivation now that Type is independently chosen per channel, not
-# implied by the letter.
+# Internal id -> this session's actual current Type ("LINEAR"/
+# "ANGULAR"), derived purely from CURRENT_LETTER via
+# _axis_type_for_letter - the live source of truth everywhere TYPE
+# matters at runtime (feed/idx adjustment ranges, deg-vs-inch unit
+# labels, jog-increment G-code amount). Was briefly computed from an
+# independent per-channel Type choice (REBset_v1.ini's "channel_types",
+# read via the now-deleted _read_persisted_channel_types) between 3 and
+# 4 September 2026; that feature was retired the same week it shipped,
+# reverting this to its original letter-derived form.
 CURRENT_TYPE = {
-    internal_id: _CHANNEL_TYPES_AT_STARTUP[channel_id]
-    for internal_id, channel_id in DEFAULT_LETTER_CHANNEL.items()
+    internal_id: _axis_type_for_letter(letter)
+    for internal_id, letter in CURRENT_LETTER.items()
 }
 
 # Internal id -> HAL `pid` component instance driving that axis's PID
 # loop right now (see CURRENT_LETTER above for why this can't be a
 # static dict, and PID_SPINDLE_LOOPS below for Sp0/Sp1's own loops).
-PID_AXES = {internal_id: "pid." + letter for internal_id, letter in CURRENT_LETTER.items()}
 
 # Reverse of CURRENT_LETTER: currently-assigned axis letter (uppercase)
 # -> internal id of whichever physical channel is driving it right now,
@@ -399,29 +346,15 @@ CURRENT_LETTER_INTERNAL_ID = {letter.upper(): internal_id for internal_id, lette
 # channels' own blocks - see _load_scale_settings and
 # _axis_set_scale_letter below, and REB_Scale_Persist.py's mirror of
 # this same constant.
-EXTRA_SETTINGS_LETTERS = ("A", "C")
 
 # Spindle id -> {"Pos": position-loop component, "Vel": velocity-loop
 # component}. The suffix ("Pos"/"Vel") matches the Settings tab widget
 # id suffix (e.g. Sp0_Set_P_Pos, Sp0_Set_P_Vel) and the REB_Settings_v1.ini
 # block tag ("pid_pos"/"pid_vel").
-PID_SPINDLE_LOOPS = {
-    "Sp0": {"Pos": "pid.p0", "Vel": "pid.s0"},
-    "Sp1": {"Pos": "pid.p1", "Vel": "pid.s1"},
-}
 
 # Settings tab field name -> HAL pid component pin name. Order matches
 # the P/I/D/FF0/FF1/FF2 column order in REB_Tab_Settings_v1.ui's
 # "Stepper Motor Settings" grid.
-PID_PARAM_PIN = {
-    "P":   "Pgain",
-    "I":   "Igain",
-    "D":   "Dgain",
-    "FF0": "FF0",
-    "FF1": "FF1",
-    "FF2": "FF2",
-}
-PID_PARAMS = ("P", "I", "D", "FF0", "FF1", "FF2")
 
 # Max time (seconds) to wait for both Sp0 and Sp1 to report oriented in
 # Sp0_Move_Idx_Fwd/Rev's simultaneous-index path (see
@@ -489,12 +422,12 @@ def idx_log(msg):
 def _clear_ena_override(axis_id):
     # The *_Set_Ena handlers fire from whichever component owns that
     # axis's ENA button (the main panel, "gladevcp") - but the real,
-    # netted *_Ena_Override pin (see REB_PostGUI_v1.hal) lives on the
-    # Settings tab's component ("REBCnfg"), a different process. Writing
-    # to self.halcomp there would only touch this component's own,
-    # unconnected pin of the same name - a no-op. Cross the process
-    # boundary via halcmd instead, the same way Sp0_Set_Scale already
-    # does in the other direction for *_ENA-light.
+    # netted *_Ena_Override pin (see REB_PostGUI_v1.hal) is written from
+    # the standalone REB_Settings program, a different process (before
+    # 4 September 2026 this was the embedded Settings tab's own
+    # component, "REBCnfg" - now retired). Cross the process boundary
+    # via halcmd instead, the same way REB_Settings's own Scale handlers
+    # already do in the other direction for *_ENA-light.
     #
     # Once a pin is netted to a signal, halcmd can't "setp" the pin
     # directly ("pin is connected to a signal") - the signal itself has
@@ -590,31 +523,7 @@ def _show_restart_required_popup(widget, detail=None):
     dialog.run()
     dialog.destroy()
 
-def _save_measurement_system(system):
-    '''
-    Persists the Measurement System choice ("Metric"/"Imperial") into
-    REB_Settings_v1.ini, the same silent, automatic settings file that
-    _load_scale_settings/_load_axis_comments already read/write - see
-    docs/settings_file.md for why this file (rather than a .settings.ini) is
-    the right home for machine-level state like this.
-    '''
-    settings = reb_settings_io.load_settings()
-    settings["measurement_system"] = system
-    reb_settings_io.save_settings(settings)
-    print("Saved measurement_system = " + system)
 
-def _save_device_names(names):
-    '''
-    Persists the maintained device-name list (General tab's Device
-    Names box - one name per line, e.g. "Spindle (Sp0)", "Rosette
-    Phaser/Multiplier (Sp1)", "Retractor") into REBset_v1.ini's
-    "device_names" list, replacing it wholesale each time rather than
-    tracking adds/removes/reorders across saves.
-    '''
-    settings = reb_settings_io.load_settings()
-    settings["device_names"] = list(names)
-    reb_settings_io.save_settings(settings)
-    print("Saved " + str(len(names)) + " device name(s)")
 
 def _read_persisted_device_names():
     '''
@@ -656,16 +565,6 @@ def _combo_selected_device(combo):
     '''
     return combo.get_active_text() if combo.get_active() > 0 else ""
 
-def _save_max_jog_speed(value):
-    '''
-    Persists the Max Jog Speed choice into REB_Settings_v1.ini, the same
-    silent, automatic settings file _save_measurement_system already
-    writes measurement_system into.
-    '''
-    settings = reb_settings_io.load_settings()
-    settings["max_jog_speed"] = round(value, 4)
-    reb_settings_io.save_settings(settings)
-    print("Saved max_jog_speed = " + str(settings["max_jog_speed"]))
 
 # Settings tab jog-speed-grid widget id -> (REB_Settings_v1.ini tag,
 # fallback default matching REB.ini's own shipped value). Mirrors
@@ -678,24 +577,7 @@ def _save_max_jog_speed(value):
 # where [TRAJ] carried a much larger, effectively-unlimited value; this
 # was a deliberate choice to unify them under one operator-facing
 # control rather than leave two different meanings behind one label).
-VELOCITY_SETTINGS = {
-    "Default_Linear_Velocity":  ("default_linear_velocity",  0.250000),
-    "Min_Linear_Velocity":      ("min_linear_velocity",      0.016670),
-    "Max_Angular_Velocity":     ("max_angular_velocity",     1.000000),
-    "Default_Angular_Velocity": ("default_angular_velocity", 12.000000),
-    "Min_Angular_Velocity":     ("min_angular_velocity",     1.666667),
-}
 
-def _save_velocity_setting(tag, value):
-    '''
-    Persists one of VELOCITY_SETTINGS' values into REB_Settings_v1.ini -
-    generic version of _save_max_jog_speed above, parameterized by key
-    name since these five all follow the exact same shape.
-    '''
-    settings = reb_settings_io.load_settings()
-    settings[tag] = round(value, 6)
-    reb_settings_io.save_settings(settings)
-    print("Saved " + tag + " = " + str(settings[tag]))
 
 # The indexing Fwd/Rev handlers block on c.wait_complete() for as long as
 # each M19 takes to converge (or time out), which otherwise leaves the UI
@@ -968,360 +850,9 @@ class HandlerClass:
         _set_depressed(rev, bool(hal.get_value('spindle.0.forward')))
         return True
 
-    def _load_scale_settings(self):
-        '''
-        Reads persisted axis scale values from REB_Settings_v1.ini and
-        applies them to the Settings tab's spin buttons and the real
-        stepgen position-scale HAL pins.
 
-        Only runs in the component that actually owns the Settings
-        tab's spin buttons (X_Set_Scale etc.) - every other tab/panel
-        also using REB_main.py will find that widget missing and
-        return immediately.
 
-        Sp0/Sp1 (never reassignable - no letter concept applies) always
-        own their own live pin unconditionally. The 6 reassignable
-        channels are instead handled uniformly by LETTER (not internal
-        id) below, resolving the live channel through CURRENT_LETTER_
-        INTERNAL_ID for all 8 AXIS_SELECTION_LETTERS - fixed 3 September
-        2026: this used to split "native" letters (X/Z/B/U/V/W, pushed
-        to their own internal id's fixed stepgen channel regardless of
-        what letter that channel currently wore) from "extra" letters
-        (A/C, resolved dynamically), which meant a channel wearing a
-        borrowed *native* letter (e.g. channel 00 reassigned to letter
-        B) never got its scale restored at all - see
-        _axis_set_scale_letter's docstring for the live-edit half of
-        this same bug.
-        '''
-        if self.builder.get_object("X_Set_Scale") is None:
-            return
 
-        settings = reb_settings_io.load_settings()
-        axes = settings.get("axes", {})
-
-        for axis_id in ("Sp0", "Sp1"):
-            axis_entry = axes.get(axis_id)
-            if axis_entry is None or "scale" not in axis_entry:
-                print("No stored scale found for axis " + axis_id
-                      + " in " + SETTINGS_PATH)
-                continue
-
-            value = float(axis_entry["scale"])
-
-            widget = self.builder.get_object(axis_id + "_Set_Scale")
-            if widget is not None:
-                widget.set_value(value)
-
-            hal_pin = "hm2_7i92.0.stepgen." + AXIS_STEPGEN[axis_id] + ".position-scale"
-            try:
-                subprocess.run(
-                    ["halcmd", "setp", hal_pin, str(value)],
-                    check=True,
-                    capture_output=True,
-                    text=True
-                )
-                print("Restored " + hal_pin + " = " + str(value))
-            except subprocess.CalledProcessError as e:
-                print("Error restoring " + hal_pin + ": " + e.stderr)
-            except FileNotFoundError:
-                print("halcmd not found - is the LinuxCNC environment sourced?")
-
-        # All 8 letters (X,Z,U,V,W,A,B,C): letter-keyed - always load the
-        # persisted value into the spin button, but only push it live if
-        # this letter is currently assigned to a channel this session
-        # (CURRENT_LETTER_INTERNAL_ID).
-        for letter in AXIS_SELECTION_LETTERS:
-            axis_entry = axes.get(letter)
-            if axis_entry is None or "scale" not in axis_entry:
-                print("No stored scale found for axis " + letter
-                      + " in " + SETTINGS_PATH)
-                continue
-
-            value = float(axis_entry["scale"])
-
-            widget = self.builder.get_object(letter + "_Set_Scale")
-            if widget is not None:
-                widget.set_value(value)
-
-            internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
-            if internal_id is None:
-                # Not currently assigned to any channel - nothing live
-                # to push to, the value just sits in the spin button/
-                # file for whenever this letter is assigned.
-                continue
-
-            hal_pin = "hm2_7i92.0.stepgen." + AXIS_STEPGEN[internal_id] + ".position-scale"
-            try:
-                subprocess.run(
-                    ["halcmd", "setp", hal_pin, str(value)],
-                    check=True,
-                    capture_output=True,
-                    text=True
-                )
-                print("Restored " + hal_pin + " = " + str(value) + " (" + letter + ")")
-            except subprocess.CalledProcessError as e:
-                print("Error restoring " + hal_pin + ": " + e.stderr)
-            except FileNotFoundError:
-                print("halcmd not found - is the LinuxCNC environment sourced?")
-
-    def _load_max_vel_accel_settings(self):
-        '''
-        Reads persisted axis/spindle "max_vel"/"max_accel" values from
-        REB_Settings_v1.ini and applies them to the Settings tab's Max
-        Vel/Max Accel spin buttons and the real stepgen maxvel/maxaccel
-        HAL params (hm2_7i92.0.stepgen.NN.maxvel/.maxaccel) - mirrors
-        _load_scale_settings above exactly (same per-letter resolution
-        via CURRENT_LETTER_INTERNAL_ID, same Sp0/Sp1-are-fixed
-        exception), just pushing two values per axis instead of one.
-        These are the stepgen hardware limits, not [JOINT_n]MAX_
-        VELOCITY/MAX_ACCELERATION - see reb_settings_io.py's
-        _default_axis_entry for why.
-
-        Only runs in the component that actually owns the Settings
-        tab's spin buttons (X_Set_Max_Vel etc.) - every other tab/panel
-        also using REB_main.py will find that widget missing and
-        return immediately.
-        '''
-        if self.builder.get_object("X_Set_Max_Vel") is None:
-            return
-
-        settings = reb_settings_io.load_settings()
-        axes = settings.get("axes", {})
-
-        def restore(axis_id, stepgen_ch, axis_entry, label_suffix=""):
-            for key, widget_suffix, hal_suffix in (
-                ("max_vel", "_Set_Max_Vel", ".maxvel"),
-                ("max_accel", "_Set_Max_Accel", ".maxaccel"),
-            ):
-                if key not in axis_entry:
-                    print("No stored " + key + " found for axis " + axis_id
-                          + " in " + SETTINGS_PATH)
-                    continue
-
-                value = float(axis_entry[key])
-
-                widget = self.builder.get_object(axis_id + widget_suffix)
-                if widget is not None:
-                    widget.set_value(value)
-
-                if stepgen_ch is None:
-                    continue
-
-                hal_pin = "hm2_7i92.0.stepgen." + stepgen_ch + hal_suffix
-                try:
-                    subprocess.run(
-                        ["halcmd", "setp", hal_pin, str(value)],
-                        check=True,
-                        capture_output=True,
-                        text=True
-                    )
-                    print("Restored " + hal_pin + " = " + str(value) + label_suffix)
-                except subprocess.CalledProcessError as e:
-                    print("Error restoring " + hal_pin + ": " + e.stderr)
-                except FileNotFoundError:
-                    print("halcmd not found - is the LinuxCNC environment sourced?")
-
-        for axis_id in ("Sp0", "Sp1"):
-            axis_entry = axes.get(axis_id)
-            if axis_entry is None:
-                continue
-            restore(axis_id, AXIS_STEPGEN[axis_id], axis_entry)
-
-        # All 8 letters (X,Z,U,V,W,A,B,C): letter-keyed, same pattern as
-        # _load_scale_settings.
-        for letter in AXIS_SELECTION_LETTERS:
-            axis_entry = axes.get(letter)
-            if axis_entry is None:
-                continue
-            internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
-            stepgen_ch = AXIS_STEPGEN[internal_id] if internal_id is not None else None
-            restore(letter, stepgen_ch, axis_entry, " (" + letter + ")")
-
-    def _load_pid_settings(self):
-        '''
-        Reads persisted P/I/D/FF0/FF1/FF2 gains from REB_Settings_v1.ini
-        (each axis's <pid> block, or <pid_pos>/<pid_vel> for the two
-        spindle loops) and applies them to the Settings tab's PID spin
-        buttons and the live pid.* HAL gain pins - mirrors
-        _load_scale_settings above for the axis stepgen scales (same
-        per-letter resolution via CURRENT_LETTER_INTERNAL_ID for all 8
-        AXIS_SELECTION_LETTERS, fixed 3 September 2026 - see that
-        function's docstring for the bug this replaced: the previous
-        PID_AXES-based loop here, keyed by internal id, never restored
-        a channel's gains at all once it wore a borrowed native letter).
-        REB_Scale_Persist.py is what writes these back into
-        REB_Settings_v1.ini at shutdown, the same as it already does
-        for scale.
-
-        Only runs in the component that actually owns the Settings
-        tab's PID spin buttons (X_Set_P etc.) - every other tab/panel
-        also using REB_main.py will find that widget missing and
-        return immediately.
-        '''
-        if self.builder.get_object("X_Set_P") is None:
-            return
-
-        settings = reb_settings_io.load_settings()
-        axes = settings.get("axes", {})
-
-        def apply(axis_id, block_tag, hal_component, widget_id_for_param, push_live=True):
-            '''
-            widget_id_for_param(param) builds the Settings tab widget id
-            for a given P/I/D/FF0/FF1/FF2 param - axes and spindle loops
-            put their disambiguating suffix in different places
-            (X_Set_P vs Sp0_Set_P_Pos), so the caller supplies this
-            rather than apply() assuming one fixed naming shape.
-
-            push_live=False (used for EXTRA_SETTINGS_LETTERS when not
-            currently assigned to a channel - see below) still sets the
-            widget from file but skips the halcmd push, since
-            hal_component names a pid.* instance that doesn't currently
-            exist rather than one that's merely stale.
-            '''
-            axis_entry = axes.get(axis_id)
-            if axis_entry is None:
-                print("No axis \"" + axis_id + "\" entry found in " + SETTINGS_PATH)
-                return
-
-            pid_block = axis_entry.get(block_tag)
-            if pid_block is None:
-                print("No \"" + block_tag + "\" entry found for axis " + axis_id
-                      + " in " + SETTINGS_PATH)
-                return
-
-            for param in PID_PARAMS:
-                widget_id = widget_id_for_param(param)
-
-                if param not in pid_block:
-                    print("No stored " + param + " found for " + widget_id
-                          + " in " + SETTINGS_PATH)
-                    continue
-
-                value = pid_block[param]
-                widget = self.builder.get_object(widget_id)
-                if widget is not None:
-                    widget.set_value(float(value))
-
-                if not push_live:
-                    continue
-
-                hal_pin = hal_component + "." + PID_PARAM_PIN[param]
-                try:
-                    subprocess.run(
-                        ["halcmd", "setp", hal_pin, str(value)],
-                        check=True,
-                        capture_output=True,
-                        text=True
-                    )
-                    print("Restored " + hal_pin + " = " + str(value))
-                except subprocess.CalledProcessError as e:
-                    print("Error restoring " + hal_pin + ": " + e.stderr)
-                except FileNotFoundError:
-                    print("halcmd not found - is the LinuxCNC environment sourced?")
-
-        for spindle_id, loops in PID_SPINDLE_LOOPS.items():
-            for suffix, component in loops.items():
-                block_tag = "pid_pos" if suffix == "Pos" else "pid_vel"
-                apply(spindle_id, block_tag, component,
-                      lambda param, spindle_id=spindle_id, suffix=suffix:
-                          spindle_id + "_Set_" + param + "_" + suffix)
-
-        # All 8 letters (X,Z,U,V,W,A,B,C): letter-keyed, no fixed channel
-        # of their own - the live pid.<letter> component is named after
-        # the letter itself (REB_Generate_Local_Ini.py renames each
-        # channel's pid component to match its current assignment), so
-        # it only exists at all while this letter is currently assigned
-        # to a channel (CURRENT_LETTER_INTERNAL_ID) - see _pid_set_letter.
-        for letter in AXIS_SELECTION_LETTERS:
-            apply(letter, "pid", "pid." + letter.lower(),
-                  lambda param, letter=letter: letter + "_Set_" + param,
-                  push_live=letter in CURRENT_LETTER_INTERNAL_ID)
-
-    def _load_backlash_settings(self):
-        '''
-        Reads persisted axis/spindle backlash values from
-        REB_Settings_v1.ini (each axis's <backlash> element) and applies
-        them to the Settings tab's Backlash spin buttons and the live
-        joint.N.backlash HAL parameters - mirrors _load_scale_settings
-        above (same per-letter resolution via CURRENT_LETTER_INTERNAL_ID
-        for all 8 AXIS_SELECTION_LETTERS, fixed 3 September 2026 - see
-        that function's docstring). REB_Scale_Persist.py is what writes
-        these back into REB_Settings_v1.ini at shutdown, the same as it
-        already does for scale and PID gains.
-
-        Only runs in the component that actually owns the Settings tab's
-        Backlash spin buttons (X_Set_Backlash etc.) - every other tab/
-        panel also using REB_main.py will find that widget missing and
-        return immediately.
-        '''
-        if self.builder.get_object("X_Set_Backlash") is None:
-            return
-
-        settings = reb_settings_io.load_settings()
-        axes = settings.get("axes", {})
-
-        for axis_id in ("Sp0", "Sp1"):
-            axis_entry = axes.get(axis_id)
-            if axis_entry is None or "backlash" not in axis_entry:
-                print("No stored backlash found for axis " + axis_id
-                      + " in " + SETTINGS_PATH)
-                continue
-
-            value = float(axis_entry["backlash"])
-
-            widget = self.builder.get_object(axis_id + "_Set_Backlash")
-            if widget is not None:
-                widget.set_value(value)
-
-            hal_pin = "joint." + str(JOINT_NUMBER[axis_id]) + ".backlash"
-            try:
-                subprocess.run(
-                    ["halcmd", "setp", hal_pin, str(value)],
-                    check=True,
-                    capture_output=True,
-                    text=True
-                )
-                print("Restored " + hal_pin + " = " + str(value))
-            except subprocess.CalledProcessError as e:
-                print("Error restoring " + hal_pin + ": " + e.stderr)
-            except FileNotFoundError:
-                print("halcmd not found - is the LinuxCNC environment sourced?")
-
-        # All 8 letters (X,Z,U,V,W,A,B,C): letter-keyed, no fixed joint
-        # number of their own - always load the persisted value into the
-        # spin button, but only push it live if this letter is currently
-        # assigned to a channel this session (CURRENT_LETTER_INTERNAL_ID),
-        # same pattern as _load_scale_settings.
-        for letter in AXIS_SELECTION_LETTERS:
-            axis_entry = axes.get(letter)
-            if axis_entry is None or "backlash" not in axis_entry:
-                print("No stored backlash found for axis " + letter
-                      + " in " + SETTINGS_PATH)
-                continue
-
-            value = float(axis_entry["backlash"])
-
-            widget = self.builder.get_object(letter + "_Set_Backlash")
-            if widget is not None:
-                widget.set_value(value)
-
-            internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
-            if internal_id is None:
-                continue
-
-            hal_pin = "joint." + str(JOINT_NUMBER[internal_id]) + ".backlash"
-            try:
-                subprocess.run(
-                    ["halcmd", "setp", hal_pin, str(value)],
-                    check=True,
-                    capture_output=True,
-                    text=True
-                )
-                print("Restored " + hal_pin + " = " + str(value) + " (" + letter + ")")
-            except subprocess.CalledProcessError as e:
-                print("Error restoring " + hal_pin + ": " + e.stderr)
-            except FileNotFoundError:
-                print("halcmd not found - is the LinuxCNC environment sourced?")
 
     def _load_axis_comments(self):
         '''
@@ -1410,247 +941,13 @@ class HandlerClass:
 
         return True
 
-    def _apply_measurement_system_labels(self, system):
-        '''
-        Sets the feed-rate/indexing-distance unit labels on the main panel
-        and the scale/max-vel/max-accel unit labels on the Settings tab
-        (each channel's Feed_UOM/IdxDist_UOM/Scale_UOM/Max_Vel_UOM/
-        Max_Accel_UOM set) to match the given system ("Metric" or
-        "Imperial") for channels *currently* assigned a linear letter, or
-        to the fixed angular text ("deg / min"/"deg"/"pulses\n/ deg"/
-        "deg\n/ sec"/"deg\n/ sec²") for channels currently assigned an
-        angular one - degrees aren't metric or imperial, so an angular
-        channel's labels don't change when the operator toggles
-        measurement system, but still need to be set at least once (a
-        channel reassigned away from its shipped-default type wouldn't
-        otherwise get correct text - the .ui file's own static default
-        only matches that channel's *default* letter, e.g. X's Scale_UOM
-        defaults to "pulses\n/ in", wrong if X's channel is now assigned
-        an angular letter). Scale_UOM/Max_Vel_UOM/Max_Accel_UOM are set
-        two lines at a time (embedded "\n") to match the .ui file's own
-        static defaults for the labels this function doesn't reach
-        (A/C/Sp0/Sp1 - see EXTRA_SETTINGS_LETTERS); Feed_UOM/IdxDist_UOM
-        stay single-line, matching REB_Panel_v1.ui's static defaults for
-        those widgets. Whichever labels this component doesn't own
-        (builder.get_object returns None) are silently skipped - same
-        no-op-in-the-wrong-component pattern as _load_scale_settings/
-        _load_axis_comments.
-        '''
-        if system == "Metric":
-            linear_feed_uom, linear_dist_uom, linear_scale_uom = "mm / min", "mm", "pulses\n/ mm"
-            linear_vel_uom, linear_accel_uom = "mm\n/ sec", "mm\n/ sec²"
-        else:
-            linear_feed_uom, linear_dist_uom, linear_scale_uom = "in / min", "in", "pulses\n/ in"
-            linear_vel_uom, linear_accel_uom = "in\n/ sec", "in\n/ sec²"
 
-        for axis_id in CHANNEL_DEFAULT_LETTER.values():
-            if CURRENT_TYPE[axis_id] == "ANGULAR":
-                feed_uom, dist_uom, scale_uom = "deg / min", "deg", "pulses\n/ deg"
-                vel_uom, accel_uom = "deg\n/ sec", "deg\n/ sec²"
-            else:
-                feed_uom, dist_uom, scale_uom = linear_feed_uom, linear_dist_uom, linear_scale_uom
-                vel_uom, accel_uom = linear_vel_uom, linear_accel_uom
 
-            feed_label = self.builder.get_object(axis_id + "_Feed_UOM")
-            if feed_label is not None:
-                feed_label.set_text(feed_uom)
 
-            dist_label = self.builder.get_object(axis_id + "_IdxDist_UOM")
-            if dist_label is not None:
-                dist_label.set_text(dist_uom)
 
-            scale_label = self.builder.get_object(axis_id + "_Scale_UOM")
-            if scale_label is not None:
-                scale_label.set_text(scale_uom)
 
-            max_vel_label = self.builder.get_object(axis_id + "_Max_Vel_UOM")
-            if max_vel_label is not None:
-                max_vel_label.set_text(vel_uom)
 
-            max_accel_label = self.builder.get_object(axis_id + "_Max_Accel_UOM")
-            if max_accel_label is not None:
-                max_accel_label.set_text(accel_uom)
 
-    def _load_measurement_system(self):
-        '''
-        Reads the persisted Measurement System ("Metric"/"Imperial", default
-        "Imperial" if absent - matching REB.ini's shipped inch/INCH default)
-        from REB_Settings_v1.ini, applies it to the Settings tab's combo box
-        (if this component owns it) and to whichever unit-of-measure labels
-        this component owns (see _apply_measurement_system_labels).
-        '''
-        settings = reb_settings_io.load_settings()
-        system = settings.get("measurement_system", "Imperial")
-        if system not in ("Metric", "Imperial"):
-            system = "Imperial"
-
-        combo = self.builder.get_object("Measurement_System")
-        if combo is not None:
-            self._applying_measurement_system = True
-            combo.set_active(0 if system == "Metric" else 1)
-            self._applying_measurement_system = False
-
-        self._apply_measurement_system_labels(system)
-
-    def _load_device_names(self):
-        '''
-        Reads the persisted device-name list (REBset_v1.ini's
-        <device_names> block) and applies it to the General tab's
-        Device Names GtkTextView, one name per line - mirrors
-        _load_measurement_system above. No-ops outside the component
-        that owns that widget.
-        '''
-        view = self.builder.get_object("Device_Names")
-        if view is None:
-            return
-
-        names = _read_persisted_device_names()
-
-        self._applying_device_names = True
-        view.get_buffer().set_text("\n".join(names))
-        self._applying_device_names = False
-
-    def _read_device_names(self):
-        '''
-        Reads the maintained device-name list straight from the live
-        Device Names widget (kept in sync with REBset_v1.ini by
-        Device_Names_Changed on every edit) rather than re-reading the
-        file - used by _run_export_selection_dialog to populate each
-        axis's comment dropdown. Blank/whitespace-only lines are
-        dropped. Returns [] if this component doesn't own the widget.
-        '''
-        view = self.builder.get_object("Device_Names")
-        if view is None:
-            return []
-        buf = view.get_buffer()
-        text = buf.get_text(buf.get_start_iter(), buf.get_end_iter(), False)
-        return [line.strip() for line in text.splitlines() if line.strip()]
-
-    def _rebuild_all_channel_combo_items(self):
-        '''
-        Populates every Channel_0N_Axis combo with the full letter pool
-        (AXIS_SELECTION_LETTERS) and reselects that combo's own current
-        letter. Every letter is always offered here - this used to
-        filter out whatever letter another channel already held
-        (uniqueness by construction), but Rich asked for that removed:
-        any channel should be freely selectable to any letter, with
-        duplicates flagged live instead (see _update_duplicate_warnings)
-        and only actually blocked from being persisted, not from being
-        picked in the first place.
-
-        Called both by _load_channel_assignments (startup) and by
-        Channel_0N_Axis_Changed itself (every time one combo's choice
-        changes). Does NOT touch Channel_0N_Type - Type is now an
-        independent per-channel choice (see _rebuild_all_channel_type_
-        combos), not derived from the letter, so it never needs
-        recomputing when only the letter changes. No-ops outside the
-        component that owns these widgets.
-        '''
-        if self.builder.get_object("Channel_00_Axis") is None:
-            return
-
-        for channel_id in CHANNEL_DEFAULT_LETTER:
-            combo = self.builder.get_object("Channel_" + channel_id + "_Axis")
-            if combo is None:
-                continue
-
-            current = self._channel_assignments[channel_id]
-
-            combo.remove_all()
-            for letter in AXIS_SELECTION_LETTERS:
-                combo.append_text(letter)
-            combo.set_active(AXIS_SELECTION_LETTERS.index(current))
-
-    def _rebuild_all_channel_type_combos(self):
-        '''
-        Populates every Channel_0N_Type combo with "Linear"/"Angular"
-        and reselects that combo's own currently-persisted Type. Unlike
-        _rebuild_all_channel_combo_items, this only ever needs to run
-        once at load (_load_channel_assignments) - a single channel's
-        Type change never affects any other channel's combo, since
-        Type carries no duplicate-uniqueness constraint the way letters
-        do. No-ops outside the component that owns these widgets.
-        '''
-        if self.builder.get_object("Channel_00_Type") is None:
-            return
-
-        for channel_id in CHANNEL_DEFAULT_LETTER:
-            combo = self.builder.get_object("Channel_" + channel_id + "_Type")
-            if combo is None:
-                continue
-
-            combo.remove_all()
-            combo.append_text("Linear")
-            combo.append_text("Angular")
-            combo.set_active(0 if self._channel_types[channel_id] == "LINEAR" else 1)
-
-    def _update_duplicate_warnings(self):
-        '''
-        Flags every channel whose currently-selected letter is also
-        selected by at least one other channel, by setting its
-        Channel_0N_Warning label to a red "Duplicate!" notice (cleared
-        for channels with no conflict). This is the live feedback that
-        replaced uniqueness-by-construction (see
-        _rebuild_all_channel_combo_items) - a duplicate can now be
-        picked freely, it's just flagged immediately rather than
-        rejected. Channel_0N_Axis_Changed uses this method's return
-        value to decide whether the assignment is safe to persist -
-        actually saving/showing the restart notice is refused for as
-        long as any duplicate remains, resuming automatically on
-        whichever change clears it.
-
-        Returns True if at least one duplicate exists (False, and every
-        warning cleared, if the assignment is fully valid). No-ops
-        (returns False) outside the component that owns these widgets.
-        '''
-        if self.builder.get_object("Channel_00_Axis") is None:
-            return False
-
-        letter_counts = {}
-        for letter in self._channel_assignments.values():
-            letter_counts[letter] = letter_counts.get(letter, 0) + 1
-
-        any_duplicate = False
-        for channel_id, letter in self._channel_assignments.items():
-            warning = self.builder.get_object("Channel_" + channel_id + "_Warning")
-            if warning is None:
-                continue
-            if letter_counts[letter] > 1:
-                warning.set_markup('<span foreground="red" weight="bold">Duplicate!</span>')
-                any_duplicate = True
-            else:
-                warning.set_text("")
-
-        return any_duplicate
-
-    def _load_channel_assignments(self):
-        '''
-        Reads the persisted channel -> axis letter assignment
-        (REBset_v1.ini's <channel_assignments> block) and channel ->
-        Type assignment (<channel_types>), and populates the Axis
-        Selection tab's six letter combos and six Type combos, if this
-        component owns them. No-ops outside that component, same
-        pattern as _load_measurement_system.
-        '''
-        if self.builder.get_object("Channel_00_Axis") is None:
-            return
-
-        self._channel_assignments = _read_persisted_channel_assignments()
-        self._channel_types = _read_persisted_channel_types(self._channel_assignments)
-
-        self._applying_channel_assignments = True
-        self._rebuild_all_channel_combo_items()
-        self._applying_channel_assignments = False
-
-        self._applying_channel_types = True
-        self._rebuild_all_channel_type_combos()
-        self._applying_channel_types = False
-
-        # _read_persisted_channel_assignments already falls back to the
-        # shipped defaults rather than ever returning a duplicate, so
-        # this should always clear every warning - called anyway so the
-        # tab's own state stays consistent if that ever changes.
-        self._update_duplicate_warnings()
 
     def _load_panel_axis_display(self):
         '''
@@ -1671,7 +968,7 @@ class HandlerClass:
             return
 
         assignments = _read_persisted_channel_assignments()
-        types = _read_persisted_channel_types(assignments)
+        types = {channel_id: _axis_type_for_letter(letter) for channel_id, letter in assignments.items()}
         for channel_id, letter in assignments.items():
             axis_label = self.builder.get_object("Panel_Channel_" + channel_id + "_Axis")
             if axis_label is not None:
@@ -1785,46 +1082,7 @@ class HandlerClass:
             if unit_label is not None:
                 unit_label.set_visible(not angular)
 
-    def _load_max_jog_speed(self):
-        '''
-        Reads the persisted Max Jog Speed (default 1.0, matching REB.ini's
-        shipped [TRAJ]/[DISPLAY] MAX_LINEAR_VELOCITY) from
-        REB_Settings_v1.ini and applies it to the Settings tab's spin
-        button, if this component owns it - same no-op-in-the-wrong-
-        component pattern as _load_measurement_system.
-        '''
-        settings = reb_settings_io.load_settings()
-        value = float(settings.get("max_jog_speed", 1.0))
 
-        spin = self.builder.get_object("Max_Jog_Speed")
-        if spin is not None:
-            self._applying_max_jog_speed = True
-            spin.set_value(value)
-            self._applying_max_jog_speed = False
-
-    def _load_velocity_settings(self):
-        '''
-        Reads each of VELOCITY_SETTINGS' persisted values from
-        REB_Settings_v1.ini (default to REB.ini's own shipped value if
-        never persisted) and applies them to their Settings tab spin
-        buttons, if this component owns them - mirrors
-        _load_max_jog_speed above, generalized to all five at once under
-        one shared guard flag (they're only ever loaded together, so one
-        flag covering the whole batch is enough - no risk of one load
-        call falsely suppressing a genuine edit to a different widget).
-        '''
-        settings = reb_settings_io.load_settings()
-
-        self._applying_velocity_settings = True
-        try:
-            for widget_id, (tag, default) in VELOCITY_SETTINGS.items():
-                value = float(settings.get(tag, default))
-
-                spin = self.builder.get_object(widget_id)
-                if spin is not None:
-                    spin.set_value(value)
-        finally:
-            self._applying_velocity_settings = False
 
     def _save_axis_comment(self, axis_id, text):
         '''
@@ -1837,30 +1095,7 @@ class HandlerClass:
         reb_settings_io.save_settings(settings)
         print("Saved " + axis_id + " comment")
 
-    def _read_pid_gains(self, widget_id_for_param):
-        '''
-        Reads P/I/D/FF0/FF1/FF2 from one axis's/spindle loop's own
-        Settings tab widgets into a plain {param: value} dict, for
-        embedding directly in a .settings.ini JSON "pid"/"pid_pos"/
-        "pid_vel" entry - the JSON counterpart to _export_pid_block's XML
-        sub-element (kept separate rather than shared, since one builds
-        an ElementTree element and this builds a dict). Missing widgets
-        are skipped; returns {} if none of this axis's PID widgets exist
-        in this component.
-        '''
-        values = {}
-        for param in PID_PARAMS:
-            widget = self.builder.get_object(widget_id_for_param(param))
-            if widget is not None:
-                values[param] = widget.get_value()
-        return values
 
-    def Settings_Notes_Changed(self, buffer):
-        # Wired to the Notes GtkTextView's GtkTextBuffer "changed" signal.
-        # The Notes field is free-text scratch space only - nothing
-        # persists it (the .settings.ini profile mechanism that used to
-        # save it has been removed; REBset_v1.ini has no notes field).
-        pass
 
 #######################################################################
 # Measurement_System_Changed
@@ -1887,28 +1122,7 @@ class HandlerClass:
 #   Widget:              Measurement_System  (GtkComboBoxText)
 #   Signal:              GtkComboBoxText/changed
 #######################################################################
-    def Measurement_System_Changed(self, widget):
-        if self._applying_measurement_system:
-            return
 
-        system = widget.get_active_text()
-        if system not in ("Metric", "Imperial"):
-            return
-
-        self._apply_measurement_system_labels(system)
-        _save_measurement_system(system)
-        _show_restart_required_popup(widget)
-
-    def Device_Names_Changed(self, buffer):
-        # Wired to the Device Names GtkTextView's GtkTextBuffer
-        # "changed" signal - mirrors Measurement_System_Changed's
-        # save-immediately pattern. Suppressed while _load_device_names
-        # is itself the one driving the buffer text at startup.
-        if self._applying_device_names:
-            return
-        text = buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), False)
-        names = [line.strip() for line in text.splitlines() if line.strip()]
-        _save_device_names(names)
 
 #######################################################################
 # Max_Jog_Speed_Changed
@@ -1932,17 +1146,6 @@ class HandlerClass:
 #   Widget:              Max_Jog_Speed  (GtkSpinButton)
 #   Signal:              GtkSpinButton/value-changed
 #######################################################################
-    def Max_Jog_Speed_Changed(self, widget):
-        if self._applying_max_jog_speed:
-            return
-
-        value = widget.get_value()
-        _save_max_jog_speed(value)
-        _show_restart_required_popup(
-            widget,
-            "The Max Jog Speed change will not take effect until you exit "
-            "and restart LinuxCNC."
-        )
 
 #######################################################################
 # Open_User_Manual
@@ -1956,16 +1159,6 @@ class HandlerClass:
 #   Button:              Open User Manual  (HAL_Button)
 #   Signal:              GtkButton/pressed
 #######################################################################
-    def Open_User_Manual(self, widget):
-
-        print("=================================================")
-        print("FUNCTION Open_User_Manual")
-
-        url = "https://roseenginebutler.com/UserManual/index.php?n=Main.AxisConfigurationFile"
-        webbrowser.open(url)
-
-        Prt1 = "Opening website " + url
-        print(Prt1)
 
 #######################################################################
 # Settings_Save
@@ -1989,61 +1182,7 @@ class HandlerClass:
 #   Button:              Settings_Save  (GtkButton)
 #   Signal:              GtkButton/clicked
 #######################################################################
-    def Settings_Save(self, widget):
-        if self.builder.get_object("X_Set_Scale") is None:
-            return
 
-        print("=================================================")
-        print("FUNCTION Settings_Save")
-        self._write_rebset_snapshot()
-
-    def _write_rebset_snapshot(self):
-        '''
-        Writes this tab's live Scale/Backlash/PID widget values into
-        REBset_v1.ini's per-axis entries - see Settings_Save above for
-        why Measurement System/Max Jog Speed/VELOCITY_SETTINGS aren't
-        touched here. Reads the whole file once, patches every axis's
-        dict entry in memory, then writes it back once - unlike the
-        shutdown path (REB_Scale_Persist.py), which patches and writes
-        incrementally since it goes through separate halcmd calls per
-        value.
-        '''
-        settings = reb_settings_io.load_settings()
-        axes = settings.setdefault("axes", {})
-
-        for axis_id in list(AXIS_STEPGEN) + list(EXTRA_SETTINGS_LETTERS):
-            axis_entry = axes.setdefault(axis_id, {})
-
-            scale_widget = self.builder.get_object(axis_id + "_Set_Scale")
-            if scale_widget is not None:
-                axis_entry["scale"] = scale_widget.get_value()
-
-            backlash_widget = self.builder.get_object(axis_id + "_Set_Backlash")
-            if backlash_widget is not None:
-                axis_entry["backlash"] = backlash_widget.get_value()
-
-            max_vel_widget = self.builder.get_object(axis_id + "_Set_Max_Vel")
-            if max_vel_widget is not None:
-                axis_entry["max_vel"] = max_vel_widget.get_value()
-
-            max_accel_widget = self.builder.get_object(axis_id + "_Set_Max_Accel")
-            if max_accel_widget is not None:
-                axis_entry["max_accel"] = max_accel_widget.get_value()
-
-            if axis_id in PID_AXES or axis_id in EXTRA_SETTINGS_LETTERS:
-                values = self._read_pid_gains(lambda param, axis_id=axis_id: axis_id + "_Set_" + param)
-                if values:
-                    axis_entry.setdefault("pid", {}).update(values)
-            elif axis_id in PID_SPINDLE_LOOPS:
-                for suffix, block_tag in (("Pos", "pid_pos"), ("Vel", "pid_vel")):
-                    values = self._read_pid_gains(
-                        lambda param, axis_id=axis_id, suffix=suffix: axis_id + "_Set_" + param + "_" + suffix
-                    )
-                    if values:
-                        axis_entry.setdefault(block_tag, {}).update(values)
-
-        reb_settings_io.save_settings(settings)
-        print("Saved live scale/backlash/max vel/max accel/PID values to " + SETTINGS_PATH)
 
 #######################################################################
 # Settings_Save_As
@@ -2069,59 +1208,6 @@ class HandlerClass:
 #   Button:              Settings_Save_As  (GtkButton)
 #   Signal:              GtkButton/clicked
 #######################################################################
-    def Settings_Save_As(self, widget):
-        if self.builder.get_object("X_Set_Scale") is None:
-            return
-
-        print("=================================================")
-        print("FUNCTION Settings_Save_As")
-
-        self._write_rebset_snapshot()
-
-        os.makedirs(REBSET_DEFAULT_DIR, exist_ok=True)
-
-        dialog = Gtk.FileChooserDialog(
-            title="Save Settings As",
-            transient_for=widget.get_toplevel(),
-            action=Gtk.FileChooserAction.SAVE,
-        )
-        dialog.add_buttons(
-            "_Cancel", Gtk.ResponseType.CANCEL,
-            "_Save", Gtk.ResponseType.OK,
-        )
-        dialog.set_current_folder(REBSET_DEFAULT_DIR)
-        dialog.set_do_overwrite_confirmation(True)
-        # Today's date, not SETTINGS_PATH's own fixed "REBset_v1.ini"
-        # name - this is a copy going somewhere else, so defaulting to
-        # the exact name of the file it's copied from just invites
-        # confusing the two; a dated name reads as "a snapshot from
-        # this day" and is still just a default the operator can
-        # rename on this same dialog.
-        dialog.set_current_name(time.strftime("%Y-%m-%d") + ".REBset_v1.ini")
-
-        file_filter = Gtk.FileFilter()
-        file_filter.set_name("Rose Engine Butler Settings (*.ini)")
-        file_filter.add_pattern("*.ini")
-        dialog.add_filter(file_filter)
-
-        response = dialog.run()
-        path = dialog.get_filename() if response == Gtk.ResponseType.OK else None
-        dialog.destroy()
-
-        if not path:
-            print("Settings_Save_As cancelled")
-            return
-
-        if not path.endswith(".ini"):
-            path += ".ini"
-
-        try:
-            shutil.copyfile(SETTINGS_PATH, path)
-        except OSError as e:
-            _show_settings_error(widget, "Could not write " + path + ":\n" + str(e))
-            return
-
-        print("Saved a copy of " + SETTINGS_PATH + " to " + path)
 
 #######################################################################
 # Settings_Load
@@ -2148,51 +1234,6 @@ class HandlerClass:
 #   Button:              Settings_Load  (GtkButton)
 #   Signal:              GtkButton/clicked
 #######################################################################
-    def Settings_Load(self, widget):
-        if self.builder.get_object("X_Set_Scale") is None:
-            return
-
-        print("=================================================")
-        print("FUNCTION Settings_Load")
-
-        os.makedirs(REBSET_DEFAULT_DIR, exist_ok=True)
-
-        dialog = Gtk.FileChooserDialog(
-            title="Load Settings",
-            transient_for=widget.get_toplevel(),
-            action=Gtk.FileChooserAction.OPEN,
-        )
-        dialog.add_buttons(
-            "_Cancel", Gtk.ResponseType.CANCEL,
-            "_Load", Gtk.ResponseType.OK,
-        )
-        dialog.set_current_folder(REBSET_DEFAULT_DIR)
-
-        file_filter = Gtk.FileFilter()
-        file_filter.set_name("Rose Engine Butler Settings (*.ini)")
-        file_filter.add_pattern("*.ini")
-        dialog.add_filter(file_filter)
-
-        response = dialog.run()
-        path = dialog.get_filename() if response == Gtk.ResponseType.OK else None
-        dialog.destroy()
-
-        if not path:
-            print("Settings_Load cancelled")
-            return
-
-        try:
-            with open(path, "r") as f:
-                data = json.load(f)
-        except (OSError, ValueError) as e:
-            _show_settings_error(widget, "Could not read " + path + ":\n" + str(e))
-            return
-
-        if not isinstance(data, dict) or "axes" not in data:
-            _show_settings_error(widget, path + " is not a Rose Engine Butler settings file.")
-            return
-
-        self._apply_settings_root(widget, data, path, "usercomment")
 
 
 #######################################################################
@@ -2217,322 +1258,8 @@ class HandlerClass:
 #   Button:              Export_Settings  (GtkButton)
 #   Signal:              GtkButton/clicked
 #######################################################################
-    def Export_Settings(self, widget):
-        if self.builder.get_object("X_Set_Scale") is None:
-            return
 
-        print("=================================================")
-        print("FUNCTION Export_Settings")
 
-        selected = self._run_export_selection_dialog(widget)
-        if not selected:
-            print("Export_Settings cancelled")
-            return
-
-        comments = set(selected.get("comments", {}).values())
-        if not comments:
-            _show_settings_error(
-                widget,
-                "Pick a device name for at least one exported axis - it's "
-                "used to name the exported file."
-            )
-            return
-        if len(comments) == 1:
-            file_name = re.sub(r'[\\/]', '-', comments.pop()) + EXPORT_EXTENSION
-        else:
-            # More than one different device name was selected (e.g.
-            # exporting several axes belonging to different physical
-            # devices at once) - no single name to build the file's
-            # default name from, so fall back to today's date instead of
-            # refusing to export. Still just a default: the operator can
-            # rename it on the save dialog that comes up next.
-            file_name = time.strftime("%Y-%m-%d") + EXPORT_EXTENSION
-
-        os.makedirs(REBSET_DEFAULT_DIR, exist_ok=True)
-
-        dialog = Gtk.FileChooserDialog(
-            title="Export Settings",
-            transient_for=widget.get_toplevel(),
-            action=Gtk.FileChooserAction.SAVE,
-        )
-        dialog.add_buttons(
-            "_Cancel", Gtk.ResponseType.CANCEL,
-            "_Export", Gtk.ResponseType.OK,
-        )
-        dialog.set_current_folder(REBSET_DEFAULT_DIR)
-        dialog.set_do_overwrite_confirmation(True)
-        dialog.set_current_name(file_name)
-
-        file_filter = Gtk.FileFilter()
-        file_filter.set_name("Rose Engine Butler Export (*" + EXPORT_EXTENSION + ")")
-        file_filter.add_pattern("*" + EXPORT_EXTENSION)
-        dialog.add_filter(file_filter)
-
-        response = dialog.run()
-        path = dialog.get_filename() if response == Gtk.ResponseType.OK else None
-        dialog.destroy()
-
-        if not path:
-            print("Export_Settings cancelled")
-            return
-
-        if not path.endswith(EXPORT_EXTENSION):
-            path += EXPORT_EXTENSION
-
-        data = {"axes": {}}
-
-        def get_axis_entry(axis_id):
-            return data["axes"].setdefault(axis_id, {})
-
-        # Each selected axis exports Scale, Backlash, Max Vel/Max Accel,
-        # and Stepper Motor Tuning/PID together as one unit - see
-        # _run_export_selection_dialog for why these no longer get
-        # independent checkboxes.
-        exported = []
-        for axis_id in selected.get("axes", ()):
-            spin = self.builder.get_object(axis_id + "_Set_Scale")
-            if spin is not None:
-                get_axis_entry(axis_id)["scale"] = spin.get_value()
-                exported.append(axis_id + " Scale")
-
-            backlash_spin = self.builder.get_object(axis_id + "_Set_Backlash")
-            if backlash_spin is not None:
-                get_axis_entry(axis_id)["backlash"] = backlash_spin.get_value()
-                exported.append(axis_id + " Backlash")
-
-            max_vel_spin = self.builder.get_object(axis_id + "_Set_Max_Vel")
-            if max_vel_spin is not None:
-                get_axis_entry(axis_id)["max_vel"] = max_vel_spin.get_value()
-                exported.append(axis_id + " Max Vel")
-
-            max_accel_spin = self.builder.get_object(axis_id + "_Set_Max_Accel")
-            if max_accel_spin is not None:
-                get_axis_entry(axis_id)["max_accel"] = max_accel_spin.get_value()
-                exported.append(axis_id + " Max Accel")
-
-            if axis_id in PID_AXES or axis_id in EXTRA_SETTINGS_LETTERS:
-                self._export_pid_block(get_axis_entry(axis_id), "pid",
-                                        lambda param, axis_id=axis_id: axis_id + "_Set_" + param)
-                exported.append(axis_id + " PID")
-            elif axis_id in PID_SPINDLE_LOOPS:
-                for suffix in ("Pos", "Vel"):
-                    block_tag = "pid_pos" if suffix == "Pos" else "pid_vel"
-                    self._export_pid_block(
-                        get_axis_entry(axis_id), block_tag,
-                        lambda param, axis_id=axis_id, suffix=suffix: axis_id + "_Set_" + param + "_" + suffix
-                    )
-                exported.append(axis_id + " PID")
-
-        for axis_id, comment in selected.get("comments", {}).items():
-            get_axis_entry(axis_id)["comment"] = comment
-            exported.append(axis_id + " Comment (" + comment + ")")
-
-        if selected.get("measurement_system"):
-            combo = self.builder.get_object("Measurement_System")
-            system = combo.get_active_text() if combo is not None else None
-            if system:
-                data["measurement_system"] = system
-                exported.append("Measurement System")
-
-        try:
-            reb_settings_io.save_settings(data, path)
-        except OSError as e:
-            _show_settings_error(widget, "Could not write " + path + ":\n" + str(e))
-            return
-
-        print("Exported " + ", ".join(exported) + " to " + path)
-
-    def _export_pid_block(self, axis_entry, block_tag, widget_id_for_param):
-        '''
-        Reads P/I/D/FF0/FF1/FF2 from this axis's/spindle loop's own
-        Settings tab widgets into a "pid"/"pid_pos"/"pid_vel" dict on
-        axis_entry - the same shape REB_Settings_v1.ini already uses, so
-        a value round-trips through Import_Settings/_load_pid_settings
-        identically either way. Missing widgets are skipped rather than
-        erroring - matches the tolerant, "just skip what isn't there"
-        pattern the rest of Export/Import already uses.
-        '''
-        block = {}
-        for param in PID_PARAMS:
-            widget = self.builder.get_object(widget_id_for_param(param))
-            if widget is None:
-                continue
-            block[param] = widget.get_value()
-        if block:
-            axis_entry[block_tag] = block
-
-    def _run_export_selection_dialog(self, widget):
-        '''
-        Modal checklist: one row per axis, each with a single checkbox
-        covering that axis's Scale, Backlash, and Stepper Motor Tuning/
-        PID together (P/I/D/FF0/FF1/FF2 - Sp0/Sp1 each cover both their
-        position and velocity loops as part of the same unit), plus a
-        Device dropdown (populated from the General tab's maintained
-        Device Names list) to optionally label that axis's export with
-        which physical device it belongs to (e.g. "Rosette Phaser/
-        Multiplier (Sp1)") - axis-to-device isn't fixed, so this is a
-        per-export choice rather than something inferred from the axis
-        id. Two entries per axis, nothing more - these three used to be
-        independent checkboxes in separate columns, which was more
-        precision than this dialog needs; a device's Scale/Backlash/
-        tuning are always exported or skipped together in practice.
-        Measurement System stays a separate, independent checkbox below
-        the axis list. All pre-checked, with Select All/None convenience
-        buttons.
-
-        Each Device combo defaults to whatever's currently set on the
-        main panel's own comment field for that axis (X/Z/U/V/W/B - see
-        COMMENT_AXES), via _read_persisted_axis_comment against
-        SETTINGS_PATH - the main panel is a separate gladevcp process
-        from this one, so its live widget isn't reachable directly (see
-        CLAUDE.md), but its own "changed" handler saves every edit
-        straight to REBset_v1.ini's <usercomment>, which is what's read
-        here instead. Sp0/Sp1 have no such field, so they default to
-        SPINDLE_DEFAULT_DEVICE_NAME instead. Either way, falls back to
-        the placeholder if that value doesn't match any currently
-        maintained device name, same as _load_axis_comments does for the
-        main panel's own combos.
-
-        Returns {"axes": [...ids...], "comments":
-        {axis_id: name, ...}, "measurement_system": bool} on Export, or
-        None if cancelled/nothing was selected.
-        '''
-        dialog = Gtk.Dialog(
-            title="Export Settings - Choose What to Include",
-            transient_for=widget.get_toplevel(),
-            modal=True,
-        )
-        dialog.add_buttons(
-            "_Cancel", Gtk.ResponseType.CANCEL,
-            "_Export", Gtk.ResponseType.OK,
-        )
-
-        content = dialog.get_content_area()
-        content.set_border_width(8)
-        content.set_spacing(6)
-
-        select_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        select_all_btn = Gtk.Button(label="Select All")
-        select_none_btn = Gtk.Button(label="Select None")
-        select_row.pack_start(select_all_btn, False, False, 0)
-        select_row.pack_start(select_none_btn, False, False, 0)
-        content.pack_start(select_row, False, False, 0)
-
-        content.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0)
-
-        def section_label(text):
-            label = Gtk.Label()
-            label.set_markup("<b>" + text + "</b>")
-            label.set_xalign(0)
-            return label
-
-        device_names = self._read_device_names()
-        comments_settings = reb_settings_io.load_settings()
-
-        axis_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        content.pack_start(axis_col, False, False, 0)
-
-        # Sized so the "Device" header lines up with the combo boxes
-        # below it, not just with wherever the widest axis checkbox
-        # happens to end - axis labels are different widths (e.g. "X"
-        # vs. "Sp0"), so without this the combos (and this header) would
-        # drift depending on which axis's row is widest.
-        axis_label_group = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
-
-        axis_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        axis_label = section_label("Axis")
-        axis_label_group.add_widget(axis_label)
-        axis_header.pack_start(axis_label, False, False, 0)
-        axis_header.pack_start(section_label("Device"), False, False, 0)
-        axis_col.pack_start(axis_header, False, False, 0)
-
-        checks = {}
-        comment_combos = {}
-        for axis_id in list(AXIS_STEPGEN) + list(EXTRA_SETTINGS_LETTERS):
-            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-            check = Gtk.CheckButton(label=axis_id)
-            check.set_active(True)
-            check.set_tooltip_text(
-                "Exports this axis's Scale, Backlash, and Stepper Motor "
-                "Tuning together."
-            )
-            axis_label_group.add_widget(check)
-            row.pack_start(check, False, False, 0)
-
-            combo = Gtk.ComboBoxText()
-            combo.append_text(DEVICE_COMBO_PLACEHOLDER)
-            for name in device_names:
-                combo.append_text(name)
-
-            stored = (_read_persisted_axis_comment(axis_id, comments_settings)
-                      or SPINDLE_DEFAULT_DEVICE_NAME.get(axis_id, ""))
-            try:
-                combo.set_active(device_names.index(stored) + 1 if stored else 0)
-            except ValueError:
-                # Doesn't match any currently maintained device name -
-                # see _load_axis_comments' matching fallback.
-                combo.set_active(0)
-
-            combo.set_tooltip_text(
-                "Optional: label this axis's export with one of the "
-                "device names maintained on the General tab."
-            )
-            row.pack_start(combo, False, False, 0)
-
-            axis_col.pack_start(row, False, False, 0)
-            checks[axis_id] = check
-            comment_combos[axis_id] = combo
-
-        content.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0)
-
-        measurement_check = Gtk.CheckButton(label="Measurement System")
-        measurement_check.set_active(True)
-        content.pack_start(measurement_check, False, False, 0)
-
-        device_note = Gtk.Label()
-        device_note.set_markup(
-            "<i>You must select a device for any axis data you wish to "
-            "save. You can change that name on the file save screen "
-            "which pops up next.</i>"
-        )
-        device_note.set_xalign(0)
-        device_note.set_line_wrap(True)
-        device_note.set_max_width_chars(60)
-        content.pack_start(device_note, False, False, 0)
-
-        all_checks = list(checks.values()) + [measurement_check]
-        select_all_btn.connect("clicked", lambda b: [c.set_active(True) for c in all_checks])
-        select_none_btn.connect("clicked", lambda b: [c.set_active(False) for c in all_checks])
-
-        content.show_all()
-
-        result = None
-        while True:
-            response = dialog.run()
-            if response != Gtk.ResponseType.OK:
-                break
-
-            axes = [axis_id for axis_id, c in checks.items() if c.get_active()]
-            comments = {
-                axis_id: text
-                for axis_id, combo in comment_combos.items()
-                for text in [_combo_selected_device(combo)]
-                if text
-            }
-            measurement_system = measurement_check.get_active()
-            if not axes and not comments and not measurement_system:
-                _show_settings_error(widget, "Select at least one item to export.")
-                continue
-
-            result = {
-                "axes": axes,
-                "comments": comments,
-                "measurement_system": measurement_system,
-            }
-            break
-
-        dialog.destroy()
-        return result
 
 #######################################################################
 # Import_Settings
@@ -2558,228 +1285,8 @@ class HandlerClass:
 #   Button:              Import_Settings  (GtkButton)
 #   Signal:              GtkButton/clicked
 #######################################################################
-    def Import_Settings(self, widget):
-        if self.builder.get_object("X_Set_Scale") is None:
-            return
 
-        print("=================================================")
-        print("FUNCTION Import_Settings")
 
-        os.makedirs(REBSET_DEFAULT_DIR, exist_ok=True)
-
-        dialog = Gtk.FileChooserDialog(
-            title="Import Settings",
-            transient_for=widget.get_toplevel(),
-            action=Gtk.FileChooserAction.OPEN,
-        )
-        dialog.add_buttons(
-            "_Cancel", Gtk.ResponseType.CANCEL,
-            "_Import", Gtk.ResponseType.OK,
-        )
-        dialog.set_current_folder(REBSET_DEFAULT_DIR)
-
-        file_filter = Gtk.FileFilter()
-        file_filter.set_name("Rose Engine Butler Export (*" + EXPORT_EXTENSION + ")")
-        file_filter.add_pattern("*" + EXPORT_EXTENSION)
-        dialog.add_filter(file_filter)
-
-        response = dialog.run()
-        path = dialog.get_filename() if response == Gtk.ResponseType.OK else None
-        dialog.destroy()
-
-        if not path:
-            print("Import_Settings cancelled")
-            return
-
-        try:
-            with open(path, "r") as f:
-                data = json.load(f)
-        except (OSError, ValueError) as e:
-            _show_settings_error(widget, "Could not read " + path + ":\n" + str(e))
-            return
-
-        if not isinstance(data, dict) or "axes" not in data:
-            _show_settings_error(widget, path + " is not a Rose Engine Butler export file.")
-            return
-
-        self._apply_settings_root(widget, data, path, "comment")
-
-    def _apply_settings_root(self, widget, data, path, comment_key):
-        '''
-        Applies whatever subset of axis Scale/Backlash/PID/comment/
-        Measurement System values a parsed settings dict contains to
-        the live Settings-tab widgets, then reports what changed. Shared
-        by Import_Settings (small "comment"-keyed Export_Settings
-        subset files) and Settings_Load (full "usercomment"-keyed
-        REBset_v1.ini-shaped snapshots) - comment_key is the only thing
-        that differs between those two file shapes; everything else
-        (scale/backlash/pid/measurement_system field names) is common
-        to both. See Import_Settings's old docstring history for why
-        each value is applied through its own widget handler
-        (<Axis>_Set_Scale/<Axis>_Set_Backlash/Measurement_System_Changed)
-        rather than written to disk directly - it keeps the usual
-        per-axis safety checks (motion abort, disable-if-enabled) in the
-        loop exactly as if the operator had typed/selected each value
-        themselves.
-        '''
-        imported = []
-        comment_imported = False
-        for axis_id, axis_entry in data.get("axes", {}).items():
-            if axis_id not in AXIS_STEPGEN and axis_id not in EXTRA_SETTINGS_LETTERS:
-                continue
-            if not isinstance(axis_entry, dict):
-                continue
-
-            # Scale and PID are independent - a file may carry either,
-            # both, or neither for a given axis, so check each on its own
-            # rather than skipping the whole axis entry when one is
-            # absent.
-            if "scale" in axis_entry:
-                spin = self.builder.get_object(axis_id + "_Set_Scale")
-                if spin is not None:
-                    try:
-                        scale = float(axis_entry["scale"])
-                    except (TypeError, ValueError):
-                        print("Skipping " + axis_id + " scale - not a number: " + str(axis_entry["scale"]))
-                        scale = None
-                    if scale is not None:
-                        spin.set_value(scale)  # fires <Axis>_Set_Scale: abort/disable-if-enabled/halcmd setp/mark dirty
-                        imported.append(axis_id + " Scale")
-
-            if "backlash" in axis_entry:
-                spin = self.builder.get_object(axis_id + "_Set_Backlash")
-                if spin is not None:
-                    try:
-                        backlash = float(axis_entry["backlash"])
-                    except (TypeError, ValueError):
-                        print("Skipping " + axis_id + " backlash - not a number: " + str(axis_entry["backlash"]))
-                        backlash = None
-                    if backlash is not None:
-                        spin.set_value(backlash)  # fires <Axis>_Set_Backlash: halcmd setp/mark dirty
-                        imported.append(axis_id + " Backlash")
-
-            if "max_vel" in axis_entry:
-                spin = self.builder.get_object(axis_id + "_Set_Max_Vel")
-                if spin is not None:
-                    try:
-                        max_vel = float(axis_entry["max_vel"])
-                    except (TypeError, ValueError):
-                        print("Skipping " + axis_id + " max_vel - not a number: " + str(axis_entry["max_vel"]))
-                        max_vel = None
-                    if max_vel is not None:
-                        spin.set_value(max_vel)  # fires <Axis>_Set_Max_Vel: halcmd setp
-                        imported.append(axis_id + " Max Vel")
-
-            if "max_accel" in axis_entry:
-                spin = self.builder.get_object(axis_id + "_Set_Max_Accel")
-                if spin is not None:
-                    try:
-                        max_accel = float(axis_entry["max_accel"])
-                    except (TypeError, ValueError):
-                        print("Skipping " + axis_id + " max_accel - not a number: " + str(axis_entry["max_accel"]))
-                        max_accel = None
-                    if max_accel is not None:
-                        spin.set_value(max_accel)  # fires <Axis>_Set_Max_Accel: halcmd setp
-                        imported.append(axis_id + " Max Accel")
-
-            # Comment (device name - see Export_Settings/the General
-            # tab's Device Names list): only COMMENT_AXES have a live
-            # comment field to apply it to (Sp0/Sp1 don't - the main
-            # panel has no spindle comment entries), so a file's comment
-            # for a spindle is informational-only and doesn't round-trip
-            # back into anything here. _save_axis_comment only patches
-            # REBset_v1.ini on disk - it can't reach into the
-            # X_Comment/etc. Entry widget itself, because that widget
-            # lives on REB_Panel_v1.ui, a separate `loadusr gladevcp`
-            # process from this Settings-tab one (see EMBED_TAB_COMMAND
-            # in REB.ini) - not just a different builder in the same
-            # process. There is no live IPC between them for this, so the
-            # panel only picks up the new text from _load_axis_comments()
-            # at its own next startup - hence comment_imported below.
-            comment_value = axis_entry.get(comment_key)
-            if comment_value is not None and axis_id in COMMENT_AXES:
-                self._save_axis_comment(axis_id, comment_value)
-                imported.append(axis_id + " Comment")
-                comment_imported = True
-
-            pid_applied = False
-            if axis_id in PID_AXES or axis_id in EXTRA_SETTINGS_LETTERS:
-                pid_applied = self._import_pid_block(
-                    axis_entry, "pid", lambda param, axis_id=axis_id: axis_id + "_Set_" + param
-                )
-            elif axis_id in PID_SPINDLE_LOOPS:
-                for suffix in ("Pos", "Vel"):
-                    block_tag = "pid_pos" if suffix == "Pos" else "pid_vel"
-                    if self._import_pid_block(
-                        axis_entry, block_tag,
-                        lambda param, axis_id=axis_id, suffix=suffix: axis_id + "_Set_" + param + "_" + suffix
-                    ):
-                        pid_applied = True
-            if pid_applied:
-                imported.append(axis_id + " PID")
-
-        measurement_system = data.get("measurement_system")
-        if measurement_system in ("Metric", "Imperial"):
-            combo = self.builder.get_object("Measurement_System")
-            if combo is not None:
-                combo.set_active(0 if measurement_system == "Metric" else 1)  # fires Measurement_System_Changed
-                imported.append("Measurement System")
-
-        if imported:
-            print("Imported " + ", ".join(imported) + " from " + path)
-            dialog = Gtk.MessageDialog(
-                transient_for=widget.get_toplevel(),
-                flags=0,
-                message_type=Gtk.MessageType.INFO,
-                buttons=Gtk.ButtonsType.OK,
-                text="Imported: " + ", ".join(imported),
-            )
-            if comment_imported:
-                dialog.format_secondary_text(
-                    "The imported comment(s) are saved, but the main "
-                    "panel's Comment field runs as a separate program and "
-                    "won't show the new text until you restart LinuxCNC."
-                )
-            dialog.run()
-            dialog.destroy()
-        else:
-            _show_settings_error(widget, "Nothing recognizable to import in " + path)
-
-    def _import_pid_block(self, axis_entry, block_tag, widget_id_for_param):
-        '''
-        Mirror of _export_pid_block: reads a "pid"/"pid_pos"/"pid_vel"
-        dict (if present) and applies each P/I/D/FF0/FF1/FF2 value it
-        contains to that param's own Settings tab widget via
-        set_value() - fires the same _pid_set handler a live edit would
-        (pushes straight to the live pid.* HAL gain pin; see that
-        function's docstring for why it doesn't need the abort/disable
-        dance scale changes do, and doesn't mark .settings.ini dirty -
-        PID gains aren't part of that format's schema). Returns True if
-        anything was actually applied.
-        '''
-        block = axis_entry.get(block_tag)
-        if not isinstance(block, dict):
-            return False
-
-        applied = False
-        for param in PID_PARAMS:
-            if param not in block:
-                continue
-
-            widget = self.builder.get_object(widget_id_for_param(param))
-            if widget is None:
-                continue
-
-            try:
-                value = float(block[param])
-            except (TypeError, ValueError):
-                print("Skipping " + widget_id_for_param(param) + " - not a number: " + str(block[param]))
-                continue
-
-            widget.set_value(value)
-            applied = True
-
-        return applied
 
     def _on_machine_is_on_changed(self, hal_pin, data=None):
         '''
@@ -2963,16 +1470,6 @@ class HandlerClass:
 #   Button:              PID_Tuning_Reference  (GtkButton)
 #   Signal:              GtkButton/clicked
 #######################################################################
-    def OpenPidTuningReference(self,widget):
-
-        print("=================================================")
-        print("FUNCTION OpenPidTuningReference")
-
-        url = "https://linuxcnc.org/docs/html/man/man9/pid.9.html"
-        webbrowser.open(url)
-
-        Prt1 = "Opening website " + url
-        print(Prt1)
 
 #######################################################################
 # OpenPidControllerWikipedia
@@ -2988,16 +1485,6 @@ class HandlerClass:
 #   Button:              PID_Controller_Wikipedia  (GtkButton)
 #   Signal:              GtkButton/clicked
 #######################################################################
-    def OpenPidControllerWikipedia(self,widget):
-
-        print("=================================================")
-        print("FUNCTION OpenPidControllerWikipedia")
-
-        url = "https://en.wikipedia.org/wiki/PID_controller"
-        webbrowser.open(url)
-
-        Prt1 = "Opening website " + url
-        print(Prt1)
 
 #######################################################################
 # OpenLibrary
@@ -3806,80 +2293,6 @@ class HandlerClass:
 # HAL Commands:         halcmd setp hm2_7i92.0.stepgen.04.position-scale
 #                              (value)
 #######################################################################
-    def Sp0_Set_Scale(self,widget):
-
-        print("=================================================")
-        print("FUNCTION Sp0_Set_Scale")
-
-        # Stop any Run Operation spindle rotation (M3/M4) before this
-        # scale change lands - a large change to position-scale while
-        # the spindle is actively spinning under S-word/M3/M4 control
-        # could otherwise cause a runaway once the new scale takes
-        # effect (see conversation).
-        #
-        # Only if the machine is actually ON: this handler also fires
-        # from _load_scale_settings's programmatic spin.set_value() (the
-        # startup auto-restore from REBset_v1.ini), which runs before
-        # the operator has powered on/reset E-stop, when there's no
-        # spinning spindle to stop anyway. Sending M5 unconditionally
-        # there popped an "EMC_TASK_PLAN_EXECUTE cannot be executed
-        # until the machine is out of E-stop and turned on" error dialog
-        # at every startup.
-        s.poll()
-        if s.task_state == linuxcnc.STATE_ON:
-            if s.task_state != linuxcnc.MODE_MDI:
-                    c.mode(linuxcnc.MODE_MDI)
-                    c.wait_complete()
-            c.mdi("M5")
-            c.wait_complete()
-        else:
-            print("Sp0_Set_Scale: machine not ON - skipping M5 (nothing to stop)")
-
-        Sp0_Scale = round(widget.get_value(), 1)
-
-        # Sp0_ENA-light belongs to the main panel's HAL component
-        # ("gladevcp"); read it cross-component via halcmd. To disable
-        # the axis, drive this component's own Sp0_Ena_Override pin
-        # (ANDed with the panel button in RESp0_PostGUI.hal) instead of
-        # trying to write another component's pin directly.
-        status_pin = "gladevcp.Sp0_ENA-light"
-
-        try:
-            result = subprocess.run(
-                ["halcmd", "getp", status_pin],
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            is_enabled = result.stdout.strip().upper() in ("TRUE", "1")
-            print(status_pin + " = " + result.stdout.strip())
-
-            if is_enabled:
-                print("Sp0 axis is enabled - disabling")
-                self.halcomp['Sp0_Ena_Override'] = False
-            else:
-                print("Sp0 axis is already disabled")
-        except subprocess.CalledProcessError as e:
-            print("Error checking " + status_pin + ": " + e.stderr)
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
-
-        # Send the new scale to the X axis stepgen via halcmd.
-        hal_pin = "hm2_7i92.0.stepgen.06.position-scale"
-        cmd = ["halcmd", "setp", hal_pin, str(Sp0_Scale)]
-
-        try:
-            result = subprocess.run(
-                cmd,
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            print("Set " + hal_pin + " = " + str(Sp0_Scale))
-        except subprocess.CalledProcessError as e:
-            print("Error setting " + hal_pin + ": " + e.stderr)
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
 
 #######################################################################
 # Sp0_Set_Ena
@@ -4042,69 +2455,6 @@ class HandlerClass:
 # HAL Commands:         halcmd setp hm2_7i92.0.stepgen.04.position-scale
 #                              (value)
 #######################################################################
-    def Sp1_Set_Scale(self,widget):
-
-        print("=================================================")
-        print("FUNCTION Sp1_Set_Scale")
-
-        # See Sp0_Set_Scale for why this stops Run Operation rotation
-        # before the scale change lands, and why it's skipped when the
-        # machine isn't ON (the startup auto-reload path).
-        s.poll()
-        if s.task_state == linuxcnc.STATE_ON:
-            if s.task_state != linuxcnc.MODE_MDI:
-                    c.mode(linuxcnc.MODE_MDI)
-                    c.wait_complete()
-            c.mdi("M5")
-            c.wait_complete()
-        else:
-            print("Sp1_Set_Scale: machine not ON - skipping M5 (nothing to stop)")
-
-        Sp1_Scale = round(widget.get_value(), 1)
-
-        # Sp1_ENA-light belongs to the main panel's HAL component
-        # ("gladevcp"); read it cross-component via halcmd. To disable
-        # the axis, drive this component's own Sp1_Ena_Override pin
-        # (ANDed with the panel button in RESp1_PostGUI.hal) instead of
-        # trying to write another component's pin directly.
-        status_pin = "gladevcp.Sp1_ENA-light"
-
-        try:
-            result = subprocess.run(
-                ["halcmd", "getp", status_pin],
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            is_enabled = result.stdout.strip().upper() in ("TRUE", "1")
-            print(status_pin + " = " + result.stdout.strip())
-
-            if is_enabled:
-                print("Sp1 axis is enabled - disabling")
-                self.halcomp['Sp1_Ena_Override'] = False
-            else:
-                print("Sp1 axis is already disabled")
-        except subprocess.CalledProcessError as e:
-            print("Error checking " + status_pin + ": " + e.stderr)
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
-
-        # Send the new scale to the X axis stepgen via halcmd.
-        hal_pin = "hm2_7i92.0.stepgen.07.position-scale"
-        cmd = ["halcmd", "setp", hal_pin, str(Sp1_Scale)]
-
-        try:
-            result = subprocess.run(
-                cmd,
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            print("Set " + hal_pin + " = " + str(Sp1_Scale))
-        except subprocess.CalledProcessError as e:
-            print("Error setting " + hal_pin + ": " + e.stderr)
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
 
 #######################################################################
 # Sp1_Set_Ena
@@ -4136,41 +2486,15 @@ class HandlerClass:
         self.builder        = builder
         self.nhits          = 0
 
-        # Suppresses Measurement_System_Changed's save/patch/popup while
-        # _load_measurement_system is itself the one driving the combo box
-        # at startup (see combo.set_active there) - a startup load should
-        # not re-save REB_Settings_v1.ini, re-patch REB.ini, or pop up the
-        # restart notice.
-        self._applying_measurement_system = False
 
-        # Same suppression as _applying_measurement_system above, for
-        # _load_device_names driving the Device Names text buffer at
-        # startup.
-        self._applying_device_names = False
 
-        # Same suppression as _applying_measurement_system above, for
-        # _load_max_jog_speed driving the Max Jog Speed spin button at
-        # startup.
-        self._applying_max_jog_speed = False
 
-        # Same suppression as above, for _load_velocity_settings driving
-        # the five VELOCITY_SETTINGS spin buttons at startup.
-        self._applying_velocity_settings = False
 
         # Same suppression as above, for _load_axis_comments driving each
         # axis's comment combo box at startup.
         self._applying_axis_comments = False
 
-        # Same suppression as above, for _load_channel_assignments (and
-        # Channel_0N_Axis_Changed's own re-filtering rebuild - see
-        # _rebuild_all_channel_combo_items) driving the six Axis Selection
-        # combos.
-        self._applying_channel_assignments = False
 
-        # Same suppression as above, for _load_channel_assignments (and
-        # _rebuild_all_channel_type_combos) driving the six Axis
-        # Selection Type combos.
-        self._applying_channel_types = False
 
         _install_depress_css()
 
@@ -4178,12 +2502,20 @@ class HandlerClass:
         # axis disabled from this tab regardless of what the main
         # panel's own enable button is doing. Each defaults to "allow
         # enabled". ANDed with the panel button per-axis in
-        # REB_PostGUI_v1.hal (REBCnfg.<Axis>_Ena_Override).
+        # REB_PostGUI_v1.hal - only this component's own copy
+        # ("gladevcp.<Axis>_Ena_Override") is actually netted; every
+        # other component (Help, License) creates the same pin
+        # harmlessly unused.
         #
         # HAL_IO, not HAL_OUT: this component's own Set_Scale handlers
         # clear an axis to False, but re-arming it happens from the main
         # panel's ENA button - a different process - via
-        # `halcmd setp REBCnfg.<Axis>_Ena_Override TRUE` (see
+        # the external REB_Settings program clears an axis to False
+        # before a scale change (a different process, via
+        # `halcmd sets <letter>-ena-settings-allow FALSE` - the signal,
+        # not this pin directly, once netted) - re-arming happens back
+        # in THIS component's own _clear_ena_override, below, when the
+        # panel's ENA button is pressed again. See
         # _clear_ena_override). An OUT pin can only ever be driven by
         # its owning component; halcmd setp on one fails outright
         # ("pin is not writable"). IO allows the legitimate external
@@ -4228,33 +2560,9 @@ class HandlerClass:
                 )
                 self.halcomp[active_pin] = False
 
-        # Restore persisted axis scale values (REB_Settings_v1.ini)
-        # into the Settings tab's spin buttons and the real stepgen
-        # scale pins. No-ops in every component other than the
-        # Settings tab (REBHlp), which is the only one with these
-        # widgets.
-        self._load_scale_settings()
 
-        # Restore persisted P/I/D/FF0/FF1/FF2 gains (REB_Settings_v1.ini)
-        # into the Settings tab's PID spin buttons and the live pid.*
-        # HAL gain pins. No-ops in every component other than the
-        # Settings tab (REBCnfg), which is the only one with these
-        # widgets.
-        self._load_pid_settings()
 
-        # Restore persisted backlash values (REB_Settings_v1.ini) into
-        # the Settings tab's Backlash spin buttons and the live
-        # joint.N.backlash HAL parameters. No-ops in every component
-        # other than the Settings tab (REBCnfg), which is the only one
-        # with these widgets.
-        self._load_backlash_settings()
 
-        # Restore persisted Max Vel/Max Accel values (REB_Settings_v1.ini)
-        # into the Settings tab's spin buttons and the live stepgen
-        # maxvel/maxaccel HAL params. No-ops in every component other
-        # than the Settings tab (REBCnfg), which is the only one with
-        # these widgets.
-        self._load_max_vel_accel_settings()
 
         # Restore persisted per-axis user comments (REB_Settings_v1.ini)
         # into the main panel's comment fields. No-ops in every
@@ -4283,21 +2591,8 @@ class HandlerClass:
         # flush costs nothing while idle). See _autosave_axis_comments.
         GLib.timeout_add(1000, self._autosave_axis_comments)
 
-        # Restore the persisted Measurement System (REB_Settings_v1.ini)
-        # into the Settings tab's combo box (if owned by this component)
-        # and the unit-of-measure labels this component owns on either
-        # the main panel or the Settings tab.
-        self._load_measurement_system()
 
-        # Restore the persisted device-name list (REBset_v1.ini) into
-        # the General tab's Device Names text box (if owned by this
-        # component).
-        self._load_device_names()
 
-        # Restore the persisted channel -> axis letter assignment
-        # (REBset_v1.ini) into the Axis Selection tab's six combos (if
-        # owned by this component).
-        self._load_channel_assignments()
 
         # Restore the persisted channel -> axis letter assignment
         # (REBset_v1.ini) into the main panel's own read-only display
@@ -4310,14 +2605,7 @@ class HandlerClass:
         # component).
         self._load_panel_axis_controls()
 
-        # Restore the persisted Max Jog Speed (REB_Settings_v1.ini) into
-        # the Settings tab's spin button (if owned by this component).
-        self._load_max_jog_speed()
 
-        # Restore the five persisted VELOCITY_SETTINGS values
-        # (REB_Settings_v1.ini) into the Settings tab's jog-speed spin
-        # buttons (if owned by this component).
-        self._load_velocity_settings()
 
         # Let the mouse wheel scroll the page even when the cursor is
         # over one of its many spin buttons/combo boxes, rather than only
@@ -4577,77 +2865,7 @@ def _axis_set_move_dist(axis):
     handler.__name__ = axis + "_Set_Move_Dist"
     return handler
 
-def _stepgen_step_rate_ceiling(stepgen_ch):
-    '''
-    Returns the hardware step-rate ceiling (steps/sec) for the given
-    stepgen channel, derived from its live steplen/stepspace HAL params
-    (nanoseconds, set from [JOINT_n]STEPLEN/STEPSPACE in REB.hal at
-    startup and not editable from this UI) via
-    1 / (STEPLEN + STEPSPACE) - the same formula worked by hand in
-    REB.ini's STEPGEN_MAXVEL comments (e.g. [JOINT_0]: "STEPLEN+STEPSPACE
-    = 5000ns/step the hardware ceiling is 1/5000ns = 200,000 steps/sec").
-    Returns None if steplen+stepspace sum to zero.
-    '''
-    steplen = hal.get_value("hm2_7i92.0.stepgen." + stepgen_ch + ".steplen")
-    stepspace = hal.get_value("hm2_7i92.0.stepgen." + stepgen_ch + ".stepspace")
-    total_ns = steplen + stepspace
-    if total_ns <= 0:
-        return None
-    return 1e9 / total_ns
 
-def _warn_if_max_vel_exceeds_ceiling(self, widget, axis, stepgen_ch, scale, max_vel_widget):
-    '''
-    Warns and clamps when scale (steps/unit, just-committed) and the
-    Max Vel spin button's current value together would ask the stepgen
-    for more steps/sec than its steplen+stepspace timing can produce.
-    LinuxCNC doesn't error in this case, it silently clips the
-    stepgen's actual speed at the hardware ceiling (see the "maxvel is
-    too big" style warning this is meant to preempt) - rather than
-    leave the field showing a value the hardware can't actually honor,
-    this pushes the calculated safe maximum back into max_vel_widget,
-    which (via its own "value-changed" signal, already wired to
-    _axis_set_max/_axis_set_max_letter) sends the corrected value to
-    the live HAL maxvel pin the same way a manual edit would - no
-    separate HAL write needed here. Only called for Max Vel, not Max
-    Accel - there's no equivalent stepgen step-rate limit tied to
-    acceleration.
-    '''
-    if scale == 0:
-        return
-    ceiling = _stepgen_step_rate_ceiling(stepgen_ch)
-    if ceiling is None:
-        return
-    max_vel = max_vel_widget.get_value()
-    if abs(scale) * max_vel <= ceiling:
-        return
-
-    # Round down (not to nearest) so the clamped value can't itself
-    # still exceed the ceiling after rounding - the set_value() below
-    # reenters this same check via max_vel_widget's own "value-changed"
-    # signal, and a second popup there would be confusing.
-    digits = max_vel_widget.get_digits()
-    factor = 10 ** digits
-    safe_max_vel = int((ceiling / abs(scale)) * factor) / factor
-
-    uom_widget = self.builder.get_object(axis + "_Max_Vel_UOM")
-    uom = uom_widget.get_label().replace("\n", " ") if uom_widget is not None else "units/sec"
-    dialog = Gtk.MessageDialog(
-        transient_for=widget.get_toplevel(),
-        flags=0,
-        message_type=Gtk.MessageType.WARNING,
-        buttons=Gtk.ButtonsType.OK,
-        text=axis + ": Max Velocity was too high for this Scale",
-    )
-    dialog.format_secondary_text(
-        "At a Scale of {:g}, the stepgen hardware can drive at most {:.4f} {} "
-        "(step-rate ceiling {:.0f} steps/sec, from STEPLEN+STEPSPACE). "
-        "Max Velocity has been reduced from {:g} {} to {:.4f} {} to match."
-        .format(abs(scale), safe_max_vel, uom, ceiling, max_vel, uom, safe_max_vel, uom)
-    )
-    dialog.run()
-    dialog.destroy()
-
-    max_vel_widget.set_value(safe_max_vel)
 
 def _axis_set_ena(axis):
     def handler(self, widget, *args):
@@ -4681,387 +2899,20 @@ for _axis in CHANNEL_DEFAULT_LETTER.values():
     # Scale edits were silently landing on channel 05's stepgen instead).
 del _axis
 
-def _axis_set_scale_letter(letter):
-    '''
-    Value-changed handler for one of the Settings tab's 8 letter-labeled
-    Scale spin buttons (<letter>_Set_Scale, letter in
-    AXIS_SELECTION_LETTERS) - bound uniformly for all 8 letters, not
-    just EXTRA_SETTINGS_LETTERS (A/C) as it originally was. The live
-    stepgen pin (and the ENA-light/override pins used to disable the
-    axis first) are resolved through CURRENT_LETTER_INTERNAL_ID/
-    AXIS_STEPGEN at call time, rather than a closure-captured constant -
-    this is the fix for a real bug found live 3 September 2026: the
-    previous per-internal-id handler (_axis_set_scale, now deleted)
-    always targeted its own internal id's stepgen channel regardless of
-    what letter that channel currently wore, so e.g. editing the "B"
-    row (after channel 00 was reassigned to letter B) silently wrote to
-    channel 05's stepgen instead of channel 00's - and, worse, could
-    silently clobber whatever channel 05's *actual* current letter had
-    live, mid-session. If this letter isn't currently assigned to any
-    channel, the value is simply kept (and persisted at shutdown by
-    REB_Scale_Persist.py) with no live HAL write to make.
 
-    scale is rounded to 3 decimal places, matching this widget's own
-    "digits" property in the .ui file (previously rounded to 1 decimal,
-    silently truncating a legitimately 3-decimal value like a
-    gear-ratio-derived pulses/deg scale - e.g. 17.778 became 17.8).
-    '''
-    def handler(self, widget):
-        print("=================================================")
-        print("FUNCTION " + letter + "_Set_Scale")
 
-        internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
-        if internal_id is None:
-            print(letter + " is not currently assigned to a channel - value kept, no live HAL write")
-            return
 
-        c.abort()
-        c.wait_complete()
 
-        scale = round(widget.get_value(), 3)
-        hal_pin = "hm2_7i92.0.stepgen." + AXIS_STEPGEN[internal_id] + ".position-scale"
-        status_pin = "gladevcp." + internal_id + "_ENA-light"
 
-        try:
-            result = subprocess.run(
-                ["halcmd", "getp", status_pin],
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            is_enabled = result.stdout.strip().upper() in ("TRUE", "1")
-            print(status_pin + " = " + result.stdout.strip())
 
-            if is_enabled:
-                print(internal_id + " axis is enabled - disabling")
-                self.halcomp[internal_id + '_Ena_Override'] = False
-            else:
-                print(internal_id + " axis is already disabled")
-        except subprocess.CalledProcessError as e:
-            print("Error checking " + status_pin + ": " + e.stderr)
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
 
-        cmd = ["halcmd", "setp", hal_pin, str(scale)]
-        try:
-            subprocess.run(
-                cmd,
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            print("Set " + hal_pin + " = " + str(scale) + " (" + letter + ")")
-        except subprocess.CalledProcessError as e:
-            print("Error setting " + hal_pin + ": " + e.stderr)
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
 
-        max_vel_widget = self.builder.get_object(letter + "_Set_Max_Vel")
-        if max_vel_widget is not None:
-            _warn_if_max_vel_exceeds_ceiling(
-                self, widget, letter, AXIS_STEPGEN[internal_id], scale, max_vel_widget)
-    handler.__name__ = letter + "_Set_Scale"
-    return handler
 
-for _letter in AXIS_SELECTION_LETTERS:
-    setattr(HandlerClass, _letter + "_Set_Scale", _axis_set_scale_letter(_letter))
-del _letter
 
-def _axis_set_backlash(axis):
-    '''
-    Value-changed handler for Sp0_Set_Backlash/Sp1_Set_Backlash only -
-    the spindles are never reassignable (no letter concept applies), so
-    their own JOINT_NUMBER entry is always correct with no letter
-    resolution needed. The six reassignable channels are instead bound
-    to _axis_set_backlash_letter below, uniformly for all 8 letters -
-    this function used to also serve them (closure-capturing
-    JOINT_NUMBER[axis] once, keyed by internal id), which was a bug:
-    the closure never tracked which channel actually wears a given
-    letter later, matching the identical bug just fixed for Scale (see
-    _axis_set_scale_letter's docstring).
 
-    Unlike _axis_set_scale_letter, there's no need to disable the axis
-    first - same reasoning as _pid_set below: a backlash change is safe
-    to make on the fly, it doesn't invalidate an in-progress move the
-    way a scale change can.
 
-    REB_Settings_v1.ini itself is not written here - same as scale/PID,
-    that only happens at shutdown (REB_Scale_Persist.py reading the
-    live HAL pins), not on every keystroke/spin-click.
-    '''
-    hal_pin = "joint." + str(JOINT_NUMBER[axis]) + ".backlash"
-    def handler(self, widget):
-        value = widget.get_value()
-        try:
-            subprocess.run(
-                ["halcmd", "setp", hal_pin, str(value)],
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            print("Set " + hal_pin + " = " + str(value))
-        except subprocess.CalledProcessError as e:
-            print("Error setting " + hal_pin + ": " + e.stderr)
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
-    handler.__name__ = axis + "_Set_Backlash"
-    return handler
 
-for _axis_id in ("Sp0", "Sp1"):
-    setattr(HandlerClass, _axis_id + "_Set_Backlash", _axis_set_backlash(_axis_id))
-del _axis_id
 
-def _axis_set_backlash_letter(letter):
-    '''
-    Value-changed handler for one of the Settings tab's 8 letter-labeled
-    Backlash spin buttons (<letter>_Set_Backlash, letter in
-    AXIS_SELECTION_LETTERS) - bound uniformly for all 8 letters, not
-    just EXTRA_SETTINGS_LETTERS (A/C) as it originally was (see
-    _axis_set_scale_letter's docstring for the bug this generalization
-    fixes). letter has no fixed joint number of its own, so the live
-    joint.N.backlash pin is resolved through CURRENT_LETTER_INTERNAL_ID/
-    JOINT_NUMBER at call time.
-    '''
-    def handler(self, widget):
-        internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
-        if internal_id is None:
-            print(letter + " is not currently assigned to a channel - value kept, no live HAL write")
-            return
-
-        hal_pin = "joint." + str(JOINT_NUMBER[internal_id]) + ".backlash"
-        value = widget.get_value()
-        try:
-            subprocess.run(
-                ["halcmd", "setp", hal_pin, str(value)],
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            print("Set " + hal_pin + " = " + str(value) + " (" + letter + ")")
-        except subprocess.CalledProcessError as e:
-            print("Error setting " + hal_pin + ": " + e.stderr)
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
-    handler.__name__ = letter + "_Set_Backlash"
-    return handler
-
-for _letter in AXIS_SELECTION_LETTERS:
-    setattr(HandlerClass, _letter + "_Set_Backlash", _axis_set_backlash_letter(_letter))
-del _letter
-
-def _axis_set_max(axis, param):
-    '''
-    Value-changed handler for Sp0/Sp1's Max Vel/Max Accel spin buttons
-    only - the spindles are never reassignable (no letter concept
-    applies), so AXIS_STEPGEN[axis] is always correct with no letter
-    resolution needed. The six reassignable channels are instead bound
-    to _axis_set_max_letter below, uniformly for all 8 letters - this
-    function used to also serve them (closure-capturing
-    AXIS_STEPGEN[axis] once, keyed by internal id), which was a bug:
-    the closure never tracked which channel actually wears a given
-    letter later, matching the identical bug just fixed for Scale (see
-    _axis_set_scale_letter's docstring).
-
-    Pushes the new value straight to the live
-    hm2_7i92.0.stepgen.NN.maxvel/.maxaccel HAL param (the stepgen
-    hardware limit - see reb_settings_io.py's _default_axis_entry for
-    why this, not [JOINT_n]MAX_VELOCITY/MAX_ACCELERATION, is what these
-    widgets control). param is "Vel" or "Accel". Like backlash (and
-    unlike scale), no need to disable the axis first - changing a
-    stepgen's own speed/accel ceiling doesn't jump position or
-    invalidate an in-progress move.
-
-    REB_Settings_v1.ini itself is not written here - same as scale/
-    backlash/PID, that only happens at shutdown (REB_Scale_Persist.py
-    reading the live HAL pins), not on every keystroke/spin-click.
-    '''
-    hal_suffix = ".maxvel" if param == "Vel" else ".maxaccel"
-    hal_pin = "hm2_7i92.0.stepgen." + AXIS_STEPGEN[axis] + hal_suffix
-    def handler(self, widget):
-        value = widget.get_value()
-        try:
-            subprocess.run(
-                ["halcmd", "setp", hal_pin, str(value)],
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            print("Set " + hal_pin + " = " + str(value))
-        except subprocess.CalledProcessError as e:
-            print("Error setting " + hal_pin + ": " + e.stderr)
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
-
-        if param == "Vel":
-            scale_widget = self.builder.get_object(axis + "_Set_Scale")
-            if scale_widget is not None:
-                _warn_if_max_vel_exceeds_ceiling(
-                    self, widget, axis, AXIS_STEPGEN[axis], scale_widget.get_value(), widget)
-    handler.__name__ = axis + "_Set_Max_" + param
-    return handler
-
-for _axis in ("Sp0", "Sp1"):
-    setattr(HandlerClass, _axis + "_Set_Max_Vel", _axis_set_max(_axis, "Vel"))
-    setattr(HandlerClass, _axis + "_Set_Max_Accel", _axis_set_max(_axis, "Accel"))
-del _axis
-
-def _axis_set_max_letter(letter, param):
-    '''
-    Value-changed handler for one of the Settings tab's 8 letter-labeled
-    Max Vel/Max Accel spin buttons (<letter>_Set_Max_Vel/_Accel, letter
-    in AXIS_SELECTION_LETTERS) - bound uniformly for all 8 letters, not
-    just EXTRA_SETTINGS_LETTERS (A/C) as it originally was (see
-    _axis_set_scale_letter's docstring for the bug this generalization
-    fixes). letter has no fixed channel of its own, so the live stepgen
-    pin is resolved through CURRENT_LETTER_INTERNAL_ID/AXIS_STEPGEN at
-    call time, same as _axis_set_scale_letter/_axis_set_backlash_letter.
-    '''
-    hal_suffix = ".maxvel" if param == "Vel" else ".maxaccel"
-    def handler(self, widget):
-        internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
-        if internal_id is None:
-            print(letter + " is not currently assigned to a channel - value kept, no live HAL write")
-            return
-
-        hal_pin = "hm2_7i92.0.stepgen." + AXIS_STEPGEN[internal_id] + hal_suffix
-        value = widget.get_value()
-        try:
-            subprocess.run(
-                ["halcmd", "setp", hal_pin, str(value)],
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            print("Set " + hal_pin + " = " + str(value) + " (" + letter + ")")
-        except subprocess.CalledProcessError as e:
-            print("Error setting " + hal_pin + ": " + e.stderr)
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
-
-        if param == "Vel":
-            scale_widget = self.builder.get_object(letter + "_Set_Scale")
-            if scale_widget is not None:
-                _warn_if_max_vel_exceeds_ceiling(
-                    self, widget, letter, AXIS_STEPGEN[internal_id], scale_widget.get_value(), widget)
-    handler.__name__ = letter + "_Set_Max_" + param
-    return handler
-
-for _letter in AXIS_SELECTION_LETTERS:
-    setattr(HandlerClass, _letter + "_Set_Max_Vel", _axis_set_max_letter(_letter, "Vel"))
-    setattr(HandlerClass, _letter + "_Set_Max_Accel", _axis_set_max_letter(_letter, "Accel"))
-del _letter
-
-def _channel_axis_changed(channel_id):
-    '''
-    Generic "changed" handler for one Axis Selection letter combo.
-    Records the new choice and refreshes every combo
-    (_rebuild_all_channel_combo_items) - every letter is always
-    selectable now, duplicates are no longer prevented at the dropdown.
-    Instead, _update_duplicate_warnings flags every channel currently
-    sharing a letter; as long as any duplicate remains, this handler
-    deliberately does NOT persist the assignment or show the restart
-    notice - both only happen once the whole assignment is duplicate-
-    free, at which point they fire on that clearing change, matching
-    Measurement_System_Changed's save-immediately/apply-on-restart
-    pattern (since [TRAJ]COORDINATES/[AXIS_*]TYPE are read once at
-    LinuxCNC startup the same way LINEAR_UNITS is - see REB_Setup/
-    REB_Generate_Local_Ini.py).
-    '''
-    def handler(self, widget):
-        if self._applying_channel_assignments:
-            return
-
-        letter = widget.get_active_text()
-        if letter not in AXIS_SELECTION_LETTERS:
-            return
-
-        self._channel_assignments[channel_id] = letter
-
-        self._applying_channel_assignments = True
-        self._rebuild_all_channel_combo_items()
-        self._applying_channel_assignments = False
-
-        if self._update_duplicate_warnings():
-            return
-
-        _save_channel_assignments(self._channel_assignments)
-        _show_restart_required_popup(
-            widget,
-            "The axis assignment change will not take effect until you "
-            "exit and restart LinuxCNC. Make sure the physical motor "
-            "cable for this channel actually matches the letter you just "
-            "assigned before restarting."
-        )
-    handler.__name__ = "Channel_" + channel_id + "_Axis_Changed"
-    return handler
-
-for _channel_id in CHANNEL_DEFAULT_LETTER:
-    setattr(HandlerClass, "Channel_" + _channel_id + "_Axis_Changed", _channel_axis_changed(_channel_id))
-del _channel_id
-
-def _channel_type_changed(channel_id):
-    '''
-    Generic "changed" handler for one Axis Selection Type combo.
-    Unlike the letter combo, Type carries no cross-channel duplicate
-    constraint (two channels sharing a Type is fine), so this saves
-    immediately on every change with no gating - simpler than
-    _channel_axis_changed above.
-    '''
-    def handler(self, widget):
-        if self._applying_channel_types:
-            return
-
-        text = widget.get_active_text()
-        if text is None:
-            return
-        axis_type = text.upper()
-        if axis_type not in ("LINEAR", "ANGULAR"):
-            return
-
-        self._channel_types[channel_id] = axis_type
-
-        _save_channel_types(self._channel_types, self._channel_assignments)
-        _show_restart_required_popup(
-            widget,
-            "The axis type change will not take effect until you exit "
-            "and restart LinuxCNC. Make sure this channel's physical "
-            "hardware actually matches Linear/Angular before restarting."
-        )
-    handler.__name__ = "Channel_" + channel_id + "_Type_Changed"
-    return handler
-
-for _channel_id in CHANNEL_DEFAULT_LETTER:
-    setattr(HandlerClass, "Channel_" + _channel_id + "_Type_Changed", _channel_type_changed(_channel_id))
-del _channel_id
-
-def _pid_set(hal_pin):
-    '''
-    Generic value-changed handler for a single P/I/D/FF0/FF1/FF2 spin
-    button: pushes the new value straight to the live pid.* HAL gain
-    pin. Unlike _axis_set_scale, there's no need to disable the axis
-    first - a PID gain is safe to retune on the fly, it doesn't
-    invalidate an in-progress move the way a scale change can.
-
-    REB_Settings_v1.ini itself is not written here - same as scale,
-    that only happens when the operator clicks Save Settings, or
-    automatically at shutdown (REB_Scale_Persist.py reading the live
-    HAL pins), not on every keystroke/spin-click.
-    '''
-    def handler(self, widget):
-        value = widget.get_value()
-        try:
-            subprocess.run(
-                ["halcmd", "setp", hal_pin, str(value)],
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            print("Set " + hal_pin + " = " + str(value))
-        except subprocess.CalledProcessError as e:
-            print("Error setting " + hal_pin + ": " + e.stderr)
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
-    return handler
 
 # No PID_AXES-based binding loop here for the 6 reassignable channels
 # (X/Z/B/U/V/W widgets) - PID is instead bound per LETTER, uniformly
@@ -5071,87 +2922,10 @@ def _pid_set(hal_pin):
 # Settings snapshot's "is this a reassignable axis id" membership
 # check) - just no longer as a live-HAL-pin source here.
 
-def _pid_set_letter(letter, param):
-    '''
-    Value-changed handler for one of the Settings tab's 8 letter-labeled
-    PID spin buttons (<letter>_Set_<param>, letter in
-    AXIS_SELECTION_LETTERS) - bound uniformly for all 8 letters, not
-    just EXTRA_SETTINGS_LETTERS (A/C) as it originally was. The 6
-    reassignable channels used to be bound via PID_AXES/_pid_set
-    instead, keyed by internal id (e.g. widget "B_Set_P" always meaning
-    channel 05's own live component, whatever it's currently named) -
-    that's a real UX mismatch with every other Settings-tab control
-    fixed 3 September 2026 (see _axis_set_scale_letter's docstring):
-    "B" should mean whichever channel currently wears letter B, the
-    same as Scale/Max Vel/Max Accel/Backlash now do, not "channel 05
-    forever." Unlike _pid_set's fixed-at-load-time pin, the live pid.*
-    component here is named after the LETTER ITSELF
-    (REB_Generate_Local_Ini.py renames each channel's pid component to
-    match its current assignment), so no channel indirection is needed
-    to build the pin name, only a check that some channel is actually
-    using this letter right now (CURRENT_LETTER_INTERNAL_ID), since the
-    component doesn't exist at all otherwise - same gating
-    _axis_set_scale_letter/_axis_set_backlash_letter use.
-    '''
-    hal_pin = "pid." + letter.lower() + "." + PID_PARAM_PIN[param]
-    def handler(self, widget):
-        if letter not in CURRENT_LETTER_INTERNAL_ID:
-            print(letter + " is not currently assigned to a channel - value kept, no live HAL write")
-            return
-        value = widget.get_value()
-        try:
-            subprocess.run(
-                ["halcmd", "setp", hal_pin, str(value)],
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            print("Set " + hal_pin + " = " + str(value))
-        except subprocess.CalledProcessError as e:
-            print("Error setting " + hal_pin + ": " + e.stderr)
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
-    handler.__name__ = letter + "_Set_" + param
-    return handler
 
-for _letter in AXIS_SELECTION_LETTERS:
-    for _param in PID_PARAMS:
-        setattr(HandlerClass, _letter + "_Set_" + _param, _pid_set_letter(_letter, _param))
-del _letter, _param
 
-for _spindle_id, _loops in PID_SPINDLE_LOOPS.items():
-    for _suffix, _component in _loops.items():
-        for _param in PID_PARAMS:
-            _widget_id = _spindle_id + "_Set_" + _param + "_" + _suffix
-            _handler = _pid_set(_component + "." + PID_PARAM_PIN[_param])
-            _handler.__name__ = _widget_id
-            setattr(HandlerClass, _widget_id, _handler)
-del _spindle_id, _loops, _suffix, _component, _param, _widget_id, _handler
 
-def _velocity_setting_changed(tag):
-    '''
-    Generic value-changed handler for one of VELOCITY_SETTINGS' spin
-    buttons: persists to REB_Settings_v1.ini and warns that a restart is
-    needed, same as Max_Jog_Speed_Changed - these are read once by
-    LinuxCNC at process startup (see REB_Setup/REB_Generate_Local_Ini.py),
-    not live HAL pins, so there's no halcmd setp to also do here.
-    '''
-    def handler(self, widget):
-        if self._applying_velocity_settings:
-            return
-        value = widget.get_value()
-        _save_velocity_setting(tag, value)
-        _show_restart_required_popup(
-            widget,
-            "This change will not take effect until you exit and restart LinuxCNC."
-        )
-    return handler
 
-for _widget_id, (_tag, _default) in VELOCITY_SETTINGS.items():
-    _handler = _velocity_setting_changed(_tag)
-    _handler.__name__ = _widget_id + "_Changed"
-    setattr(HandlerClass, _widget_id + "_Changed", _handler)
-del _widget_id, _tag, _default, _handler
 
 def get_handlers(halcomp,builder,useropts):
     '''
