@@ -197,10 +197,10 @@ if [ $? != 0 ]; then
    exit $?
 fi
 echo -e "${CMNTTEXT}    REB_Update.sh                                                  ${NOCOLOR}"
-sudo cp /home/cnc/linuxcnc/configs/RoseEngineButler/REB_Setup/REB_Update.sh .
+sudo cp /home/cnc/linuxcnc/configs/RoseEngineButler/REB_Update.sh .
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: copy of REB_Update.sh                                        ${NOCOLOR}"
-   echo -e "${KEYNOTE}    from /home/cnc/linuxcnc/configs/RoseEngineButler/REB_Setup       ${NOCOLOR}"
+   echo -e "${KEYNOTE}    from /home/cnc/linuxcnc/configs/RoseEngineButler                ${NOCOLOR}"
    echo -e "${KEYNOTE}    to /home/cnc/                                                    ${NOCOLOR}"
    echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
