@@ -283,13 +283,23 @@ def _overlay_axis_assignment(text, assignments, types):
     Settings tab after physically reconfiguring hardware; this only
     fixes labeling/typing/kinematics, not motion tuning.
 
-    Safe against channels swapping letters with each other: every
-    section-header rename below searches for that channel's *default*
-    letter (unique per channel, and never itself the target of an
-    earlier rename in this same loop, since renames only ever produce
-    the *new*, not the *default*, letters) against the pristine text
-    read at the top of main() - so which channel is processed first
-    never matters.
+    Safe against channels swapping letters with each other in the sense
+    that every [AXIS_*] section is located by that channel's *default*
+    letter (unique per channel, and every such lookup below is scoped
+    to that one already-isolated section span - never a fresh whole-
+    text search by the *new* letter). That distinction matters: a
+    whole-text-by-new-letter search is NOT safe mid-loop, since renaming
+    one channel's section to a letter that's also some OTHER channel's
+    still-unrenamed default letter briefly leaves two sections sharing
+    that name - the earlier bug here (found live 4 September 2026,
+    REB.ini's own [AXIS_B] left at TYPE=LINEAR after channel 00 was
+    reassigned to letter B) resolved "AXIS_" + new_letter against the
+    whole text *after* the rename and silently grabbed the wrong
+    (unrelated, still-default) section instead of the one just renamed.
+    Renaming and setting TYPE together on one isolated span, before
+    splicing back, avoids that ambiguity entirely - so which channel is
+    processed first still never matters, just not for the reason the
+    old version of this docstring gave.
     '''
     if assignments == CHANNEL_DEFAULT_LETTER and types == DEFAULT_CHANNEL_TYPES:
         return text, None
@@ -304,18 +314,42 @@ def _overlay_axis_assignment(text, assignments, types):
 
         joint_num = CHANNEL_JOINT_NUMBER[channel_id]
 
+        # Locate this channel's [AXIS_<default_letter>] section by its
+        # DEFAULT letter (always unique/stable - see docstring), then
+        # rename the header and set TYPE together within that one
+        # isolated span before splicing it back into text. Doing these
+        # as two separate whole-text operations (rename, then a fresh
+        # _set_key_in_section("AXIS_" + new_letter, ...) lookup) is what
+        # broke - see docstring.
+        axis_section_pattern = re.compile(
+            r'(\[AXIS_' + re.escape(default_letter) + r'\].*?)(?=\n\[|\Z)',
+            re.DOTALL,
+        )
+        axis_match = axis_section_pattern.search(text)
+        if not axis_match:
+            print("Could not find [AXIS_" + default_letter + "] in REB.ini")
+            continue
+        axis_section_text = axis_match.group(1)
+
         if new_letter != default_letter:
-            text, n = re.subn(
+            axis_section_text = re.sub(
                 r'(?m)^\[AXIS_' + re.escape(default_letter) + r'\]',
                 '[AXIS_' + new_letter + ']',
-                text,
+                axis_section_text,
                 count=1,
             )
-            if n == 0:
-                print("Could not find [AXIS_" + default_letter + "] in REB.ini")
-                continue
 
-        text = _set_key_in_section(text, "AXIS_" + new_letter, "TYPE", new_type)
+        axis_section_text, n = re.subn(
+            r'(?m)^(TYPE\s*= )\S+',
+            lambda m: m.group(1) + new_type,
+            axis_section_text,
+            count=1,
+        )
+        if n == 0:
+            print("Could not find TYPE in [AXIS_" + default_letter + "]")
+
+        text = text[:axis_match.start(1)] + axis_section_text + text[axis_match.end(1):]
+
         text = _set_key_in_section(text, "JOINT_" + str(joint_num), "TYPE", new_type)
 
         # UNITS lives only in [JOINT_n]. DEGREE if now angular; otherwise

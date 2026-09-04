@@ -625,7 +625,7 @@ setp pid.v.maxoutput                        [JOINT_4]MAX_OUTPUT
 #  Modified 13 Jul 26 by R. Colvin
 # ********************************************************************
 
-# addf pid.w.do-pid-calcs                     servo-thread
+addf pid.w.do-pid-calcs                     servo-thread
 
 # ********************************************************************
 #  Connect signals to pins
@@ -641,36 +641,42 @@ net jog-w-pos                               halui.axis.w.plus
 # See also the REB_PostGui.hal
 net w-enable                             => hm2_7i92.0.outm.00.out-00
 net w-enable                             => hm2_7i92.0.stepgen.00.enable
-# net w-enable                             => pid.w.enable
+net w-enable                             => pid.w.enable
 
 net w-home-sw                            => joint.5.home-sw-in
 
-# net w-index-enable                       => pid.w.index-enable
+net w-index-enable                       => pid.w.index-enable
 
 net w-is-homed                              halui.joint.5.is-homed
 
 net w-neg-limit                          => joint.5.neg-lim-sw-in
 
 net w-pos-cmd                           <=  joint.5.motor-pos-cmd
-# net w-pos-cmd                            => pid.w.command
+net w-pos-cmd                            => pid.w.command
 
 net w-pos-fb                            <=  hm2_7i92.0.stepgen.00.position-fb
 net w-pos-fb                             => joint.5.motor-pos-fb
-# net w-pos-fb                             => pid.w.feedback
+net w-pos-fb                             => pid.w.feedback
 
-# net w-output                            <=  pid.w.output
-# net w-output                             => hm2_7i92.0.stepgen.00.velocity-cmd
+net w-output                            <=  pid.w.output
+net w-output                             => hm2_7i92.0.stepgen.00.velocity-cmd
 
 net w-pos-limit                          => joint.5.pos-lim-sw-in
 
-# W has no PID (open-loop stepgen) - feed joint.5's velocity command
-# straight to the stepgen instead of through pid.w.output. Previously
-# w-output had no writer (pid.w.output's net was commented out when
-# PID was disabled for W) while w-vel-cmd had no reader, so the
-# stepgen's velocity-cmd was permanently stuck at 0 - W would enable
-# and hold torque but never step, regardless of jog/MDI/panel input.
+# W used to have no PID (open-loop stepgen, fed joint.5's velocity
+# command straight to the stepgen instead of through pid.w.output) -
+# fine for a channel only ever jogged by hand (joint.N.vel-cmd is
+# populated by jog operations, not by G-code/MDI coordinated moves,
+# which drive motor-pos-cmd instead), but this channel is now
+# reassignable via the Axis Selection tab to letters that need real
+# G-code-commanded indexing (confirmed live 4 September 2026: with the
+# bypass below, G0/MDI moves updated joint.5's commanded position but
+# produced zero actual stepgen output, since the stepgen was listening
+# to vel-cmd, not pid.w's position-loop output). PID enabled above,
+# matching every other reassignable channel's wiring (e.g. V's) - this
+# net now goes nowhere, same as V's own v-vel-cmd, which likewise has
+# no reader.
 net w-vel-cmd                           <=  joint.5.vel-cmd
-net w-vel-cmd                            => hm2_7i92.0.stepgen.00.velocity-cmd
 
 # ********************************************************************
 #  Set pin values
