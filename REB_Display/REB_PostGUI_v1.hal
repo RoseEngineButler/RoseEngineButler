@@ -103,9 +103,21 @@
 # by feeding its own inverted output back into "data", so each clk
 # rising edge flips "out" without the button staying visually
 # pressed in). Every axis also ANDs in an independent "allow" pin
-# owned by the Settings tab (REBCnfg.<Axis>_Ena_Override), so the
-# Settings tab can force any axis disabled regardless of its panel
-# button's state.
+# (<Axis>_Ena_Override), so the external REB_Settings configurator
+# program can force any axis disabled regardless of its panel
+# button's state, e.g. while changing that axis's scale.
+#
+# The pin lives on the main panel's own always-running HAL component
+# ("gladevcp"), not on REB_Settings - until 4 September 2026 it was
+# owned by the embedded Settings tab's component (REBCnfg), but that
+# component no longer exists once the Settings tab was replaced by the
+# standalone REB_Settings program. Hosting it on the main panel instead
+# means its existence (and default TRUE value) doesn't depend on
+# whether REB_Settings happens to be running - REB_Settings writes to
+# it purely via `halcmd sets <letter>-ena-settings-allow ...` (the
+# signal, not the pin - a netted pin can't be setp'd directly), the
+# same as the main panel's own _clear_ena_override() already does in
+# the other direction.
 #
 # B/X/Z/U/V/W also AND in "machine-is-on" (a second and2 stage,
 # <axis>-estop-and) before the result reaches <axis>-enable - without
@@ -145,7 +157,7 @@ net sp0-ena-panel                        => sp0-ena-and.in0
 net sp0-ena-panel                        => sp0-ena-not.in
 net sp0-ena-panel-inv                    <= sp0-ena-not.out
 net sp0-ena-panel-inv                    => sp0-ena-flip.data
-net sp0-ena-settings-allow               <= REBCnfg.Sp0_Ena_Override
+net sp0-ena-settings-allow               <= gladevcp.Sp0_Ena_Override
 net sp0-ena-settings-allow               => sp0-ena-and.in1
 net spindle.0-enable                     <= sp0-ena-and.out
 net spindle.0-enable                     => gladevcp.Sp0_ENA-light
@@ -158,7 +170,7 @@ net sp1-ena-panel                        => sp1-ena-and.in0
 net sp1-ena-panel                        => sp1-ena-not.in
 net sp1-ena-panel-inv                    <= sp1-ena-not.out
 net sp1-ena-panel-inv                    => sp1-ena-flip.data
-net sp1-ena-settings-allow               <= REBCnfg.Sp1_Ena_Override
+net sp1-ena-settings-allow               <= gladevcp.Sp1_Ena_Override
 net sp1-ena-settings-allow               => sp1-ena-and.in1
 net spindle.1-enable                     <= sp1-ena-and.out
 net spindle.1-enable                     => gladevcp.Sp1_ENA-light
@@ -180,7 +192,7 @@ net b-ena-panel                          => b-ena-and.in0
 net b-ena-panel                          => b-ena-not.in
 net b-ena-panel-inv                      <= b-ena-not.out
 net b-ena-panel-inv                      => b-ena-flip.data
-net b-ena-settings-allow                 <= REBCnfg.B_Ena_Override
+net b-ena-settings-allow                 <= gladevcp.B_Ena_Override
 net b-ena-settings-allow                 => b-ena-and.in1
 net b-ena-panel-allow                    <= b-ena-and.out
 net b-ena-panel-allow                    => b-estop-and.in0
@@ -206,7 +218,7 @@ net x-ena-panel                          => x-ena-and.in0
 net x-ena-panel                          => x-ena-not.in
 net x-ena-panel-inv                      <= x-ena-not.out
 net x-ena-panel-inv                      => x-ena-flip.data
-net x-ena-settings-allow                 <= REBCnfg.X_Ena_Override
+net x-ena-settings-allow                 <= gladevcp.X_Ena_Override
 net x-ena-settings-allow                 => x-ena-and.in1
 net x-ena-panel-allow                    <= x-ena-and.out
 net x-ena-panel-allow                    => x-estop-and.in0
@@ -245,7 +257,7 @@ net z-ena-panel                          => z-ena-and.in0
 net z-ena-panel                          => z-ena-not.in
 net z-ena-panel-inv                      <= z-ena-not.out
 net z-ena-panel-inv                      => z-ena-flip.data
-net z-ena-settings-allow                 <= REBCnfg.Z_Ena_Override
+net z-ena-settings-allow                 <= gladevcp.Z_Ena_Override
 net z-ena-settings-allow                 => z-ena-and.in1
 net z-ena-panel-allow                    <= z-ena-and.out
 net z-ena-panel-allow                    => z-estop-and.in0
@@ -262,7 +274,7 @@ net u-ena-panel                          => u-ena-and.in0
 net u-ena-panel                          => u-ena-not.in
 net u-ena-panel-inv                      <= u-ena-not.out
 net u-ena-panel-inv                      => u-ena-flip.data
-net u-ena-settings-allow                 <= REBCnfg.U_Ena_Override
+net u-ena-settings-allow                 <= gladevcp.U_Ena_Override
 net u-ena-settings-allow                 => u-ena-and.in1
 net u-ena-panel-allow                    <= u-ena-and.out
 net u-ena-panel-allow                    => u-estop-and.in0
@@ -279,7 +291,7 @@ net v-ena-panel                          => v-ena-and.in0
 net v-ena-panel                          => v-ena-not.in
 net v-ena-panel-inv                      <= v-ena-not.out
 net v-ena-panel-inv                      => v-ena-flip.data
-net v-ena-settings-allow                 <= REBCnfg.V_Ena_Override
+net v-ena-settings-allow                 <= gladevcp.V_Ena_Override
 net v-ena-settings-allow                 => v-ena-and.in1
 net v-ena-panel-allow                    <= v-ena-and.out
 net v-ena-panel-allow                    => v-estop-and.in0
@@ -296,7 +308,7 @@ net w-ena-panel                          => w-ena-and.in0
 net w-ena-panel                          => w-ena-not.in
 net w-ena-panel-inv                      <= w-ena-not.out
 net w-ena-panel-inv                      => w-ena-flip.data
-net w-ena-settings-allow                 <= REBCnfg.W_Ena_Override
+net w-ena-settings-allow                 <= gladevcp.W_Ena_Override
 net w-ena-settings-allow                 => w-ena-and.in1
 net w-ena-panel-allow                    <= w-ena-and.out
 net w-ena-panel-allow                    => w-estop-and.in0
