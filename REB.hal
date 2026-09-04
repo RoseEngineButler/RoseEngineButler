@@ -1105,4 +1105,32 @@ net MDI-mode                                halui.mode.is-mdi
 
 net probe-in                             => motion.probe-input
 
+# ********************************************************************
+#  Restore persisted axis scale/maxvel/maxaccel/PID/backlash values
+#  Added 4 September 2026 by Claude
+# ********************************************************************
+# hm2_7i92.0.stepgen.*.position-scale/maxvel/maxaccel, pid.*.Pgain/
+# Igain/Dgain/FF0/FF1/FF2, and joint.*.backlash are all live HAL
+# PARAMETERS with no connection to REB.ini/REB.local.ini at all - each
+# one resets to that component's own hard default (0 or 1, not this
+# machine's real values) every time hm2_7i92/pid/motion are freshly
+# loaded above. Before 4 September 2026, the embedded AXIS Settings
+# tab's own startup pushed every persisted value from REBset_v1.ini
+# onto these live HAL parameters, automatically, every time LinuxCNC
+# started - because the tab was embedded in AXIS itself. Once the
+# Settings tab was replaced by the standalone REB_Settings program
+# (which must run BEFORE LinuxCNC, and is blocked from running while
+# LinuxCNC is running), nothing was left to do this restore at a normal
+# LinuxCNC startup at all - confirmed live 4 September 2026: every
+# axis's scale and PID gains sat at hm2's own defaults for at least one
+# full session, and REB_Shutdown.hal's REB_Scale_Persist.py then
+# faithfully saved those wrong live values straight back into
+# REBset_v1.ini, silently overwriting real calibrated data (recovered
+# afterward from an old backup - see REB_Display/REB_Settings_Restore.py's
+# own docstring for the full story). This loadusr is the fix: the
+# load-side counterpart to REB_Scale_Persist.py, run here (with -w, so
+# HAL loading waits for it to finish) now that hm2_7i92/pid/motion are
+# all already loaded above and every pin/param it needs to setp exists.
+loadusr -w python3 REB_Display/REB_Settings_Restore.py
+
 # *********************** NOTHING FOLLOWS ****************************
