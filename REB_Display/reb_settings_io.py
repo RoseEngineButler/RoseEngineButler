@@ -152,52 +152,22 @@ _DEFAULT_SPINDLE_MAX_VEL = 3.0
 _DEFAULT_SPINDLE_MAX_ACCEL = 1.0
 
 
-# Fallback only - see channel_types below. TYPE is now an independent,
-# per-channel operator choice (Axis Selection tab), not derived from
-# the letter; this rule is used solely to synthesize a channel_types
-# default the first time a channel's type is read with nothing yet
-# persisted, so a pre-existing REBset_v1.ini sees zero behavior change
-# until the operator actually touches the new Type control. Mirrors
-# REB_main.py's/REB_Generate_Local_Ini.py's own copies of this rule -
-# see this module's header for why read/write logic is shared here but
-# small constants like this one stay duplicated per the rest of the
+# The axis letter -> Type rule. TYPE was briefly an independent,
+# per-channel operator choice via the Axis Selection tab's Type combo
+# (REBset_v1.ini's "channel_types" field) between 3 and 4 September
+# 2026; that feature was retired the same week it shipped (nothing in
+# the current UI can ever set an independent type again), so this is
+# now simply the one and only source of truth: A/B/C are angular,
+# everything else is linear. Mirrors REB_main.py's/
+# REB_Generate_Local_Ini.py's own copies of this rule - see this
+# module's header for why read/write logic is shared here but small
+# constants like this one stay duplicated per the rest of the
 # codebase's convention.
 def _axis_type_for_letter(letter):
     return "ANGULAR" if letter in ("A", "B", "C") else "LINEAR"
 
 
-def _default_channel_types(channel_assignments):
-    '''
-    Synthesizes a channel_types dict from channel_assignments alone,
-    for a file that predates the channel_types field. Keyed off the
-    *actual* assignments passed in (not the static CHANNEL_DEFAULT_
-    LETTER), so a channel already reassigned away from its shipped
-    letter still gets the type its current letter implied under the
-    old letter-derived rule, matching pre-upgrade behavior exactly.
-    '''
-    return {
-        channel_id: _axis_type_for_letter(
-            channel_assignments.get(channel_id, CHANNEL_DEFAULT_LETTER[channel_id]))
-        for channel_id in CHANNEL_DEFAULT_LETTER
-    }
-
-
-def _resolve_axis_type(axis_id, channel_assignments, channel_types):
-    '''
-    The type a Settings-tab letter slot (axis_id, e.g. "A") should use
-    when seeding a never-before-seen axes[] entry: whichever channel
-    currently wears that letter, per its own channel_types choice. Both
-    "no channel currently wears this letter" (a parked slot, e.g. A/C
-    when unplugged) and "channel wears it but has no explicit type yet"
-    fall back to the old letter-derived rule.
-    '''
-    for channel_id, letter in channel_assignments.items():
-        if letter == axis_id:
-            return channel_types.get(channel_id, _axis_type_for_letter(axis_id))
-    return _axis_type_for_letter(axis_id)
-
-
-def _default_axis_entry(axis_id, channel_assignments, channel_types):
+def _default_axis_entry(axis_id):
     if axis_id in SPINDLE_IDS:
         return {
             "scale": 1,
@@ -207,11 +177,7 @@ def _default_axis_entry(axis_id, channel_assignments, channel_types):
             "pid_pos": dict(_DEFAULT_SPINDLE_PID_POS),
             "pid_vel": dict(_DEFAULT_SPINDLE_PID_VEL),
         }
-    # TYPE (and therefore default max_vel/max_accel/PID magnitude) is
-    # now whatever the channel currently wearing this letter has chosen
-    # via the Axis Selection tab's independent Type control - see
-    # _resolve_axis_type - not a fixed "A/B/C always angular" rule.
-    angular = _resolve_axis_type(axis_id, channel_assignments, channel_types) == "ANGULAR"
+    angular = _axis_type_for_letter(axis_id) == "ANGULAR"
     return {
         "scale": 1,
         "backlash": 0.0,
@@ -231,18 +197,16 @@ def default_settings():
     the file is written in (json.dump preserves dict insertion order).
     '''
     channel_assignments = dict(CHANNEL_DEFAULT_LETTER)
-    channel_types = _default_channel_types(channel_assignments)
     settings = {
         "format_version": FORMAT_VERSION,
         "channel_assignments": channel_assignments,
-        "channel_types": channel_types,
         "device_names": [],
         "measurement_system": "Imperial",
         "max_jog_speed": 1.0,
     }
     settings.update(VELOCITY_DEFAULTS)
     settings["axes"] = {
-        axis_id: _default_axis_entry(axis_id, channel_assignments, channel_types)
+        axis_id: _default_axis_entry(axis_id)
         for axis_id in AXIS_IDS
     }
     return settings
@@ -257,31 +221,27 @@ def _merge_defaults(loaded):
     surface deep in caller code later. Same "absent -> shipped default"
     convention the old per-tag regex fallbacks already used.
 
-    channel_assignments and channel_types are resolved explicitly,
-    before axes, because a never-before-seen axes[] entry's default
-    max_vel/max_accel/PID depends on both (see _default_axis_entry) -
-    a file with real channel_assignments but no channel_types yet (pre-
-    upgrade) gets one synthesized from its *loaded* assignments, not
-    the shipped-default ones, so upgrading never changes behavior for
-    a channel already reassigned away from its default letter.
+    channel_assignments is resolved explicitly, before axes, because a
+    never-before-seen axes[] entry needs the real letter to derive its
+    default TYPE (see _default_axis_entry).
+
+    A loaded file's stale "channel_types" key (written only briefly, 3-4
+    September 2026, by a feature since retired) is intentionally left
+    alone here rather than merged in or deleted - it's just inert dead
+    data now, nothing reads it.
     '''
     merged = default_settings()
 
     if "channel_assignments" in loaded and isinstance(loaded["channel_assignments"], dict):
         merged["channel_assignments"].update(loaded["channel_assignments"])
 
-    if "channel_types" in loaded and isinstance(loaded["channel_types"], dict):
-        merged["channel_types"].update(loaded["channel_types"])
-    else:
-        merged["channel_types"] = _default_channel_types(merged["channel_assignments"])
-
     merged["axes"] = {
-        axis_id: _default_axis_entry(axis_id, merged["channel_assignments"], merged["channel_types"])
+        axis_id: _default_axis_entry(axis_id)
         for axis_id in AXIS_IDS
     }
 
     for key, value in loaded.items():
-        if key in ("channel_assignments", "channel_types"):
+        if key == "channel_assignments":
             continue
         if key == "axes" and isinstance(value, dict):
             for axis_id, axis_value in value.items():
@@ -349,14 +309,11 @@ def _parse_legacy_xml(xml_text):
         else:
             print("Duplicate letter(s) in legacy channel_assignments - using shipped defaults")
 
-    # The legacy XML format predates channel_types entirely - synthesize
-    # it from whatever channel_assignments was just resolved above (not
-    # the shipped default), and rebuild the axes[] skeleton so a never-
-    # before-seen letter's default max_vel/max_accel/PID reflect it,
-    # before the per-axis XML overlay loop below fills in real values.
-    settings["channel_types"] = _default_channel_types(settings["channel_assignments"])
+    # Rebuild the axes[] skeleton (default max_vel/max_accel/PID, which
+    # depend on TYPE - see _default_axis_entry) before the per-axis XML
+    # overlay loop below fills in real values.
     settings["axes"] = {
-        axis_id: _default_axis_entry(axis_id, settings["channel_assignments"], settings["channel_types"])
+        axis_id: _default_axis_entry(axis_id)
         for axis_id in AXIS_IDS
     }
 
