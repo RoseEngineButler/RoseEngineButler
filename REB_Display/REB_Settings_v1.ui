@@ -985,6 +985,22 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                       </packing>
                                     </child>
                                     <child>
+                                      <object class="GtkLabel" id="Channel_02_Type">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                        </attributes>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">1</property>
+                                      </packing>
+                                    </child>
+                                    <child>
                                       <object class="GtkLabel" id="Channel_02_Warning">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
@@ -998,7 +1014,7 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                       <packing>
                                         <property name="expand">False</property>
                                         <property name="fill">True</property>
-                                        <property name="position">1</property>
+                                        <property name="position">2</property>
                                       </packing>
                                     </child>
                                   </object>
@@ -1048,6 +1064,22 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                       </packing>
                                     </child>
                                     <child>
+                                      <object class="GtkLabel" id="Channel_03_Type">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                        </attributes>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">1</property>
+                                      </packing>
+                                    </child>
+                                    <child>
                                       <object class="GtkLabel" id="Channel_03_Warning">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
@@ -1061,7 +1093,7 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                       <packing>
                                         <property name="expand">False</property>
                                         <property name="fill">True</property>
-                                        <property name="position">1</property>
+                                        <property name="position">2</property>
                                       </packing>
                                     </child>
                                   </object>
@@ -1112,6 +1144,22 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                       </packing>
                                     </child>
                                     <child>
+                                      <object class="GtkLabel" id="Channel_00_Type">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                        </attributes>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">1</property>
+                                      </packing>
+                                    </child>
+                                    <child>
                                       <object class="GtkLabel" id="Channel_00_Warning">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
@@ -1125,7 +1173,7 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                       <packing>
                                         <property name="expand">False</property>
                                         <property name="fill">True</property>
-                                        <property name="position">1</property>
+                                        <property name="position">2</property>
                                       </packing>
                                     </child>
                                   </object>
@@ -1175,6 +1223,22 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                       </packing>
                                     </child>
                                     <child>
+                                      <object class="GtkLabel" id="Channel_05_Type">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                        </attributes>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">1</property>
+                                      </packing>
+                                    </child>
+                                    <child>
                                       <object class="GtkLabel" id="Channel_05_Warning">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
@@ -1188,7 +1252,7 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                       <packing>
                                         <property name="expand">False</property>
                                         <property name="fill">True</property>
-                                        <property name="position">1</property>
+                                        <property name="position">2</property>
                                       </packing>
                                     </child>
                                   </object>
@@ -1257,6 +1321,22 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                       </packing>
                                     </child>
                                     <child>
+                                      <object class="GtkLabel" id="Channel_04_Type">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                        </attributes>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">1</property>
+                                      </packing>
+                                    </child>
+                                    <child>
                                       <object class="GtkLabel" id="Channel_04_Warning">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
@@ -1270,7 +1350,7 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                       <packing>
                                         <property name="expand">False</property>
                                         <property name="fill">True</property>
-                                        <property name="position">1</property>
+                                        <property name="position">2</property>
                                       </packing>
                                     </child>
                                   </object>
@@ -1320,6 +1400,22 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                       </packing>
                                     </child>
                                     <child>
+                                      <object class="GtkLabel" id="Channel_01_Type">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                        </attributes>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">1</property>
+                                      </packing>
+                                    </child>
+                                    <child>
                                       <object class="GtkLabel" id="Channel_01_Warning">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
@@ -1333,7 +1429,7 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                       <packing>
                                         <property name="expand">False</property>
                                         <property name="fill">True</property>
-                                        <property name="position">1</property>
+                                        <property name="position">2</property>
                                       </packing>
                                     </child>
                                   </object>
@@ -1544,9 +1640,7 @@ Multiplier</property>
                             <property name="can-focus">False</property>
                             <property name="halign">start</property>
                             <property name="valign">center</property>
-                            <property name="label" translatable="yes">Changing an assignment will probably require you to move the actual motor cable to match the assignment.
-                    
-Nothing will take effect until you exit and restart LinuxCNC.</property>
+                            <property name="label" translatable="yes">Changing an assignment will probably require you to move the actual motor cable to match the assignment.</property>
                             <property name="wrap">True</property>
                             <attributes>
                               <attribute name="font-desc" value="DejaVu Serif 10"/>
@@ -1556,6 +1650,239 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                             <property name="expand">False</property>
                             <property name="fill">True</property>
                             <property name="position">6</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkSeparator">
+                            <property name="height-request">5</property>
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="valign">start</property>
+                            <property name="margin-top">5</property>
+                            <property name="margin-bottom">5</property>
+                            <property name="hexpand">True</property>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">False</property>
+                            <property name="position">7</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkBox" id="Settings_Toolbar_Box">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="margin-start">4</property>
+                            <property name="margin-end">4</property>
+                            <property name="margin-top">4</property>
+                            <property name="margin-bottom">4</property>
+                            <property name="spacing">8</property>
+                            <child>
+                              <object class="GtkButton" id="Settings_Save">
+                                <property name="label" translatable="yes">Save All
+Settings</property>
+                                <property name="width-request">130</property>
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="receives-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Save the live axis Scale/Backlash/PID values to /home/reuben/Documents/REBset_v1.ini.</property>
+                                <signal name="clicked" handler="Settings_Save" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkButton" id="Settings_Save_As">
+                                <property name="label" translatable="yes">Save All
+Settings As...</property>
+                                <property name="width-request">130</property>
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="receives-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Save to a new file/name, or overwrite an existing one.</property>
+                                <signal name="clicked" handler="Settings_Save_As" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkButton" id="Export_Settings">
+                                <property name="label" translatable="yes">Save Subset
+of Settings As...</property>
+                                <property name="width-request">130</property>
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="receives-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Export a chosen subset (e.g. just one axis's Scale) to a small .export.ini file for sharing.</property>
+                                <signal name="clicked" handler="Export_Settings" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">2</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkButton" id="Settings_Load">
+                                <property name="label" translatable="yes">Load Settings
+from File</property>
+                                <property name="width-request">130</property>
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="receives-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Load the settings from a file. This file could contain all settings, or a subset of them. If a subset of the settings is in the file, only those values will be loaded; the rest will be left as is.</property>
+                                <signal name="clicked" handler="Settings_Load" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">3</property>
+                              </packing>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">False</property>
+                            <property name="position">8</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkBox" id="Settings_Notes_Box">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="margin-start">4</property>
+                            <property name="margin-end">4</property>
+                            <property name="margin-bottom">4</property>
+                            <property name="spacing">8</property>
+                            <child>
+                              <object class="GtkLabel" id="Settings_Notes_Label">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="valign">start</property>
+                                <property name="label" translatable="yes">Notes:</property>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkScrolledWindow" id="Settings_Notes_Scroll">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="hscrollbar-policy">never</property>
+                                <property name="shadow-type">in</property>
+                                <property name="min-content-height">54</property>
+                                <property name="max-content-height">54</property>
+                                <child>
+                                  <object class="GtkTextView" id="Settings_Notes">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">True</property>
+                                    <property name="wrap-mode">word</property>
+                                    <property name="left-margin">4</property>
+                                    <property name="right-margin">4</property>
+                                    <property name="top-margin">2</property>
+                                    <property name="bottom-margin">2</property>
+                                    <property name="buffer">Settings_Notes_Buffer</property>
+                                  </object>
+                                </child>
+                              </object>
+                              <packing>
+                                <property name="expand">True</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">False</property>
+                            <property name="position">9</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkSeparator">
+                            <property name="height-request">5</property>
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="valign">start</property>
+                            <property name="margin-top">5</property>
+                            <property name="margin-bottom">5</property>
+                            <property name="hexpand">True</property>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">False</property>
+                            <property name="position">10</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkBox" id="Settings_Help_Box">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="margin-start">4</property>
+                            <property name="margin-end">4</property>
+                            <property name="margin-bottom">6</property>
+                            <property name="spacing">8</property>
+                            <child>
+                              <object class="GtkButton" id="Open User Manual">
+                                <property name="label" translatable="yes">User Manual</property>
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="receives-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Opens the Rose Engine Butler User Manual's Axis Configuration File page in your web browser.</property>
+                                <signal name="clicked" handler="Open_User_Manual" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkButton" id="PID_Tuning_Reference">
+                                <property name="label" translatable="yes">LinuxCNC PID Component Reference</property>
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="receives-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Opens the official LinuxCNC documentation for the pid HAL component (the control loop these P/I/D/FF values tune) in your web browser.</property>
+                                <property name="use-underline">True</property>
+                                <signal name="clicked" handler="OpenPidTuningReference" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkButton" id="PID_Controller_Wikipedia">
+                                <property name="label" translatable="yes">PID Controller (Wikipedia)</property>
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="receives-default">True</property>
+                                <property name="tooltip-text" translatable="yes">Opens Wikipedia's PID controller article - general background on what P/I/D/FF terms are and how they interact - in your web browser.</property>
+                                <property name="use-underline">True</property>
+                                <signal name="clicked" handler="OpenPidControllerWikipedia" swapped="no"/>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">2</property>
+                              </packing>
+                            </child>
+                          </object>
+                          <packing>
+                            <property name="expand">False</property>
+                            <property name="fill">True</property>
+                            <property name="position">11</property>
                           </packing>
                         </child>
                       </object>
@@ -5679,239 +6006,6 @@ Nothing will take effect until you exit and restart LinuxCNC.</property>
                             <property name="expand">False</property>
                             <property name="fill">True</property>
                             <property name="position">4</property>
-                          </packing>
-                        </child>
-                        <child>
-                          <object class="GtkSeparator">
-                            <property name="height-request">5</property>
-                            <property name="visible">True</property>
-                            <property name="can-focus">False</property>
-                            <property name="valign">start</property>
-                            <property name="margin-top">5</property>
-                            <property name="margin-bottom">5</property>
-                            <property name="hexpand">True</property>
-                          </object>
-                          <packing>
-                            <property name="expand">False</property>
-                            <property name="fill">False</property>
-                            <property name="position">5</property>
-                          </packing>
-                        </child>
-                        <child>
-                          <object class="GtkBox" id="Settings_Toolbar_Box">
-                            <property name="visible">True</property>
-                            <property name="can-focus">False</property>
-                            <property name="margin-start">4</property>
-                            <property name="margin-end">4</property>
-                            <property name="margin-top">4</property>
-                            <property name="margin-bottom">4</property>
-                            <property name="spacing">8</property>
-                            <child>
-                              <object class="GtkButton" id="Settings_Save">
-                                <property name="label" translatable="yes">Save All
-Settings</property>
-                                <property name="width-request">130</property>
-                                <property name="visible">True</property>
-                                <property name="can-focus">True</property>
-                                <property name="receives-default">True</property>
-                                <property name="tooltip-text" translatable="yes">Save the live axis Scale/Backlash/PID values to /home/reuben/Documents/REBset_v1.ini.</property>
-                                <signal name="clicked" handler="Settings_Save" swapped="no"/>
-                              </object>
-                              <packing>
-                                <property name="expand">False</property>
-                                <property name="fill">True</property>
-                                <property name="position">0</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkButton" id="Settings_Save_As">
-                                <property name="label" translatable="yes">Save All
-Settings As...</property>
-                                <property name="width-request">130</property>
-                                <property name="visible">True</property>
-                                <property name="can-focus">True</property>
-                                <property name="receives-default">True</property>
-                                <property name="tooltip-text" translatable="yes">Save to a new file/name, or overwrite an existing one.</property>
-                                <signal name="clicked" handler="Settings_Save_As" swapped="no"/>
-                              </object>
-                              <packing>
-                                <property name="expand">False</property>
-                                <property name="fill">True</property>
-                                <property name="position">1</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkButton" id="Export_Settings">
-                                <property name="label" translatable="yes">Save Subset
-of Settings As...</property>
-                                <property name="width-request">130</property>
-                                <property name="visible">True</property>
-                                <property name="can-focus">True</property>
-                                <property name="receives-default">True</property>
-                                <property name="tooltip-text" translatable="yes">Export a chosen subset (e.g. just one axis's Scale) to a small .export.ini file for sharing.</property>
-                                <signal name="clicked" handler="Export_Settings" swapped="no"/>
-                              </object>
-                              <packing>
-                                <property name="expand">False</property>
-                                <property name="fill">True</property>
-                                <property name="position">2</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkButton" id="Settings_Load">
-                                <property name="label" translatable="yes">Load Settings
-from File</property>
-                                <property name="width-request">130</property>
-                                <property name="visible">True</property>
-                                <property name="can-focus">True</property>
-                                <property name="receives-default">True</property>
-                                <property name="tooltip-text" translatable="yes">Load the settings from a file. This file could contain all settings, or a subset of them. If a subset of the settings is in the file, only those values will be loaded; the rest will be left as is.</property>
-                                <signal name="clicked" handler="Settings_Load" swapped="no"/>
-                              </object>
-                              <packing>
-                                <property name="expand">False</property>
-                                <property name="fill">True</property>
-                                <property name="position">3</property>
-                              </packing>
-                            </child>
-                          </object>
-                          <packing>
-                            <property name="expand">False</property>
-                            <property name="fill">False</property>
-                            <property name="position">6</property>
-                          </packing>
-                        </child>
-                        <child>
-                          <object class="GtkBox" id="Settings_Notes_Box">
-                            <property name="visible">True</property>
-                            <property name="can-focus">False</property>
-                            <property name="margin-start">4</property>
-                            <property name="margin-end">4</property>
-                            <property name="margin-bottom">4</property>
-                            <property name="spacing">8</property>
-                            <child>
-                              <object class="GtkLabel" id="Settings_Notes_Label">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="valign">start</property>
-                                <property name="label" translatable="yes">Notes:</property>
-                              </object>
-                              <packing>
-                                <property name="expand">False</property>
-                                <property name="fill">True</property>
-                                <property name="position">0</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkScrolledWindow" id="Settings_Notes_Scroll">
-                                <property name="visible">True</property>
-                                <property name="can-focus">True</property>
-                                <property name="hscrollbar-policy">never</property>
-                                <property name="shadow-type">in</property>
-                                <property name="min-content-height">54</property>
-                                <property name="max-content-height">54</property>
-                                <child>
-                                  <object class="GtkTextView" id="Settings_Notes">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">True</property>
-                                    <property name="wrap-mode">word</property>
-                                    <property name="left-margin">4</property>
-                                    <property name="right-margin">4</property>
-                                    <property name="top-margin">2</property>
-                                    <property name="bottom-margin">2</property>
-                                    <property name="buffer">Settings_Notes_Buffer</property>
-                                  </object>
-                                </child>
-                              </object>
-                              <packing>
-                                <property name="expand">True</property>
-                                <property name="fill">True</property>
-                                <property name="position">1</property>
-                              </packing>
-                            </child>
-                          </object>
-                          <packing>
-                            <property name="expand">False</property>
-                            <property name="fill">False</property>
-                            <property name="position">7</property>
-                          </packing>
-                        </child>
-                        <child>
-                          <object class="GtkSeparator">
-                            <property name="height-request">5</property>
-                            <property name="visible">True</property>
-                            <property name="can-focus">False</property>
-                            <property name="valign">start</property>
-                            <property name="margin-top">5</property>
-                            <property name="margin-bottom">5</property>
-                            <property name="hexpand">True</property>
-                          </object>
-                          <packing>
-                            <property name="expand">False</property>
-                            <property name="fill">False</property>
-                            <property name="position">8</property>
-                          </packing>
-                        </child>
-                        <child>
-                          <object class="GtkBox" id="Settings_Help_Box">
-                            <property name="visible">True</property>
-                            <property name="can-focus">False</property>
-                            <property name="margin-start">4</property>
-                            <property name="margin-end">4</property>
-                            <property name="margin-bottom">6</property>
-                            <property name="spacing">8</property>
-                            <child>
-                              <object class="GtkButton" id="Open User Manual">
-                                <property name="label" translatable="yes">User Manual</property>
-                                <property name="visible">True</property>
-                                <property name="can-focus">True</property>
-                                <property name="receives-default">True</property>
-                                <property name="tooltip-text" translatable="yes">Opens the Rose Engine Butler User Manual's Axis Configuration File page in your web browser.</property>
-                                <signal name="clicked" handler="Open_User_Manual" swapped="no"/>
-                              </object>
-                              <packing>
-                                <property name="expand">False</property>
-                                <property name="fill">True</property>
-                                <property name="position">0</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkButton" id="PID_Tuning_Reference">
-                                <property name="label" translatable="yes">LinuxCNC PID Component Reference</property>
-                                <property name="visible">True</property>
-                                <property name="can-focus">True</property>
-                                <property name="receives-default">True</property>
-                                <property name="tooltip-text" translatable="yes">Opens the official LinuxCNC documentation for the pid HAL component (the control loop these P/I/D/FF values tune) in your web browser.</property>
-                                <property name="use-underline">True</property>
-                                <signal name="clicked" handler="OpenPidTuningReference" swapped="no"/>
-                              </object>
-                              <packing>
-                                <property name="expand">False</property>
-                                <property name="fill">True</property>
-                                <property name="position">1</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkButton" id="PID_Controller_Wikipedia">
-                                <property name="label" translatable="yes">PID Controller (Wikipedia)</property>
-                                <property name="visible">True</property>
-                                <property name="can-focus">True</property>
-                                <property name="receives-default">True</property>
-                                <property name="tooltip-text" translatable="yes">Opens Wikipedia's PID controller article - general background on what P/I/D/FF terms are and how they interact - in your web browser.</property>
-                                <property name="use-underline">True</property>
-                                <signal name="clicked" handler="OpenPidControllerWikipedia" swapped="no"/>
-                              </object>
-                              <packing>
-                                <property name="expand">False</property>
-                                <property name="fill">True</property>
-                                <property name="position">2</property>
-                              </packing>
-                            </child>
-                          </object>
-                          <packing>
-                            <property name="expand">False</property>
-                            <property name="fill">True</property>
-                            <property name="position">9</property>
                           </packing>
                         </child>
                       </object>

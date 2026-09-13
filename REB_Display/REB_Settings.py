@@ -247,7 +247,7 @@ JOINT_NUMBER = {
 # time REB_Generate_Local_Ini.py generated REB.local.hal/REB.local.ini for
 # this LinuxCNC launch (see CLAUDE.md). Read once at module import: a
 # running LinuxCNC session's assignment can't change without a restart
-# anyway (a "restart required" popup is shown on every change), so
+# anyway - and this program refuses to run while LinuxCNC is up - so
 # re-reading it later would only ever see the same value or one that
 # doesn't match what's actually wired into HAL right now.
 _CHANNEL_ASSIGNMENTS_AT_STARTUP = _read_persisted_channel_assignments()
@@ -1097,6 +1097,11 @@ class HandlerClass:
         blocked from being persisted, not from being picked in the
         first place.
 
+        Also refreshes each channel's Channel_0N_Type label from
+        _axis_type_for_letter - informational only (Linear/Angular is
+        not itself selectable, see _axis_type_for_letter above), so it
+        just needs to track whatever letter the combo now shows.
+
         Called both by _load_channel_assignments (startup) and by
         Channel_0N_Axis_Changed itself (every time one combo's choice
         changes).
@@ -1115,6 +1120,10 @@ class HandlerClass:
             for letter in AXIS_SELECTION_LETTERS:
                 combo.append_text(letter)
             combo.set_active(AXIS_SELECTION_LETTERS.index(current))
+
+            type_label = self.builder.get_object("Channel_" + channel_id + "_Type")
+            if type_label is not None:
+                type_label.set_text(_axis_type_for_letter(current).title())
 
     def _update_duplicate_warnings(self):
         '''
@@ -1160,10 +1169,12 @@ class HandlerClass:
 
         Adapted from REB_main.py's version of this method: the embedded
         Settings tab this replaces also read/populated a per-channel
-        Type combo here (<channel_types>) - that combo doesn't exist in
-        this program's UI at all (type is always derived from the
-        letter - see _axis_type_for_letter), so that half is dropped
-        entirely rather than ported as a no-op.
+        Type combo here (<channel_types>) - there is no such combo in
+        this program's UI (type is always derived from the letter, see
+        _axis_type_for_letter), so that half is dropped entirely rather
+        than ported as a no-op. _rebuild_all_channel_combo_items does
+        still populate a read-only Channel_0N_Type label from the
+        letter, informational only.
         '''
         if self.builder.get_object("Channel_00_Axis") is None:
             return
@@ -2500,9 +2511,14 @@ def _channel_axis_changed(channel_id):
     selectable, duplicates are no longer prevented at the dropdown.
     Instead, _update_duplicate_warnings flags every channel currently
     sharing a letter; as long as any duplicate remains, this handler
-    deliberately does NOT persist the assignment or show the restart
-    notice - both only happen once the whole assignment is duplicate-
-    free, at which point they fire on that clearing change.
+    deliberately does NOT persist the assignment - that only happens
+    once the whole assignment is duplicate-free, at which point it
+    fires on that clearing change. No "restart required" notice is
+    shown here (unlike Measurement System/Max Jog Speed/velocity
+    settings, which can be changed while LinuxCNC is running): this
+    program refuses to run at all while LinuxCNC is up (see
+    _linuxcnc_is_running), so every axis assignment change already
+    happens before the next launch, not during a live session.
     '''
     def handler(self, widget):
         if self._applying_channel_assignments:
@@ -2522,13 +2538,6 @@ def _channel_axis_changed(channel_id):
             return
 
         _save_channel_assignments(self._channel_assignments)
-        _show_restart_required_popup(
-            widget,
-            "The axis assignment change will not take effect until you "
-            "exit and restart LinuxCNC. Make sure the physical motor "
-            "cable for this channel actually matches the letter you just "
-            "assigned before restarting."
-        )
     handler.__name__ = "Channel_" + channel_id + "_Axis_Changed"
     return handler
 
