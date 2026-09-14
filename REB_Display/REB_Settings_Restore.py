@@ -4,11 +4,12 @@ REB_Settings_Restore.py
 
 At LinuxCNC startup, reads REBset_v1.ini and pushes each Rose Engine
 Butler axis's persisted stepgen position-scale, maxvel/maxaccel,
-P/I/D/FF0/FF1/FF2 pid.* gains, and joint.N.backlash onto the live HAL
-parameters those values actually live on. This is the load-side
-counterpart to REB_Display/REB_Scale_Persist.py (which does the same
-job in reverse, at shutdown) - together they're what makes a value
-retuned in REB_Settings survive to the next session.
+P/I/D/FF0/FF1/FF2 pid.* gains, and (axis letters only - see below)
+joint.N.backlash onto the live HAL parameters those values actually
+live on. This is the load-side counterpart to REB_Display/
+REB_Scale_Persist.py (which does the same job in reverse, at shutdown)
+- together they're what makes a value retuned in REB_Settings survive
+to the next session.
 
 Why this needs to exist as its own step: none of these are ordinary
 HAL pins wired to REB.ini through the usual [JOINT_n]/[AXIS_*]
@@ -31,6 +32,28 @@ far less physical travel than expected). This script is the fix.
 
 Invoked from REB.hal, after hm2_7i92/pid/motion are all loaded:
     loadusr -w python3 REB_Display/REB_Settings_Restore.py
+
+------------------------------------------------------------------
+Any-role/any-channel generalization (13 September 2026, Rich)
+------------------------------------------------------------------
+Any of 10 roles (8 axis letters or 2 spindles) can now be assigned to
+any of the 8 physical channels - see CLAUDE.md and REB_Setup/
+REB_Generate_Local_Ini.py, whose RoleLayout this script's
+_compute_role_layout mirrors (duplicated rather than imported - this
+script and the generator are independent processes, see AXIS_STEPGEN's
+old comment for why small maps/logic like this stay duplicated across
+scripts in this codebase).
+
+Backlash restore is now axis-letter-only. Before this generalization,
+spindles had a fixed (if largely theoretical) joint number - now that
+[KINS]JOINTS dynamically ranges 6-8 depending how many letters are
+active, joint numbers are reassigned fresh each launch and a spindle
+has no joint number of its own at all ([TRAJ]SPINDLES is entirely
+separate from [KINS]JOINTS in LinuxCNC's kinematics model - see
+CLAUDE.md). Restoring backlash for a spindle against a stale/guessed
+joint number risked writing to whatever REAL axis letter now actually
+owns that joint number instead - silently corrupting a different
+axis's backlash. Dropped rather than risk that.
 """
 
 import subprocess
@@ -38,81 +61,75 @@ import sys
 
 import reb_settings_io
 
-# Axis id (as used in REBset_v1.ini and the REB_Settings spin buttons)
-# -> hm2_7i92.0 stepgen channel. Verified against the actual "net
-# <axis>-enable => hm2_7i92.0.stepgen.NN.enable" lines in REB.hal - NOT
-# the documentation table in REB.ini, which does not match. Mirrors
-# REB_Scale_Persist.py's/REB_Settings.py's own copies of this same map
-# (see that file's own comment for why small constants like this are
-# duplicated across scripts rather than imported).
-AXIS_STEPGEN = {
-    "X":   "04",
-    "Z":   "01",
-    "B":   "05",
-    "U":   "02",
-    "V":   "03",
-    "W":   "00",
-    "Sp0": "06",
-    "Sp1": "07",
-}
+# The 8 axis letters (Y removed - not used on this machine, LATHE=1)
+# and the 2 spindles - the 10 possible roles a channel can be assigned.
+AXIS_SELECTION_LETTERS = ("X", "Z", "U", "V", "W", "A", "B", "C")
+SPINDLE_IDS = ("Sp0", "Sp1")
+CHANNEL_ROLES = AXIS_SELECTION_LETTERS + SPINDLE_IDS
 
-# Axis id -> LinuxCNC joint number, for the live joint.N.backlash HAL
-# parameter. NOT the same numbering as AXIS_STEPGEN's hm2 stepgen
-# channel map above.
-JOINT_NUMBER = {
-    "X":   0,
-    "Z":   1,
-    "B":   2,
-    "U":   3,
-    "V":   4,
-    "W":   5,
-    "Sp1": 6,
-    "Sp0": 7,
-}
-
-CHANNEL_DEFAULT_LETTER = {
+# Channel id ("00".."07") -> the role REB.ini/REB.hal ship with by
+# default. Mirrors reb_settings_io.py's own CHANNEL_DEFAULT_ROLE.
+CHANNEL_DEFAULT_ROLE = {
     "00": "W",
     "01": "Z",
     "02": "U",
     "03": "V",
     "04": "X",
     "05": "B",
+    "06": "Sp0",
+    "07": "Sp1",
 }
-DEFAULT_LETTER_CHANNEL = {v: k for k, v in CHANNEL_DEFAULT_LETTER.items()}
-# Y removed - not used on this machine - see REB_Settings.py's AXIS_SELECTION_LETTERS.
-AXIS_SELECTION_LETTERS = ("X", "Z", "U", "V", "W", "A", "B", "C")
+
+# Canonical joint-numbering order for active axis letters - mirrors
+# REB_Setup/REB_Generate_Local_Ini.py's JOINT_NUMBER_CANONICAL_ORDER
+# exactly (must match, since this script needs to compute the SAME
+# live joint number that script's REB.local.ini generation already
+# assigned for this session).
+JOINT_NUMBER_CANONICAL_ORDER = ("X", "Z", "B", "U", "V", "W", "A", "C")
 
 
-def _read_persisted_channel_assignments():
+def _read_channel_assignments():
     '''
-    Mirrors REB_Settings.py's/REB_Scale_Persist.py's function of the
-    same name - reads the persisted channel -> axis letter map, falling
-    back to CHANNEL_DEFAULT_LETTER for anything missing/unrecognized/
-    duplicated.
+    Reads the persisted channel -> role map, falling back to
+    CHANNEL_DEFAULT_ROLE for anything missing, unrecognized, or -
+    defensively, since REBset_v1.ini's own header says it should not be
+    hand-edited - assigned to more than one channel. Mirrors
+    REB_Generate_Local_Ini.py's/REB_main.py's/REB_Scale_Persist.py's/
+    REB_Settings.py's own copies of this same function.
     '''
-    assignments = dict(CHANNEL_DEFAULT_LETTER)
+    assignments = dict(CHANNEL_DEFAULT_ROLE)
     stored = reb_settings_io.load_settings().get("channel_assignments", {})
-    for channel_id, letter in stored.items():
-        if channel_id in assignments and letter in AXIS_SELECTION_LETTERS:
-            assignments[channel_id] = letter
+    for channel_id, role in stored.items():
+        if channel_id in assignments and role in CHANNEL_ROLES:
+            assignments[channel_id] = role
 
     if len(set(assignments.values())) != len(assignments):
-        print("Duplicate letter(s) in persisted channel_assignments - using shipped defaults")
-        return dict(CHANNEL_DEFAULT_LETTER)
+        print("Duplicate role(s) in persisted channel_assignments - using shipped defaults")
+        return dict(CHANNEL_DEFAULT_ROLE)
 
     return assignments
 
 
-# Internal id -> this session's actual current axis letter (lowercase).
-# Read once at process startup (this script only ever runs once, at
-# startup, so there's no "session" to worry about staying in sync with
-# beyond this single run) - mirrors REB_Scale_Persist.py's CURRENT_LETTER.
-_CHANNEL_ASSIGNMENTS = _read_persisted_channel_assignments()
-CURRENT_LETTER = {
-    internal_id: _CHANNEL_ASSIGNMENTS.get(channel_id, internal_id).lower()
-    for internal_id, channel_id in DEFAULT_LETTER_CHANNEL.items()
-}
-CURRENT_LETTER_INTERNAL_ID = {letter.upper(): internal_id for internal_id, letter in CURRENT_LETTER.items()}
+class RoleLayout(object):
+    '''
+    Mirrors REB_Setup/REB_Generate_Local_Ini.py's own RoleLayout - which
+    of the 10 roles are active (assigned to some channel) this session,
+    which channel each one is on, and which joint number an active axis
+    letter's [JOINT_n]/joint.N now is (see JOINT_NUMBER_CANONICAL_ORDER)
+    - the same computation that script already used to generate this
+    session's REB.local.ini/REB.local.hal, needed again here to know
+    where to push each role's restored values.
+    '''
+    def __init__(self, assignments):
+        self.channel_of = {}
+        for channel_id, role in assignments.items():
+            self.channel_of[role] = channel_id
+
+        active_letters = [l for l in JOINT_NUMBER_CANONICAL_ORDER if l in self.channel_of]
+        self.joint_number = {letter: i for i, letter in enumerate(active_letters)}
+
+
+_ROLE_LAYOUT = RoleLayout(_read_channel_assignments())
 
 PID_SPINDLE_LOOPS = {
     "Sp0": {"Pos": "pid.p0", "Vel": "pid.s0"},
@@ -157,11 +174,13 @@ def set_backlash(joint_num, value):
 
 def main():
     '''
-    Restores exactly what REB_Scale_Persist.py's main() persists, in the
-    same order, keyed the same way: Sp0/Sp1 unconditionally by their own
-    fixed internal id, then all 8 AXIS_SELECTION_LETTERS resolved
-    through CURRENT_LETTER_INTERNAL_ID (skipping any letter not
-    currently assigned to a channel - nothing live to push it onto).
+    Restores exactly what REB_Scale_Persist.py's main() persists, in
+    the same order, keyed the same way: all 10 CHANNEL_ROLES, resolved
+    through _ROLE_LAYOUT.channel_of, skipping any role not currently
+    assigned to a channel this session (nothing live to push it onto).
+    Backlash is restored for axis letters only - see this file's own
+    header for why spindles no longer have a joint number to restore it
+    against.
     '''
     settings = reb_settings_io.load_settings()
     axes = settings.get("axes", {})
@@ -236,26 +255,24 @@ def main():
                 sys.exit(1)
         print("Restored " + axis_id + " " + block_tag + " PID gains = " + str(pid_block))
 
-    for axis_id in ("Sp0", "Sp1"):
-        restore_scale(axis_id, AXIS_STEPGEN[axis_id])
-        restore_stepgen_max(axis_id, AXIS_STEPGEN[axis_id])
-        restore_backlash(axis_id, JOINT_NUMBER[axis_id])
-
-    for letter in AXIS_SELECTION_LETTERS:
-        internal_id = CURRENT_LETTER_INTERNAL_ID.get(letter)
-        if internal_id is None:
+    for role in CHANNEL_ROLES:
+        channel_id = _ROLE_LAYOUT.channel_of.get(role)
+        if channel_id is None:
             # Not currently assigned to any channel this session -
             # nothing live to push it onto.
+            print(role + " is not currently assigned to a channel - skipping")
             continue
-        restore_scale(letter, AXIS_STEPGEN[internal_id])
-        restore_stepgen_max(letter, AXIS_STEPGEN[internal_id])
-        restore_backlash(letter, JOINT_NUMBER[internal_id])
-        restore_pid(letter, "pid", "pid." + letter.lower())
 
-    for spindle_id, loops in PID_SPINDLE_LOOPS.items():
-        for suffix, hal_component in loops.items():
-            block_tag = "pid_pos" if suffix == "Pos" else "pid_vel"
-            restore_pid(spindle_id, block_tag, hal_component)
+        restore_scale(role, channel_id)
+        restore_stepgen_max(role, channel_id)
+
+        if role in AXIS_SELECTION_LETTERS:
+            restore_backlash(role, _ROLE_LAYOUT.joint_number[role])
+            restore_pid(role, "pid", "pid." + role.lower())
+        else:
+            for suffix, hal_component in PID_SPINDLE_LOOPS[role].items():
+                block_tag = "pid_pos" if suffix == "Pos" else "pid_vel"
+                restore_pid(role, block_tag, hal_component)
 
 
 if __name__ == "__main__":

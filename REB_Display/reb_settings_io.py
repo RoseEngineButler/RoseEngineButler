@@ -92,26 +92,51 @@ SETTINGS_PATH = "/home/reuben/Documents/REBset_v1.ini"
 
 FORMAT_VERSION = 1
 
-# Mirrors REB_main.py's CHANNEL_DEFAULT_LETTER/REB_Scale_Persist.py's/
-# REB_Generate_Local_Ini.py's own copies (see this module's own header
-# for why the read/write logic is shared here but small constants like
-# this one stay duplicated per the rest of the codebase's convention -
-# this one only needs to match at the value level, not be imported).
-CHANNEL_DEFAULT_LETTER = {
+# Mirrors REB_main.py's/REB_Scale_Persist.py's/REB_Settings.py's/
+# REB_Settings_Restore.py's/REB_Generate_Local_Ini.py's own copies (see
+# this module's own header for why the read/write logic is shared here
+# but small constants like this one stay duplicated per the rest of the
+# codebase's convention - this one only needs to match at the value
+# level, not be imported).
+#
+# Widened 13 September 2026 (Rich): channel_assignments used to only
+# ever hold one of 8 axis letters, for channels "00".."05" - channels
+# "06"/"07" were permanently, uneditably Sp0/Sp1. Now any of the 10
+# possible roles (8 axis letters + Sp0 + Sp1) can be assigned to any of
+# the 8 physical channels, so this dict grew two more channel keys and
+# its value space grew to include "Sp0"/"Sp1". This is the shipped
+# default/fallback shape (the original pre-generalization mapping,
+# restoring A/C as the shipped-default "not currently wired" pair) -
+# an old 6-key REBset_v1.ini merges cleanly against this in
+# _merge_defaults below with zero extra migration code: the loaded
+# file's 6 keys overwrite 00-05, and 06/07 simply keep this dict's
+# Sp0/Sp1 default, exactly matching what those channels always were
+# before this change.
+CHANNEL_DEFAULT_ROLE = {
     "00": "W",
     "01": "Z",
     "02": "U",
     "03": "V",
     "04": "X",
     "05": "B",
+    "06": "Sp0",
+    "07": "Sp1",
 }
 
 # All ten <axis id="..."> rows the current schema has ever shipped -
-# the six physical channels' own default letters, the two "extra"
-# reassignable-only letters (A/C - see EXTRA_SETTINGS_LETTERS in
-# REB_main.py), and the two spindles.
+# the eight assignable axis letters and the two spindles. Every one of
+# these ten ids always has its own settings entry (scale/backlash/PID/
+# etc.) regardless of whether it's currently assigned to a channel -
+# channel_assignments (which of the 10 sits on which of the 8 physical
+# channels right now) is an entirely separate concern from this list.
 SPINDLE_IDS = ("Sp0", "Sp1")
 AXIS_IDS = ("X", "Z", "B", "U", "V", "W", "A", "C") + SPINDLE_IDS
+
+# The 10 valid values a channel_assignments entry can hold - the 8 axis
+# letters (in AXIS_IDS' order, minus the 2 spindles) plus the 2
+# spindles. Mirrors AXIS_SELECTION_LETTERS + SPINDLE_IDS in
+# REB_main.py/REB_Settings.py.
+CHANNEL_ROLES = tuple(a for a in AXIS_IDS if a not in SPINDLE_IDS) + SPINDLE_IDS
 
 PID_PARAMS = ("P", "I", "D", "FF0", "FF1", "FF2")
 
@@ -196,7 +221,7 @@ def default_settings():
     a given tag was absent from the file. Key order here is the order
     the file is written in (json.dump preserves dict insertion order).
     '''
-    channel_assignments = dict(CHANNEL_DEFAULT_LETTER)
+    channel_assignments = dict(CHANNEL_DEFAULT_ROLE)
     settings = {
         "format_version": FORMAT_VERSION,
         "channel_assignments": channel_assignments,
@@ -299,11 +324,19 @@ def _parse_legacy_xml(xml_text):
 
     assignments_block = _xml_tag(xml_text, "channel_assignments", "")
     if assignments_block:
-        assignments = dict(CHANNEL_DEFAULT_LETTER)
-        for channel_id, letter in re.findall(
-                r'<channel id="(\d\d)">([A-Z])</channel>', assignments_block):
-            if channel_id in assignments:
-                assignments[channel_id] = letter
+        # No legacy XML file ever had a spindle in channel_assignments
+        # (that's the whole point of the 13 September 2026 widening -
+        # see CHANNEL_DEFAULT_ROLE above) or a channel id beyond "05",
+        # but the value pattern is widened to \w+ (was [A-Z], one char
+        # only) and validated against CHANNEL_ROLES rather than assumed
+        # single-letter, so this stays correct if it's ever fed a
+        # channel_assignments block written by a newer version of this
+        # same schema.
+        assignments = dict(CHANNEL_DEFAULT_ROLE)
+        for channel_id, role in re.findall(
+                r'<channel id="(\d\d)">(\w+)</channel>', assignments_block):
+            if channel_id in assignments and role in CHANNEL_ROLES:
+                assignments[channel_id] = role
         if len(set(assignments.values())) == len(assignments):
             settings["channel_assignments"] = assignments
         else:

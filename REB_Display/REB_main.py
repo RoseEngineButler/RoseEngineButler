@@ -79,15 +79,25 @@ import reb_settings_io
 
 SETTINGS_PATH = "/home/reuben/Documents/REBset_v1.ini"
 
-# Channel id ("00".."05", matching the hm2_7i92.0.stepgen.NN suffix - see
-# AXIS_STEPGEN below) -> the axis letter REB.ini/REB.hal ship with by
-# default. This is the seed value for a channel's <channel_assignments>
-# entry in REBset_v1.ini when the operator has never touched the Axis
-# Selection tab - same "absent -> shipped default" convention as every
-# other REBset_v1.ini-backed setting (see _load_measurement_system).
-# Internal ids (AXIS_STEPGEN/JOINT_NUMBER/PID_AXES keys, Settings-tab
-# widget-id prefixes) always stay these default letters, regardless of
-# what the operator later assigns a channel to - see CLAUDE.md.
+# Channel id ("00".."05") -> the axis letter REB.ini/REB.hal ship with
+# by default. This is the seed value for a channel's
+# <channel_assignments> entry in REBset_v1.ini when the operator has
+# never touched the Axis Selection tab (now REB_Settings.py, a
+# standalone program - not this file, whose own embedded Settings tab
+# was retired 4 September 2026) - same "absent -> shipped default"
+# convention as every other REBset_v1.ini-backed setting (see
+# _load_measurement_system). Internal ids (PANEL_INTERNAL_IDS below,
+# Settings-tab widget-id prefixes) always stay these default letters,
+# regardless of what the operator later assigns a channel to - see
+# CLAUDE.md. Still only 6 channels here, and still only axis letters as
+# values - the 13 September 2026 generalization (any of 8 letters or 2
+# spindles assignable to any of 8 channels) only ever touched
+# REB_Settings.py's own Axis Selection tab and REB_Setup/
+# REB_Generate_Local_Ini.py; this file's read-only main-panel display
+# (_load_panel_axis_display) still only shows/understands channels
+# 00-05 and axis letters ("engine only" scope - see CLAUDE.md). A
+# channel now assigned a spindle, or one of the 8 letters landing on
+# channel 06/07, simply won't display correctly here yet.
 CHANNEL_DEFAULT_LETTER = {
     "00": "W",
     "01": "Z",
@@ -225,11 +235,12 @@ def _read_persisted_channel_assignments():
     Reads the persisted channel -> axis letter map, falling back to
     CHANNEL_DEFAULT_LETTER for any channel whose entry is missing or
     unrecognized - same "absent -> shipped default" convention as
-    _load_measurement_system. Used by the Settings tab to populate the 6
-    Axis Selection combos at startup, by CURRENT_LETTER below (module
-    load time), and duplicated (rather than imported - see AXIS_STEPGEN
-    below for why) in REB_Scale_Persist.py and REB_Setup/
-    REB_Generate_Local_Ini.py.
+    _load_measurement_system. Used by CURRENT_LETTER below (module load
+    time, for _load_panel_axis_display's read-only main-panel display),
+    and duplicated (rather than imported - small maps/logic like this
+    stay duplicated across this codebase's independent scripts rather
+    than shared) in REB_Scale_Persist.py, REB_Settings.py,
+    REB_Settings_Restore.py, and REB_Setup/REB_Generate_Local_Ini.py.
     '''
     assignments = dict(CHANNEL_DEFAULT_LETTER)
     stored = reb_settings_io.load_settings().get("channel_assignments", {})
@@ -250,39 +261,20 @@ def _read_persisted_channel_assignments():
 
 
 
-# Axis id (as used in REB_Settings_v1.ini and the Settings tab spin
-# buttons) -> hm2_7i92.0 stepgen channel. Verified against the actual
-# "net <axis>-enable => hm2_7i92.0.stepgen.NN.enable" lines in REB.hal
-# - NOT the documentation table in REB.ini, which does not match. This
-# key is the internal id (see CHANNEL_DEFAULT_LETTER above) - it never
-# changes even if the operator reassigns this channel's axis letter.
-AXIS_STEPGEN = {
-    "X":   "04",
-    "Z":   "01",
-    "B":   "05",
-    "U":   "02",
-    "V":   "03",
-    "W":   "00",
-    "Sp0": "06",
-    "Sp1": "07",
-}
-
-# Axis id -> LinuxCNC joint number, for the live joint.N.backlash HAL
-# parameter (motion's own per-joint backlash compensation - see
-# REB.ini's [JOINT_n] sections and the axis/joint map in CLAUDE.md).
-# NOT the same numbering as AXIS_STEPGEN's hm2 stepgen channel map
-# above - joint numbers come from [KINS]JOINTS/trivkins ordering, not
-# hm2 wiring.
-JOINT_NUMBER = {
-    "X":   0,
-    "Z":   1,
-    "B":   2,
-    "U":   3,
-    "V":   4,
-    "W":   5,
-    "Sp1": 6,
-    "Sp0": 7,
-}
+# The 8 internal ids that have a main-panel widget of their own (6
+# axis letters' worth of Ena_Override pin below, plus the 2 spindles) -
+# fixed forever, regardless of channel reassignment (see
+# CHANNEL_DEFAULT_LETTER above). Since 13 September 2026 (any of
+# X,Z,U,V,W,A,B,C,Sp0,Sp1 assignable to any of 8 channels - see
+# CLAUDE.md), this is no longer the same thing as "which stepgen
+# channel a role is on" (that's now fully dynamic, computed fresh each
+# launch by REB_Setup/REB_Generate_Local_Ini.py, not a fixed per-letter
+# constant) - this tuple exists purely to enumerate the fixed set of
+# internal ids below needs an Ena_Override pin for. A/C deliberately
+# excluded: no main-panel widget exists for them yet ("engine only"
+# scope - see CLAUDE.md), so no Ena_Override pin is needed for them
+# either.
+PANEL_INTERNAL_IDS = ("X", "Z", "B", "U", "V", "W", "Sp0", "Sp1")
 
 # This session's channel -> axis letter assignment, as persisted at the
 # time REB_Generate_Local_Ini.py generated REB.local.hal/REB.local.ini for
@@ -2528,7 +2520,7 @@ class HandlerClass:
         # effect. The GPin objects are kept on self so they aren't
         # garbage-collected.
         self._ena_override_pins = {}
-        for axis_id in AXIS_STEPGEN:
+        for axis_id in PANEL_INTERNAL_IDS:
             pin_name = axis_id + "_Ena_Override"
             self._ena_override_pins[axis_id] = hal_glib.GPin(
                 self.halcomp.newpin(pin_name, hal.HAL_BIT, hal.HAL_IO)

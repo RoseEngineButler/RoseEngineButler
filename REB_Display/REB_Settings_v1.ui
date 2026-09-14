@@ -747,7 +747,7 @@
                                 <property name="can-focus">False</property>
                                 <property name="halign">start</property>
                                 <property name="hexpand">True</property>
-                                <property name="label" translatable="yes">REB O/S 1.0 - alpha 04 September 2026</property>
+                                <property name="label" translatable="yes">REB O/S 1.0 - alpha 14 September 2026</property>
                                 <property name="justify">right</property>
                                 <property name="width-chars">9</property>
                                 <attributes>
@@ -1465,16 +1465,12 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                     <property name="orientation">vertical</property>
                                     <property name="spacing">2</property>
                                     <child>
-                                      <object class="GtkLabel">
+                                      <object class="GtkComboBoxText" id="Channel_06_Axis">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
                                         <property name="halign">center</property>
                                         <property name="valign">center</property>
-                                        <property name="label" translatable="yes">Sp0</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 12"/>
-                                          <attribute name="weight" value="bold"/>
-                                        </attributes>
+                                        <signal name="changed" handler="Channel_06_Axis_Changed" swapped="no"/>
                                       </object>
                                       <packing>
                                         <property name="expand">False</property>
@@ -1483,22 +1479,36 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                       </packing>
                                     </child>
                                     <child>
-                                      <object class="GtkLabel">
+                                      <object class="GtkLabel" id="Channel_06_Type">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
                                         <property name="halign">center</property>
                                         <property name="valign">center</property>
-                                        <property name="label" translatable="yes">Spindle
-                    
-                    </property>
                                         <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
                                         </attributes>
                                       </object>
                                       <packing>
                                         <property name="expand">False</property>
                                         <property name="fill">True</property>
                                         <property name="position">1</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkLabel" id="Channel_06_Warning">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <property name="use-markup">True</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                        </attributes>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">2</property>
                                       </packing>
                                     </child>
                                   </object>
@@ -1534,16 +1544,12 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                     <property name="orientation">vertical</property>
                                     <property name="spacing">2</property>
                                     <child>
-                                      <object class="GtkLabel">
+                                      <object class="GtkComboBoxText" id="Channel_07_Axis">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
                                         <property name="halign">center</property>
                                         <property name="valign">center</property>
-                                        <property name="label" translatable="yes">Sp1</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 12"/>
-                                          <attribute name="weight" value="bold"/>
-                                        </attributes>
+                                        <signal name="changed" handler="Channel_07_Axis_Changed" swapped="no"/>
                                       </object>
                                       <packing>
                                         <property name="expand">False</property>
@@ -1552,23 +1558,36 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                       </packing>
                                     </child>
                                     <child>
-                                      <object class="GtkLabel">
+                                      <object class="GtkLabel" id="Channel_07_Type">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
                                         <property name="halign">center</property>
                                         <property name="valign">center</property>
-                                        <property name="label" translatable="yes">Rosette
-Phaser
-Multiplier</property>
-                                        <property name="justify">center</property>
                                         <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
                                         </attributes>
                                       </object>
                                       <packing>
                                         <property name="expand">False</property>
                                         <property name="fill">True</property>
                                         <property name="position">1</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkLabel" id="Channel_07_Warning">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <property name="use-markup">True</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                        </attributes>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">2</property>
                                       </packing>
                                     </child>
                                   </object>
@@ -1947,7 +1966,7 @@ from File</property>
                                 <property name="can-focus">False</property>
                                 <property name="halign">start</property>
                                 <property name="hexpand">True</property>
-                                <property name="label" translatable="yes">REB O/S 1.0 - alpha 04 September 2026</property>
+                                <property name="label" translatable="yes">REB O/S 1.0 - alpha 14 September 2026</property>
                                 <property name="justify">right</property>
                                 <property name="width-chars">9</property>
                                 <attributes>
@@ -6074,7 +6093,7 @@ from File</property>
                                 <property name="can-focus">False</property>
                                 <property name="halign">start</property>
                                 <property name="hexpand">True</property>
-                                <property name="label" translatable="yes">REB O/S 1.0 - alpha 04 September 2026</property>
+                                <property name="label" translatable="yes">REB O/S 1.0 - alpha 14 September 2026</property>
                                 <property name="justify">right</property>
                                 <property name="width-chars">9</property>
                                 <attributes>
