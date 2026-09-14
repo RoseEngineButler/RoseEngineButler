@@ -82,9 +82,18 @@
 #   Y      -       --    ------     -		  Not available as LATHE=1
 #   Z      1       00    LINEAR     2    P11
 #
-#   A      -       --    ------     -		  Not used
+#   A      -       08    ANGULAR    -    --   Not currently assigned to
+#                                              a channel - no panel ENA
+#                                              button/toggle chain exists
+#                                              for A/C yet ("engine only"
+#                                              scope, 13 September 2026 -
+#                                              a-enable/c-enable are
+#                                              driven straight from
+#                                              machine-is-on in REB.hal
+#                                              instead, see CLAUDE.md)
 #   B      2       06    ANGULAR    3    P17
-#   C      -       --    ------     -		  Not used
+#   C      -       09    ANGULAR    -    --   Not currently assigned -
+#                                              see A above
 #
 #   U      3       04    LINEAR     4    P15
 #   V      4       01    LINEAR     5    P12
@@ -131,6 +140,13 @@
 # to that same guarantee, just via an extra AND stage since their
 # stepgen.enable pins are driven by <axis>-enable (the panel-toggle
 # net) rather than by machine-is-on directly.
+#
+# A/C (added 13 September 2026, not currently assigned to a channel -
+# see CLAUDE.md) have no flipflop/not/and2/estop-and instances here at
+# all and no gladevcp.A_*/C_* pins to net against, since no main-panel
+# widgets exist for them yet ("engine only" scope) - their a-enable/
+# c-enable are wired directly to machine-is-on in REB.hal instead, the
+# same simpler pattern as Sp0/Sp1's stepgen.enable.
 #
 # All instances of a given realtime component must be declared in a
 # single loadrt line - the underlying kernel module can only be
