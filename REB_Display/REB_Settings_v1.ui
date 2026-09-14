@@ -843,793 +843,967 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                           </packing>
                         </child>
                         <child>
-                          <!-- n-columns=5 n-rows=4 -->
-                          <object class="GtkGrid">
+                          <object class="GtkBox" id="Axis_Selection_Table_Row">
                             <property name="visible">True</property>
                             <property name="can-focus">False</property>
-                            <property name="margin-top">10</property>
-                            <property name="row-spacing">10</property>
-                            <property name="column-spacing">10</property>
+                            <property name="spacing">10</property>
                             <child>
-                              <object class="GtkLabel">
+                              <!-- n-columns=5 n-rows=4 -->
+                              <object class="GtkGrid">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
-                                <property name="halign">center</property>
-                                <property name="valign">center</property>
-                                <property name="margin-bottom">4</property>
-                                <attributes>
-                                  <attribute name="font-desc" value="DejaVu Serif 10"/>
-                                </attributes>
-                              </object>
-                              <packing>
-                                <property name="left-attach">0</property>
-                                <property name="top-attach">1</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkLabel">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="halign">center</property>
-                                <property name="valign">center</property>
-                                <property name="margin-bottom">4</property>
-                                <property name="label" translatable="yes">1</property>
-                                <attributes>
-                                  <attribute name="font-desc" value="DejaVu Serif 12"/>
-                                  <attribute name="weight" value="bold"/>
-                                </attributes>
-                              </object>
-                              <packing>
-                                <property name="left-attach">1</property>
-                                <property name="top-attach">1</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkLabel">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="halign">center</property>
-                                <property name="valign">center</property>
-                                <property name="margin-bottom">4</property>
-                                <property name="label" translatable="yes">2</property>
-                                <attributes>
-                                  <attribute name="font-desc" value="DejaVu Serif 12"/>
-                                  <attribute name="weight" value="bold"/>
-                                </attributes>
-                              </object>
-                              <packing>
-                                <property name="left-attach">2</property>
-                                <property name="top-attach">1</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkLabel">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="halign">center</property>
-                                <property name="valign">center</property>
-                                <property name="margin-bottom">4</property>
-                                <property name="label" translatable="yes">3</property>
-                                <attributes>
-                                  <attribute name="font-desc" value="DejaVu Serif 12"/>
-                                  <attribute name="weight" value="bold"/>
-                                </attributes>
-                              </object>
-                              <packing>
-                                <property name="left-attach">3</property>
-                                <property name="top-attach">1</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkLabel">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="halign">center</property>
-                                <property name="valign">center</property>
-                                <property name="margin-bottom">4</property>
-                                <property name="label" translatable="yes">4</property>
-                                <attributes>
-                                  <attribute name="font-desc" value="DejaVu Serif 12"/>
-                                  <attribute name="weight" value="bold"/>
-                                </attributes>
-                              </object>
-                              <packing>
-                                <property name="left-attach">4</property>
-                                <property name="top-attach">1</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkLabel">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="halign">start</property>
-                                <property name="valign">center</property>
-                                <property name="margin-right">10</property>
-                                <property name="margin-end">10</property>
-                                <property name="label" translatable="yes">Row 1</property>
-                                <attributes>
-                                  <attribute name="font-desc" value="DejaVu Serif 12"/>
-                                  <attribute name="weight" value="bold"/>
-                                </attributes>
-                              </object>
-                              <packing>
-                                <property name="left-attach">0</property>
-                                <property name="top-attach">2</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkFrame">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="label-xalign">0</property>
+                                <property name="margin-top">10</property>
+                                <property name="row-spacing">10</property>
+                                <property name="column-spacing">10</property>
                                 <child>
-                                  <object class="GtkBox">
+                                  <object class="GtkLabel">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
                                     <property name="halign">center</property>
                                     <property name="valign">center</property>
-                                    <property name="orientation">vertical</property>
-                                    <property name="spacing">2</property>
-                                    <child>
-                                      <object class="GtkComboBoxText" id="Channel_02_Axis">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <signal name="changed" handler="Channel_02_Axis_Changed" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">0</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkLabel" id="Channel_02_Type">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
-                                        </attributes>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">1</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkLabel" id="Channel_02_Warning">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <property name="use-markup">True</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
-                                        </attributes>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">2</property>
-                                      </packing>
-                                    </child>
-                                  </object>
-                                </child>
-                                <child type="label">
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="label" translatable="yes">Channel 02</property>
+                                    <property name="margin-bottom">4</property>
                                     <attributes>
                                       <attribute name="font-desc" value="DejaVu Serif 10"/>
-                                      <attribute name="weight" value="bold"/>
                                     </attributes>
                                   </object>
+                                  <packing>
+                                    <property name="left-attach">0</property>
+                                    <property name="top-attach">1</property>
+                                  </packing>
                                 </child>
-                              </object>
-                              <packing>
-                                <property name="left-attach">1</property>
-                                <property name="top-attach">2</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkFrame">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="label-xalign">0</property>
                                 <child>
-                                  <object class="GtkBox">
+                                  <object class="GtkLabel">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
                                     <property name="halign">center</property>
                                     <property name="valign">center</property>
-                                    <property name="orientation">vertical</property>
-                                    <property name="spacing">2</property>
-                                    <child>
-                                      <object class="GtkComboBoxText" id="Channel_03_Axis">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <signal name="changed" handler="Channel_03_Axis_Changed" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">0</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkLabel" id="Channel_03_Type">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
-                                        </attributes>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">1</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkLabel" id="Channel_03_Warning">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <property name="use-markup">True</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
-                                        </attributes>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">2</property>
-                                      </packing>
-                                    </child>
-                                  </object>
-                                </child>
-                                <child type="label">
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="label" translatable="yes">Channel 03</property>
+                                    <property name="margin-bottom">4</property>
+                                    <property name="label" translatable="yes">1</property>
                                     <attributes>
-                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                      <attribute name="font-desc" value="DejaVu Serif 12"/>
                                       <attribute name="weight" value="bold"/>
                                     </attributes>
                                   </object>
+                                  <packing>
+                                    <property name="left-attach">1</property>
+                                    <property name="top-attach">1</property>
+                                  </packing>
                                 </child>
-                              </object>
-                              <packing>
-                                <property name="left-attach">2</property>
-                                <property name="top-attach">2</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkFrame">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="label-xalign">0</property>
                                 <child>
-                                  <object class="GtkBox">
+                                  <object class="GtkLabel">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
                                     <property name="halign">center</property>
                                     <property name="valign">center</property>
-                                    <property name="orientation">vertical</property>
-                                    <property name="spacing">2</property>
-                                    <child>
-                                      <object class="GtkComboBoxText" id="Channel_00_Axis">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="tooltip-text" translatable="yes">Channel 00 has no PID position loop (open-loop stepgen only) regardless of which axis letter is assigned here.</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <signal name="changed" handler="Channel_00_Axis_Changed" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">0</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkLabel" id="Channel_00_Type">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
-                                        </attributes>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">1</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkLabel" id="Channel_00_Warning">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <property name="use-markup">True</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
-                                        </attributes>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">2</property>
-                                      </packing>
-                                    </child>
-                                  </object>
-                                </child>
-                                <child type="label">
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="label" translatable="yes">Channel 00</property>
+                                    <property name="margin-bottom">4</property>
+                                    <property name="label" translatable="yes">2</property>
                                     <attributes>
-                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                      <attribute name="font-desc" value="DejaVu Serif 12"/>
                                       <attribute name="weight" value="bold"/>
                                     </attributes>
                                   </object>
+                                  <packing>
+                                    <property name="left-attach">2</property>
+                                    <property name="top-attach">1</property>
+                                  </packing>
                                 </child>
-                              </object>
-                              <packing>
-                                <property name="left-attach">3</property>
-                                <property name="top-attach">2</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkFrame">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="label-xalign">0</property>
                                 <child>
-                                  <object class="GtkBox">
+                                  <object class="GtkLabel">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
                                     <property name="halign">center</property>
                                     <property name="valign">center</property>
-                                    <property name="orientation">vertical</property>
-                                    <property name="spacing">2</property>
-                                    <child>
-                                      <object class="GtkComboBoxText" id="Channel_05_Axis">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <signal name="changed" handler="Channel_05_Axis_Changed" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">0</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkLabel" id="Channel_05_Type">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
-                                        </attributes>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">1</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkLabel" id="Channel_05_Warning">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <property name="use-markup">True</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
-                                        </attributes>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">2</property>
-                                      </packing>
-                                    </child>
-                                  </object>
-                                </child>
-                                <child type="label">
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="label" translatable="yes">Channel 05</property>
+                                    <property name="margin-bottom">4</property>
+                                    <property name="label" translatable="yes">3</property>
                                     <attributes>
-                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                      <attribute name="font-desc" value="DejaVu Serif 12"/>
                                       <attribute name="weight" value="bold"/>
                                     </attributes>
                                   </object>
+                                  <packing>
+                                    <property name="left-attach">3</property>
+                                    <property name="top-attach">1</property>
+                                  </packing>
                                 </child>
-                              </object>
-                              <packing>
-                                <property name="left-attach">4</property>
-                                <property name="top-attach">2</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkLabel">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="halign">start</property>
-                                <property name="valign">center</property>
-                                <property name="margin-right">10</property>
-                                <property name="margin-end">10</property>
-                                <property name="label" translatable="yes">Row 2</property>
-                                <attributes>
-                                  <attribute name="font-desc" value="DejaVu Serif 12"/>
-                                  <attribute name="weight" value="bold"/>
-                                </attributes>
-                              </object>
-                              <packing>
-                                <property name="left-attach">0</property>
-                                <property name="top-attach">3</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkFrame">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="label-xalign">0</property>
                                 <child>
-                                  <object class="GtkBox">
+                                  <object class="GtkLabel">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
                                     <property name="halign">center</property>
                                     <property name="valign">center</property>
-                                    <property name="orientation">vertical</property>
-                                    <property name="spacing">2</property>
-                                    <child>
-                                      <object class="GtkComboBoxText" id="Channel_04_Axis">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <signal name="changed" handler="Channel_04_Axis_Changed" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">0</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkLabel" id="Channel_04_Type">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
-                                        </attributes>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">1</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkLabel" id="Channel_04_Warning">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <property name="use-markup">True</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
-                                        </attributes>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">2</property>
-                                      </packing>
-                                    </child>
-                                  </object>
-                                </child>
-                                <child type="label">
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="label" translatable="yes">Channel 04</property>
+                                    <property name="margin-bottom">4</property>
+                                    <property name="label" translatable="yes">4</property>
                                     <attributes>
-                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                      <attribute name="font-desc" value="DejaVu Serif 12"/>
                                       <attribute name="weight" value="bold"/>
                                     </attributes>
                                   </object>
+                                  <packing>
+                                    <property name="left-attach">4</property>
+                                    <property name="top-attach">1</property>
+                                  </packing>
                                 </child>
-                              </object>
-                              <packing>
-                                <property name="left-attach">1</property>
-                                <property name="top-attach">3</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkFrame">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="label-xalign">0</property>
                                 <child>
-                                  <object class="GtkBox">
+                                  <object class="GtkLabel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-right">10</property>
+                                    <property name="margin-end">10</property>
+                                    <property name="label" translatable="yes">Row 1</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 12"/>
+                                      <attribute name="weight" value="bold"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">0</property>
+                                    <property name="top-attach">2</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkFrame">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label-xalign">0</property>
+                                    <child>
+                                      <object class="GtkBox">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <property name="orientation">vertical</property>
+                                        <property name="spacing">2</property>
+                                        <child>
+                                          <object class="GtkComboBoxText" id="Channel_02_Axis">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <signal name="changed" handler="Channel_02_Axis_Changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="Channel_02_Type">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="Channel_02_Warning">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <property name="use-markup">True</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">2</property>
+                                          </packing>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child type="label">
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">Channel 02</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                          <attribute name="weight" value="bold"/>
+                                        </attributes>
+                                      </object>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">1</property>
+                                    <property name="top-attach">2</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkFrame">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label-xalign">0</property>
+                                    <child>
+                                      <object class="GtkBox">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <property name="orientation">vertical</property>
+                                        <property name="spacing">2</property>
+                                        <child>
+                                          <object class="GtkComboBoxText" id="Channel_03_Axis">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <signal name="changed" handler="Channel_03_Axis_Changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="Channel_03_Type">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="Channel_03_Warning">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <property name="use-markup">True</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">2</property>
+                                          </packing>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child type="label">
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">Channel 03</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                          <attribute name="weight" value="bold"/>
+                                        </attributes>
+                                      </object>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">2</property>
+                                    <property name="top-attach">2</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkFrame">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label-xalign">0</property>
+                                    <child>
+                                      <object class="GtkBox">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <property name="orientation">vertical</property>
+                                        <property name="spacing">2</property>
+                                        <child>
+                                          <object class="GtkComboBoxText" id="Channel_00_Axis">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="tooltip-text" translatable="yes">Channel 00 has no PID position loop (open-loop stepgen only) regardless of which axis letter is assigned here.</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <signal name="changed" handler="Channel_00_Axis_Changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="Channel_00_Type">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="Channel_00_Warning">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <property name="use-markup">True</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">2</property>
+                                          </packing>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child type="label">
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">Channel 00</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                          <attribute name="weight" value="bold"/>
+                                        </attributes>
+                                      </object>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">3</property>
+                                    <property name="top-attach">2</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkFrame">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label-xalign">0</property>
+                                    <child>
+                                      <object class="GtkBox">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <property name="orientation">vertical</property>
+                                        <property name="spacing">2</property>
+                                        <child>
+                                          <object class="GtkComboBoxText" id="Channel_05_Axis">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <signal name="changed" handler="Channel_05_Axis_Changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="Channel_05_Type">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="Channel_05_Warning">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <property name="use-markup">True</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">2</property>
+                                          </packing>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child type="label">
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">Channel 05</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                          <attribute name="weight" value="bold"/>
+                                        </attributes>
+                                      </object>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">4</property>
+                                    <property name="top-attach">2</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-right">10</property>
+                                    <property name="margin-end">10</property>
+                                    <property name="label" translatable="yes">Row 2</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 12"/>
+                                      <attribute name="weight" value="bold"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">0</property>
+                                    <property name="top-attach">3</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkFrame">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label-xalign">0</property>
+                                    <child>
+                                      <object class="GtkBox">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <property name="orientation">vertical</property>
+                                        <property name="spacing">2</property>
+                                        <child>
+                                          <object class="GtkComboBoxText" id="Channel_04_Axis">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <signal name="changed" handler="Channel_04_Axis_Changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="Channel_04_Type">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="Channel_04_Warning">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <property name="use-markup">True</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">2</property>
+                                          </packing>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child type="label">
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">Channel 04</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                          <attribute name="weight" value="bold"/>
+                                        </attributes>
+                                      </object>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">1</property>
+                                    <property name="top-attach">3</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkFrame">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label-xalign">0</property>
+                                    <child>
+                                      <object class="GtkBox">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <property name="orientation">vertical</property>
+                                        <property name="spacing">2</property>
+                                        <child>
+                                          <object class="GtkComboBoxText" id="Channel_01_Axis">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <signal name="changed" handler="Channel_01_Axis_Changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="Channel_01_Type">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="Channel_01_Warning">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <property name="use-markup">True</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">2</property>
+                                          </packing>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child type="label">
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">Channel 01</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                          <attribute name="weight" value="bold"/>
+                                        </attributes>
+                                      </object>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">2</property>
+                                    <property name="top-attach">3</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkFrame">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label-xalign">0</property>
+                                    <child>
+                                      <object class="GtkBox">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <property name="orientation">vertical</property>
+                                        <property name="spacing">2</property>
+                                        <child>
+                                          <object class="GtkComboBoxText" id="Channel_06_Axis">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <signal name="changed" handler="Channel_06_Axis_Changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="Channel_06_Type">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="Channel_06_Warning">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <property name="use-markup">True</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">2</property>
+                                          </packing>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child type="label">
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">Channel 06</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                          <attribute name="weight" value="bold"/>
+                                        </attributes>
+                                      </object>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">3</property>
+                                    <property name="top-attach">3</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkFrame">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label-xalign">0</property>
+                                    <child>
+                                      <object class="GtkBox">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <property name="orientation">vertical</property>
+                                        <property name="spacing">2</property>
+                                        <child>
+                                          <object class="GtkComboBoxText" id="Channel_07_Axis">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <signal name="changed" handler="Channel_07_Axis_Changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="Channel_07_Type">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="Channel_07_Warning">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <property name="use-markup">True</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">2</property>
+                                          </packing>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child type="label">
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">Channel 07</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                          <attribute name="weight" value="bold"/>
+                                        </attributes>
+                                      </object>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">4</property>
+                                    <property name="top-attach">3</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
                                     <property name="halign">center</property>
                                     <property name="valign">center</property>
-                                    <property name="orientation">vertical</property>
-                                    <property name="spacing">2</property>
-                                    <child>
-                                      <object class="GtkComboBoxText" id="Channel_01_Axis">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <signal name="changed" handler="Channel_01_Axis_Changed" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">0</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkLabel" id="Channel_01_Type">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
-                                        </attributes>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">1</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkLabel" id="Channel_01_Warning">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <property name="use-markup">True</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
-                                        </attributes>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">2</property>
-                                      </packing>
-                                    </child>
-                                  </object>
-                                </child>
-                                <child type="label">
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="label" translatable="yes">Channel 01</property>
+                                    <property name="margin-bottom">4</property>
+                                    <property name="label" translatable="yes">Position</property>
                                     <attributes>
-                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                      <attribute name="font-desc" value="DejaVu Serif 12"/>
                                       <attribute name="weight" value="bold"/>
                                     </attributes>
                                   </object>
+                                  <packing>
+                                    <property name="left-attach">1</property>
+                                    <property name="top-attach">0</property>
+                                    <property name="width">4</property>
+                                  </packing>
                                 </child>
-                              </object>
-                              <packing>
-                                <property name="left-attach">2</property>
-                                <property name="top-attach">3</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <object class="GtkFrame">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="label-xalign">0</property>
                                 <child>
-                                  <object class="GtkBox">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="halign">center</property>
-                                    <property name="valign">center</property>
-                                    <property name="orientation">vertical</property>
-                                    <property name="spacing">2</property>
-                                    <child>
-                                      <object class="GtkComboBoxText" id="Channel_06_Axis">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <signal name="changed" handler="Channel_06_Axis_Changed" swapped="no"/>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">0</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkLabel" id="Channel_06_Type">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
-                                        </attributes>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">1</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkLabel" id="Channel_06_Warning">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <property name="use-markup">True</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
-                                        </attributes>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">2</property>
-                                      </packing>
-                                    </child>
-                                  </object>
-                                </child>
-                                <child type="label">
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="label" translatable="yes">Channel 06</property>
-                                    <attributes>
-                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
-                                      <attribute name="weight" value="bold"/>
-                                    </attributes>
-                                  </object>
+                                  <placeholder/>
                                 </child>
                               </object>
                               <packing>
-                                <property name="left-attach">3</property>
-                                <property name="top-attach">3</property>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
                               </packing>
                             </child>
                             <child>
-                              <object class="GtkFrame">
+                              <object class="GtkSeparator" id="Axis_Selection_Notes_Vbar">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
-                                <property name="label-xalign">0</property>
+                                <property name="orientation">vertical</property>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkScrolledWindow" id="Axis_Selection_Notes_Scroll">
+                                <property name="visible">True</property>
+                                <property name="can-focus">True</property>
+                                <property name="hexpand">True</property>
+                                <property name="vexpand">True</property>
+                                <property name="shadow-type">in</property>
                                 <child>
-                                  <object class="GtkBox">
+                                  <object class="GtkViewport">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
-                                    <property name="halign">center</property>
-                                    <property name="valign">center</property>
-                                    <property name="orientation">vertical</property>
-                                    <property name="spacing">2</property>
                                     <child>
-                                      <object class="GtkComboBoxText" id="Channel_07_Axis">
+                                      <object class="GtkBox">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <signal name="changed" handler="Channel_07_Axis_Changed" swapped="no"/>
+                                        <property name="orientation">vertical</property>
+                                        <child>
+                                          <object class="GtkLabel">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">start</property>
+                                            <property name="valign">start</property>
+                                            <property name="hexpand">True</property>
+                                            <property name="label" translatable="yes">Spindle Notes</property>
+                                            <property name="justify">center</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 16"/>
+                                              <attribute name="weight" value="bold"/>
+                                              <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">start</property>
+                                            <property name="valign">center</property>
+                                            <property name="label" translatable="yes">When you wish to drive the spindle and rosette phaser/multiplier, there are two options.
+</property>
+                                            <property name="wrap">True</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">start</property>
+                                            <property name="valign">start</property>
+                                            <property name="hexpand">True</property>
+                                            <property name="label" translatable="yes">Option 1</property>
+                                            <property name="justify">center</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 13"/>
+                                              <attribute name="weight" value="bold"/>
+                                              <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">2</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">start</property>
+                                            <property name="valign">center</property>
+                                            <property name="label" translatable="yes">If you want to run them as if they were on standard motors.
+* Use Sp0 for the main spindle, and
+* Use Sp1 for the rosette phaser/multiplier.
+
+This will also give you the ability to run or index them using the panel to the right side of the system.
+</property>
+                                            <property name="wrap">True</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">3</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">start</property>
+                                            <property name="valign">start</property>
+                                            <property name="hexpand">True</property>
+                                            <property name="label" translatable="yes">Option 2</property>
+                                            <property name="justify">center</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 13"/>
+                                              <attribute name="weight" value="bold"/>
+                                              <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">4</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">start</property>
+                                            <property name="valign">center</property>
+                                            <property name="label" translatable="yes">You can also use an angular axis to drive the motion.  Usually, this is C as that rotates about the Z axis, but it could also be A or B.  This is the approach needed if you need to coordinate the spindles' movement with other axes, such as when using a Gcode program.</property>
+                                            <property name="wrap">True</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">5</property>
+                                          </packing>
+                                        </child>
                                       </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">0</property>
-                                      </packing>
                                     </child>
-                                    <child>
-                                      <object class="GtkLabel" id="Channel_07_Type">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
-                                        </attributes>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">1</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkLabel" id="Channel_07_Warning">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">center</property>
-                                        <property name="valign">center</property>
-                                        <property name="use-markup">True</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 9"/>
-                                        </attributes>
-                                      </object>
-                                      <packing>
-                                        <property name="expand">False</property>
-                                        <property name="fill">True</property>
-                                        <property name="position">2</property>
-                                      </packing>
-                                    </child>
-                                  </object>
-                                </child>
-                                <child type="label">
-                                  <object class="GtkLabel">
-                                    <property name="visible">True</property>
-                                    <property name="can-focus">False</property>
-                                    <property name="label" translatable="yes">Channel 07</property>
-                                    <attributes>
-                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
-                                      <attribute name="weight" value="bold"/>
-                                    </attributes>
                                   </object>
                                 </child>
                               </object>
                               <packing>
-                                <property name="left-attach">4</property>
-                                <property name="top-attach">3</property>
+                                <property name="expand">True</property>
+                                <property name="fill">True</property>
+                                <property name="position">2</property>
                               </packing>
-                            </child>
-                            <child>
-                              <object class="GtkLabel">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="halign">center</property>
-                                <property name="valign">center</property>
-                                <property name="margin-bottom">4</property>
-                                <property name="label" translatable="yes">Position</property>
-                                <attributes>
-                                  <attribute name="font-desc" value="DejaVu Serif 12"/>
-                                  <attribute name="weight" value="bold"/>
-                                </attributes>
-                              </object>
-                              <packing>
-                                <property name="left-attach">1</property>
-                                <property name="top-attach">0</property>
-                                <property name="width">4</property>
-                              </packing>
-                            </child>
-                            <child>
-                              <placeholder/>
                             </child>
                           </object>
                           <packing>
