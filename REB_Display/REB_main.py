@@ -270,11 +270,13 @@ def _read_persisted_channel_assignments():
 # channel a role is on" (that's now fully dynamic, computed fresh each
 # launch by REB_Setup/REB_Generate_Local_Ini.py, not a fixed per-letter
 # constant) - this tuple exists purely to enumerate the fixed set of
-# internal ids below needs an Ena_Override pin for. A/C deliberately
-# excluded: no main-panel widget exists for them yet ("engine only"
-# scope - see CLAUDE.md), so no Ena_Override pin is needed for them
-# either.
-PANEL_INTERNAL_IDS = ("X", "Z", "B", "U", "V", "W", "Sp0", "Sp1")
+# internal ids below needs an Ena_Override pin for. A got a real
+# main-panel ENA button (A_ENA) and Ena_Override pin 18 September 2026,
+# replacing B's own (REB_Panel_v1.ui's B_ENA widget was removed the same
+# day - A took over B's default channel) - B joins C in being
+# deliberately excluded now: no main-panel widget exists for either, so
+# neither needs an Ena_Override pin.
+PANEL_INTERNAL_IDS = ("X", "Z", "U", "V", "W", "A", "Sp0", "Sp1")
 
 # This session's channel -> axis letter assignment, as persisted at the
 # time REB_Generate_Local_Ini.py generated REB.local.hal/REB.local.ini for
@@ -1022,9 +1024,33 @@ class HandlerClass:
             letter = CURRENT_LETTER[axis].upper()
             angular = CURRENT_TYPE[axis] == "ANGULAR"
 
+            # Added 18 September 2026: is axis's OWN letter (its internal
+            # id) actually assigned to some channel right now, or has it
+            # been displaced entirely (e.g. B here, once A took over its
+            # default channel)? A displaced internal id's ENA button
+            # (<axis>_ENA, netted in REB_PostGUI_v1.hal to "<axis>-enable"
+            # forever - see that file) drives nothing real anymore: its
+            # own REB.hal role block is omitted whenever inactive (see
+            # REB_Setup/REB_Generate_Local_Ini.py's generate_local_hal_files),
+            # so the button would otherwise look identical to every other
+            # working ENA button while silently doing nothing - confirmed
+            # live 18 September 2026 (operator confusion after reassigning
+            # B's channel to A). Narrow, display-only fix: grey out that
+            # button and show this row's OWN true letter instead of the
+            # borrowed one below. Deliberately NOT touching `letter` itself
+            # (jog icons/feed/idx profile/G-code axis word below) - see
+            # CURRENT_LETTER's own comment for why those still assume the
+            # older per-channel-slot renaming model; reconciling that is a
+            # separate, bigger task.
+            role_active = axis in _CHANNEL_ASSIGNMENTS_AT_STARTUP.values()
+
+            ena_button = self.builder.get_object(axis + "_ENA")
+            if ena_button is not None:
+                ena_button.set_sensitive(role_active)
+
             letter_label = self.builder.get_object(axis + "_Letter")
             if letter_label is not None:
-                letter_label.set_text(letter)
+                letter_label.set_text(letter if role_active else axis)
                 # Clear the static per-widget Pango attributes REB_Panel_v1.ui
                 # gives this label (font-desc/weight/foreground) - see
                 # _DEPRESS_CSS's comment for why those would otherwise
@@ -1033,7 +1059,7 @@ class HandlerClass:
                 ctx = letter_label.get_style_context()
                 for css_class in _AXIS_LETTER_COLOR_CLASSES:
                     ctx.remove_class(css_class)
-                css_class = AXIS_LETTER_COLOR_CLASS.get(letter)
+                css_class = AXIS_LETTER_COLOR_CLASS.get(letter if role_active else axis)
                 if css_class is not None:
                     ctx.add_class(css_class)
 
@@ -2285,6 +2311,19 @@ class HandlerClass:
 # HAL Commands:         halcmd setp hm2_7i92.0.stepgen.04.position-scale
 #                              (value)
 #######################################################################
+
+#######################################################################
+# A_Set_Ena
+# Purpose:              See B_Set_Ena - same pattern, for A. Not folded
+#                       into the generic per-internal-id factory loop
+#                       below (CHANNEL_DEFAULT_LETTER only covers the 6
+#                       reassignable channels' full widget set - Idx_Dist/
+#                       Feed/Move_Dist/DegDiv - none of which A has); A
+#                       only has an ENA button, so it gets this one
+#                       hand-written handler instead, same as Sp0/Sp1.
+#######################################################################
+    def A_Set_Ena(self,widget,*args):
+        _clear_ena_override('A')
 
 #######################################################################
 # Sp0_Set_Ena

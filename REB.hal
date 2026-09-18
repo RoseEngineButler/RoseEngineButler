@@ -377,10 +377,15 @@ net jog-b-neg                               halui.axis.b.minus
 
 net jog-b-pos                               halui.axis.b.plus
 
-# See also the REB_PostGui.hal
-net b-enable                             => hm2_7i92.0.outm.00.out-05
-net b-enable                             => hm2_7i92.0.stepgen.05.enable
-net b-enable                             => pid.b.enable
+# B's panel ENA button (REB_Panel_v1.ui) was replaced by A's 18
+# September 2026 (A took over B's default channel and needed a real
+# enable control of its own; see CLAUDE.md) - B no longer has a
+# dedicated main-panel widget, so - same fallback pattern C already
+# uses - every B-enable consumer is wired straight to "machine-is-on"
+# instead of a panel-toggle chain. See REB_PostGUI_v1.hal.
+net machine-is-on                        => hm2_7i92.0.outm.00.out-05
+net machine-is-on                        => hm2_7i92.0.stepgen.05.enable
+net machine-is-on                        => pid.b.enable
 
 net b-home-sw                            => joint.2.home-sw-in
 
@@ -486,22 +491,14 @@ net jog-a-neg                               halui.axis.a.minus
 
 net jog-a-pos                               halui.axis.a.plus
 
-# A has no panel ENA-toggle button (no main-panel widget exists for it
-# yet - "engine only" scope, 13 September 2026, see CLAUDE.md), unlike
-# every other axis letter's REB_PostGUI_v1.hal panel-toggle chain - so
-# every A-enable consumer is wired straight to the existing
-# "machine-is-on" signal itself instead of a dedicated "a-enable"
-# signal (a `net machine-is-on => a-enable` line does NOT alias one
-# signal to another the way it might look - confirmed live 14 September
-# 2026: "Pin 'a-enable' does not exist", since a net command's targets
-# after the first must already be real pins, not a second, still-to-be-
-# created signal name) - same simpler pattern Sp0/Sp1's own
-# stepgen.enable already uses for the same reason (no per-axis disable
-# available, just always-on-with-the-machine, until a future main-panel
-# GUI update adds a real button).
-net machine-is-on                        => hm2_7i92.0.outm.00.out-08
-net machine-is-on                        => hm2_7i92.0.stepgen.08.enable
-net machine-is-on                        => pid.a.enable
+# A now has its own panel ENA-toggle button (A_ENA on REB_Panel_v1.ui,
+# added 18 September 2026) driving a dedicated "a-enable" signal via
+# REB_PostGUI_v1.hal's a-ena-flip/a-ena-and/a-estop-and chain, the same
+# pattern every other axis letter already uses - see that file for the
+# full chain (panel toggle AND settings-tab override AND machine-is-on).
+net a-enable                             => hm2_7i92.0.outm.00.out-08
+net a-enable                             => hm2_7i92.0.stepgen.08.enable
+net a-enable                             => pid.a.enable
 
 net a-home-sw                            => joint.8.home-sw-in
 

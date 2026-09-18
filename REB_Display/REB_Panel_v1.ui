@@ -2145,7 +2145,7 @@ feed rate</property>
               </packing>
             </child>
             <child>
-              <object class="HAL_LightButton" id="B_ENA">
+              <object class="HAL_LightButton" id="A_ENA">
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
                 <property name="halign">center</property>
@@ -2161,7 +2161,7 @@ feed rate</property>
                 <property name="is-momentary">True</property>
                 <property name="light-off-color">#ffff00000000</property>
                 <property name="light-on-color">#0000ffff0000</property>
-                <signal name="clicked" handler="B_Set_Ena" swapped="no"/>
+                <signal name="clicked" handler="A_Set_Ena" swapped="no"/>
               </object>
               <packing>
                 <property name="left-attach">1</property>
@@ -2185,14 +2185,14 @@ feed rate</property>
               </packing>
             </child>
             <child>
-              <object class="GtkLabel" id="B_Letter">
+              <object class="GtkLabel" id="A_Letter">
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
-                <property name="label" translatable="yes">B</property>
+                <property name="label" translatable="yes">A</property>
                 <attributes>
                   <attribute name="font-desc" value="DejaVu Serif Bold 12"/>
                   <attribute name="weight" value="bold"/>
-                  <attribute name="foreground" value="#a5a51d1d2d2d"/>
+                  <attribute name="foreground" value="#e5e5a5a50a0a"/>
                 </attributes>
               </object>
               <packing>
