@@ -79,42 +79,42 @@ import reb_settings_io
 
 SETTINGS_PATH = "/home/reuben/Documents/REBset_v1.ini"
 
-# Channel id ("00".."05") -> the axis letter REB.ini/REB.hal ship with
-# by default. This is the seed value for a channel's
-# <channel_assignments> entry in REBset_v1.ini when the operator has
-# never touched the Axis Selection tab (now REB_Settings.py, a
+# Channel id ("00".."07") -> the role (one of the 8 axis letters or 2
+# spindles) REB.ini/REB.hal ship with by default. Seed value for a
+# channel's <channel_assignments> entry in REBset_v1.ini when the
+# operator has never touched the Axis Selection tab (REB_Settings.py, a
 # standalone program - not this file, whose own embedded Settings tab
 # was retired 4 September 2026) - same "absent -> shipped default"
 # convention as every other REBset_v1.ini-backed setting (see
-# _load_measurement_system). Internal ids (PANEL_INTERNAL_IDS below,
-# Settings-tab widget-id prefixes) always stay these default letters,
-# regardless of what the operator later assigns a channel to - see
-# CLAUDE.md. Still only 6 channels here, and still only axis letters as
-# values - the 13 September 2026 generalization (any of 8 letters or 2
-# spindles assignable to any of 8 channels) only ever touched
-# REB_Settings.py's own Axis Selection tab and REB_Setup/
-# REB_Generate_Local_Ini.py; this file's read-only main-panel display
-# (_load_panel_axis_display) still only shows/understands channels
-# 00-05 and axis letters ("engine only" scope - see CLAUDE.md). A
-# channel now assigned a spindle, or one of the 8 letters landing on
-# channel 06/07, simply won't display correctly here yet.
-CHANNEL_DEFAULT_LETTER = {
+# _load_measurement_system). Mirrors REB_Settings.py's own
+# CHANNEL_DEFAULT_ROLE exactly (duplicated, not imported - see that
+# file's own comment on why small constants/logic like this stay
+# duplicated across this codebase's independent scripts).
+#
+# Since REB_Panel_v1.ui's 18 September 2026 rebuild, every one of the
+# 10 roles below has its own permanent, dedicated main-panel row (no
+# more "internal id" concept - a row's identity never changes at
+# runtime, only whether it's currently assigned to a channel does, via
+# PANEL_INTERNAL_IDS/_load_panel_axis_controls below) - this dict is
+# now used only to seed/validate the persisted assignment, the same way
+# REB_Settings.py already uses its own copy.
+CHANNEL_DEFAULT_ROLE = {
     "00": "W",
     "01": "Z",
     "02": "U",
     "03": "V",
     "04": "X",
     "05": "B",
+    "06": "Sp0",
+    "07": "Sp1",
 }
 
-# Reverse of CHANNEL_DEFAULT_LETTER - internal id -> channel id. Used to
-# resolve an internal id's *current* assigned letter (see _compute_pid_axes
-# below and _clear_ena_override).
-DEFAULT_LETTER_CHANNEL = {v: k for k, v in CHANNEL_DEFAULT_LETTER.items()}
-
 # The 8 letters selectable on the Axis Selection tab (Y removed - not
-# used on this machine).
+# used on this machine) and the 2 spindles - the 10 possible roles a
+# channel can be assigned.
 AXIS_SELECTION_LETTERS = ("X", "Z", "U", "V", "W", "A", "B", "C")
+SPINDLE_IDS = ("Sp0", "Sp1")
+CHANNEL_ROLES = AXIS_SELECTION_LETTERS + SPINDLE_IDS
 
 # The axis letter -> Type rule: A/B/C are angular, everything else is
 # linear. Was briefly an independent, per-channel operator choice via
@@ -125,9 +125,7 @@ AXIS_SELECTION_LETTERS = ("X", "Z", "U", "V", "W", "A", "B", "C")
 # source of truth. Mirrors REB_Setup/REB_Generate_Local_Ini.py's and
 # REB_Display/reb_settings_io.py's own copies of this same rule.
 def _axis_type_for_letter(letter):
-    # CURRENT_LETTER's values are lowercase (see below) and most call
-    # sites pass those straight through without their own .upper() -
-    # case-fold here so this stays correct regardless of caller casing.
+    # Case-fold so this stays correct regardless of caller casing.
     return "ANGULAR" if letter.upper() in ("A", "B", "C") else "LINEAR"
 
 # Letter -> the same foreground color REB_Panel_v1.ui's original per-axis
@@ -150,135 +148,62 @@ AXIS_LETTER_COLOR = {
     "C": "#1a1a5f5fb4b4",
 }
 
-# Internal id -> the two jog button widget ids REB_Panel_v1.ui actually
-# has for that channel (fixed forever - widgets are never renamed).
-# Column 12 always sends G-code sign "-", column 13 always sends "+" -
-# see JOG_NEG_HANDLER/JOG_POS_HANDLER's comment for why one factory can
-# serve both naming patterns. Only B's widget ids (B_Idx_Fwd/B_Idx_Rev)
-# differ from the rest's <letter>_Idx_Plus/<letter>_Idx_Minus pattern -
-# note these are the WIDGET ids, not the handler method names
-# (JOG_NEG_HANDLER["B"] is "B_Move_Idx_Fwd", the method the B_Idx_Fwd
-# widget's "pressed" signal is wired to).
-JOG_NEG_WIDGET = {
-    "X": "X_Idx_Plus", "Z": "Z_Idx_Plus", "U": "U_Idx_Plus",
-    "V": "V_Idx_Plus", "W": "W_Idx_Plus", "B": "B_Idx_Fwd",
-}
-JOG_POS_WIDGET = {
-    "X": "X_Idx_Minus", "Z": "Z_Idx_Minus", "U": "U_Idx_Minus",
-    "V": "V_Idx_Minus", "W": "W_Idx_Minus", "B": "B_Idx_Rev",
-}
-
-# Axis letter -> (column-12/"-" image filename, column-13/"+" image
-# filename), both under REB_Display/Images/. U/V/W intentionally reuse
-# their parallel axis's images (U parallel to X, V parallel to Y, W
-# parallel to Z - see the AXIS CONVENTIONS text on the main panel). The
-# three rotary letters (A/B/C) are inverted relative to their own
-# dedicated images' nominal pos/neg naming (confirmed live) - i.e. the
-# "-" button shows that letter's "pos" image and vice versa.
+# Type -> default Feed value for a role's initial self.<role>_Feed
+# instance attribute (set once in __init__, see the "Generated
+# per-channel handlers" block near the end of this file) - the working
+# value the generated Set_Feed/Idx_Move handlers actually read/write via
+# getattr/setattr, independent of whatever REB_Panel_v1.ui's own
+# GtkAdjustment happens to show before the operator (or this) first
+# touches it. Angular default is 360 deg/min (Rich, 3 September 2026);
+# linear stays 1 in-or-mm/min, matching every linear channel's original
+# shipped value.
 #
-# Z fixed 22 August 2026 (Rich, confirmed live): Z's "-"/"+" images were
-# swapped relative to their nominal Axis-Z{neg,pos}.png naming - the
-# opposite of every other linear letter (X/U's "-" shows *neg, "+" shows
-# *pos), which made Z's jog buttons visually point at each other instead
-# of toward the direction each one actually jogs. W's mapping was left
-# untouched (confirmed correct as-is) - it now happens to equal Z's
-# corrected mapping exactly, rather than being Z's inverse as it
-# appeared to be before this fix.
-AXIS_JOG_IMAGE = {
-    "X": ("Axis-Xneg.png", "Axis-Xpos.png"),
-    "Z": ("Axis-Zpos.png", "Axis-Zneg.png"),
-    "U": ("Axis-Xneg.png", "Axis-Xpos.png"),
-    "V": ("Axis-Yneg.png", "Axis-Ypos.png"),
-    "W": ("Axis-Zpos.png", "Axis-Zneg.png"),
-    "A": ("Axis-Apos.png", "Axis-Aneg.png"),
-    "B": ("Axis-Bpos.png", "Axis-Bneg.png"),
-    "C": ("Axis-Cpos.png", "Axis-Cneg.png"),
-}
-
-# Type -> numeric range/precision/default profile for a channel's Feed
-# and Idx (jog-increment) adjustments. "feed" is (lower, upper, step,
-# digits, default_value). Angular feed range is +/-6000 deg/min (100
-# deg/sec, Rich's requested working max speed - 27 August 2026) with a
-# 360 deg/min default value (Rich, 3 September 2026); linear stays
-# +/-10 in-or-mm/min with a 1 default, matching every linear channel's
-# original shipped value. Idx has no default_value entry - its initial
-# value (0) is fine for both types, only Feed's misleadingly-low static
-# "1" default (REB_Panel_v1.ui) needed fixing here. Applied by
-# _load_panel_axis_controls so a reassigned channel's controls behave
-# correctly for its new type, not its old one - this is the actual
-# runtime source of truth for these ranges; REB_Panel_v1.ui's own
-# GtkAdjustment lower/upper/value properties are overwritten by this
-# profile the moment the main panel component loads, so they matter
-# only until then.
+# Since REB_Panel_v1.ui's 18 September 2026 rebuild gave every role a
+# permanent row with its own static, type-correct GtkAdjustment
+# lower/upper/step/digits already baked in (no more per-role
+# reassignment to account for), this dict now exists only for the
+# default-value seeding above - it no longer overwrites REB_Panel_v1.ui's
+# adjustment properties at runtime.
 TYPE_ADJUSTMENT_PROFILE = {
-    "LINEAR":  {"feed": (-10, 10, 0.01, 3, 1), "idx": (25, 0.01, 3)},
-    "ANGULAR": {"feed": (-6000, 6000, 0.01, 3, 360), "idx": (720, 0.10, 2)},
+    "LINEAR": 1,
+    "ANGULAR": 360,
 }
-
-def _save_channel_assignments(assignments):
-    '''
-    Persists the Axis Selection tab's channel -> axis letter choices into
-    REBset_v1.ini's "channel_assignments" dict. assignments is a dict of
-    channel id ("00".."05") -> letter; any channel missing from it falls
-    back to CHANNEL_DEFAULT_LETTER.
-    '''
-    settings = reb_settings_io.load_settings()
-    settings["channel_assignments"] = {
-        channel_id: assignments.get(channel_id, CHANNEL_DEFAULT_LETTER[channel_id])
-        for channel_id in sorted(CHANNEL_DEFAULT_LETTER)
-    }
-    reb_settings_io.save_settings(settings)
-    print("Saved channel assignments: " + str(settings["channel_assignments"]))
 
 def _read_persisted_channel_assignments():
     '''
-    Reads the persisted channel -> axis letter map, falling back to
-    CHANNEL_DEFAULT_LETTER for any channel whose entry is missing or
+    Reads the persisted channel -> role map, falling back to
+    CHANNEL_DEFAULT_ROLE for any channel whose entry is missing or
     unrecognized - same "absent -> shipped default" convention as
-    _load_measurement_system. Used by CURRENT_LETTER below (module load
-    time, for _load_panel_axis_display's read-only main-panel display),
-    and duplicated (rather than imported - small maps/logic like this
-    stay duplicated across this codebase's independent scripts rather
-    than shared) in REB_Scale_Persist.py, REB_Settings.py,
-    REB_Settings_Restore.py, and REB_Setup/REB_Generate_Local_Ini.py.
+    _load_measurement_system. Mirrors REB_Settings.py's own function of
+    the same name exactly (duplicated, not imported - see
+    CHANNEL_DEFAULT_ROLE's comment above).
     '''
-    assignments = dict(CHANNEL_DEFAULT_LETTER)
+    assignments = dict(CHANNEL_DEFAULT_ROLE)
     stored = reb_settings_io.load_settings().get("channel_assignments", {})
-    for channel_id, letter in stored.items():
-        if channel_id in assignments and letter in AXIS_SELECTION_LETTERS:
-            assignments[channel_id] = letter
+    for channel_id, role in stored.items():
+        if channel_id in assignments and role in CHANNEL_ROLES:
+            assignments[channel_id] = role
 
     # Defensive against a hand-edited or corrupted file (REBset_v1.ini's
     # own header says "should not be modified directly"): if the same
-    # letter somehow ended up on two channels, ignore the persisted data
-    # entirely rather than regenerating REB.ini/REB.hal with a duplicate
-    # axis letter.
+    # role somehow ended up on two channels, ignore the persisted data
+    # entirely rather than displaying a duplicate role as active twice.
     if len(set(assignments.values())) != len(assignments):
-        print("Duplicate letter(s) in persisted channel_assignments - using shipped defaults")
-        return dict(CHANNEL_DEFAULT_LETTER)
+        print("Duplicate role(s) in persisted channel_assignments - using shipped defaults")
+        return dict(CHANNEL_DEFAULT_ROLE)
 
     return assignments
 
+# The 10 roles, in the order the operator sees them top-to-bottom on
+# REB_Panel_v1.ui (Sp0, Sp1, then the 8 axis letters) - since the 18
+# September 2026 row rebuild, every one of these has its own permanent,
+# independent main-panel row (Feed/Comment/Idx/jog widgets, an ENA
+# button, an Ena_Override pin) - no more "internal id" concept: a row's
+# identity never changes at runtime, only whether its role is currently
+# assigned to a channel does (see _load_panel_axis_controls below).
+PANEL_INTERNAL_IDS = ("Sp0", "Sp1") + AXIS_SELECTION_LETTERS
 
-
-# The 8 internal ids that have a main-panel widget of their own (6
-# axis letters' worth of Ena_Override pin below, plus the 2 spindles) -
-# fixed forever, regardless of channel reassignment (see
-# CHANNEL_DEFAULT_LETTER above). Since 13 September 2026 (any of
-# X,Z,U,V,W,A,B,C,Sp0,Sp1 assignable to any of 8 channels - see
-# CLAUDE.md), this is no longer the same thing as "which stepgen
-# channel a role is on" (that's now fully dynamic, computed fresh each
-# launch by REB_Setup/REB_Generate_Local_Ini.py, not a fixed per-letter
-# constant) - this tuple exists purely to enumerate the fixed set of
-# internal ids below needs an Ena_Override pin for. A got a real
-# main-panel ENA button (A_ENA) and Ena_Override pin 18 September 2026,
-# replacing B's own (REB_Panel_v1.ui's B_ENA widget was removed the same
-# day - A took over B's default channel) - B joins C in being
-# deliberately excluded now: no main-panel widget exists for either, so
-# neither needs an Ena_Override pin.
-PANEL_INTERNAL_IDS = ("X", "Z", "U", "V", "W", "A", "Sp0", "Sp1")
-
-# This session's channel -> axis letter assignment, as persisted at the
+# This session's channel -> role assignment, as persisted at the
 # time REB_Generate_Local_Ini.py generated REB.local.hal/REB.local.ini for
 # this LinuxCNC launch (see CLAUDE.md). Read once at module import: a
 # running session's assignment can't change without a restart anyway (the
@@ -289,66 +214,40 @@ PANEL_INTERNAL_IDS = ("X", "Z", "U", "V", "W", "A", "Sp0", "Sp1")
 # better.
 _CHANNEL_ASSIGNMENTS_AT_STARTUP = _read_persisted_channel_assignments()
 
-# Internal id -> this session's actual current axis letter (lowercase).
-# Needed anywhere a HAL net/component name in REB.local.hal/
-# REB_PostGUI_v1.local.hal embeds the assigned letter (PID_AXES below;
-# _clear_ena_override's <letter>-ena-settings-allow/<letter>-ena-flip.set)
-# - those two files are regenerated per assignment (see REB_Setup/
-# REB_Generate_Local_Ini.py), so e.g. channel 4's PID component is only
-# literally "pid.x" while channel 4 is still assigned to X; if the
-# operator reassigns it to "A" the live component becomes "pid.a", and a
-# halcmd call built from a stale "pid.x" would fail ("no such pin").
-# Does NOT apply to gladevcp.*/REBCnfg.* pin names or any Settings-tab/
-# main-panel widget id - those stay the internal id forever, see
-# CHANNEL_DEFAULT_LETTER above. Sp0/Sp1 aren't reassignable (channels
-# 06/07, out of scope for the Axis Selection tab) so they're absent here;
-# callers needing a spindle's pid component use PID_SPINDLE_LOOPS instead.
-CURRENT_LETTER = {
-    internal_id: _CHANNEL_ASSIGNMENTS_AT_STARTUP.get(channel_id, internal_id).lower()
-    for internal_id, channel_id in DEFAULT_LETTER_CHANNEL.items()
+# Roles (letters or spindle ids) currently assigned to some channel, per
+# this session's persisted assignment - the only thing that still
+# varies per role at runtime now that every row is a permanent identity
+# (see PANEL_INTERNAL_IDS above). Used by _load_panel_axis_controls
+# below to grey out every widget belonging to a role that isn't active,
+# and by _clear_ena_override/_axis_idx_move to decide whether an ENA
+# press or jog move is meaningful at all.
+_ACTIVE_ROLES_AT_STARTUP = set(_CHANNEL_ASSIGNMENTS_AT_STARTUP.values())
+
+# <letter>_-prefixed widget-id suffixes every axis-letter row
+# (X/Z/U/V/W/A/B/C) has, since REB_Panel_v1.ui's 18 September 2026
+# rebuild gave every letter the same complete, uniform set - used by
+# _load_panel_axis_controls to grey out an inactive role's whole row.
+# Idx_DegDiv_Box's two nested HAL_RadioButtons (<letter>_Idx_Deg/_Div)
+# don't need their own entry - graying their container greys them too.
+AXIS_ROW_FIELDS = (
+    "_Letter", "_ENA", "_Feed", "_Feed_UOM", "_Comment",
+    "_Idx_Dist", "_IdxDist_UOM", "_Idx_DegDiv_Box",
+)
+
+# Sp0/Sp1's own widget ids (not a per-letter suffix pattern - each
+# spindle's row has its own, genuinely different, set of controls; see
+# CLAUDE.md's "Specific Plans for REB_Panel_v1.ui" history). Used the
+# same way as AXIS_ROW_FIELDS above.
+SPINDLE_ROW_FIELDS = {
+    "Sp0": (
+        "Sp0_ENA", "Sp0_Set_Feed", "Sp0_Move_Fwd", "Sp0_Move_Stop", "Sp0_Move_Rev",
+        "Sp0_Idx_Dist", "Sp0_Idx_Fwd", "Sp0_Idx_Rev",
+        "Sp0_Set_Idx_bW_Deg", "Sp0_Set_Idx_bW_Div", "Sp0_Set_Idx_OnOff",
+    ),
+    "Sp1": (
+        "Sp1_ENA", "Sp1_Set_Move_Pct", "Sp1_Idx_Fwd", "Sp1_Idx_Rev", "Sp1_Set_Idx_OnOff",
+    ),
 }
-
-# Internal id -> this session's actual current Type ("LINEAR"/
-# "ANGULAR"), derived purely from CURRENT_LETTER via
-# _axis_type_for_letter - the live source of truth everywhere TYPE
-# matters at runtime (feed/idx adjustment ranges, deg-vs-inch unit
-# labels, jog-increment G-code amount). Was briefly computed from an
-# independent per-channel Type choice (REBset_v1.ini's "channel_types",
-# read via the now-deleted _read_persisted_channel_types) between 3 and
-# 4 September 2026; that feature was retired the same week it shipped,
-# reverting this to its original letter-derived form.
-CURRENT_TYPE = {
-    internal_id: _axis_type_for_letter(letter)
-    for internal_id, letter in CURRENT_LETTER.items()
-}
-
-# Internal id -> HAL `pid` component instance driving that axis's PID
-# loop right now (see CURRENT_LETTER above for why this can't be a
-# static dict, and PID_SPINDLE_LOOPS below for Sp0/Sp1's own loops).
-
-# Reverse of CURRENT_LETTER: currently-assigned axis letter (uppercase)
-# -> internal id of whichever physical channel is driving it right now,
-# if any - used to resolve EXTRA_SETTINGS_LETTERS' live HAL pin below.
-CURRENT_LETTER_INTERNAL_ID = {letter.upper(): internal_id for internal_id, letter in CURRENT_LETTER.items()}
-
-# Settings-tab Axis Scaling rows with no fixed physical channel of their
-# own (see CHANNEL_DEFAULT_LETTER) - added so an operator can
-# pre-configure/retain a Scale value for an A/C attachment even while it
-# isn't currently plugged into any channel ("no need for this page to
-# only show the 'selected axes'"). Persisted in REBset_v1.ini as
-# <axis id="A">/<axis id="C"> blocks, independent of the six physical
-# channels' own blocks - see _load_scale_settings and
-# _axis_set_scale_letter below, and REB_Scale_Persist.py's mirror of
-# this same constant.
-
-# Spindle id -> {"Pos": position-loop component, "Vel": velocity-loop
-# component}. The suffix ("Pos"/"Vel") matches the Settings tab widget
-# id suffix (e.g. Sp0_Set_P_Pos, Sp0_Set_P_Vel) and the REB_Settings_v1.ini
-# block tag ("pid_pos"/"pid_vel").
-
-# Settings tab field name -> HAL pid component pin name. Order matches
-# the P/I/D/FF0/FF1/FF2 column order in REB_Tab_Settings_v1.ui's
-# "Stepper Motor Settings" grid.
 
 # Max time (seconds) to wait for both Sp0 and Sp1 to report oriented in
 # Sp0_Move_Idx_Fwd/Rev's simultaneous-index path (see
@@ -361,7 +260,7 @@ REBSET_DEFAULT_DIR = os.path.expanduser("~/Documents")
 
 # Axes (not spindles) that have a free-text comment field on the main
 # panel, persisted to REB_Settings_v1.ini as each <axis>'s <usercomment>.
-COMMENT_AXES = ("X", "Z", "U", "V", "W", "B")
+COMMENT_AXES = ("X", "Z", "U", "V", "W", "A", "B", "C")
 
 # Leading entry (index 0) in every device-name GtkComboBoxText - the main
 # panel's per-axis Comment/Device combos and the Export Settings dialog's
@@ -426,14 +325,12 @@ def _clear_ena_override(axis_id):
     # Once a pin is netted to a signal, halcmd can't "setp" the pin
     # directly ("pin is connected to a signal") - the signal itself has
     # to be set instead, via "halcmd sets". The signal name follows the
-    # <letter>-ena-settings-allow convention in REB_PostGUI_v1.hal, where
-    # <letter> is the CURRENT axis letter assigned to axis_id's channel
-    # (CURRENT_LETTER) - not axis_id itself, which is the fixed internal
-    # id and may no longer match the live net name if this channel has
-    # been reassigned (see CURRENT_LETTER's own comment). Sp0/Sp1 aren't
-    # in CURRENT_LETTER (not reassignable), so they fall back to
-    # axis_id.lower(), same as before this feature existed.
-    current_letter = CURRENT_LETTER.get(axis_id, axis_id.lower())
+    # <letter>-ena-settings-allow convention in REB_PostGUI_v1.hal. Since
+    # REB_Generate_Local_Ini.py names every net by ROLE, not by physical
+    # channel (a role's own letter is a stable identity - see
+    # CHANNEL_DEFAULT_ROLE's comment above), that net is always simply
+    # axis_id's own letter, lowercased - no per-session lookup needed.
+    current_letter = axis_id.lower()
     hal_signal = current_letter + "-ena-settings-allow"
     idx_log("_clear_ena_override(" + axis_id + ") -> " + hal_signal)
 
@@ -598,27 +495,16 @@ def _set_busy_cursor(widget, busy):
 # no such built-in behavior to fight - only this code ever touches it,
 # and the darkened background makes the state obvious regardless of
 # theme.
-# Also carries the three reb-axis-* label color classes used by
-# _load_panel_axis_controls to recolor a channel row's letter label to
-# match its currently assigned letter (AXIS_LETTER_COLOR's three
-# distinct colors, converted from GTK's 16-bit-per-channel #RRRRGGGGBBBB
-# hex to CSS's 8-bit #RRGGBB - e.g. #e5e5a5a50a0a -> #e5a50a). A plain
-# label.set_markup() with a <span foreground="..."> was tried first and
-# didn't work here: REB_Panel_v1.ui's <letter>_Letter labels each have
-# their OWN static per-widget Pango <attributes> block (font-desc/
-# weight/foreground, straight from the original hand-authored panel).
-# That's a separate, widget-level Pango attribute list applied by
-# GtkLabel itself, layered ON TOP OF CSS when rendering - it can (and
-# here, did - confirmed live: the text updated correctly, the color
-# didn't) win over a CSS or markup-supplied foreground for the same
-# text. _load_panel_axis_controls clears that static attribute list
-# (set_attributes(None)) before applying this CSS class, so there's
-# nothing left to win over it - font-weight/family/size are restated
-# here in CSS so the label doesn't lose its original bold styling once
-# the Pango attributes carrying it are cleared. Contrast
-# _load_panel_axis_display's Panel_Channel_0N_Axis labels, which have
-# no such static foreground of their own, so set_markup() works fine
-# there without any of this.
+# Used to be joined by three reb-axis-* label color classes
+# _load_panel_axis_controls applied to recolor a channel row's letter
+# label to match whichever letter that row's reassignable slot was
+# currently showing. Since REB_Panel_v1.ui's 18 September 2026 rebuild
+# gave every role a permanent row with its own static, correct label
+# color already baked in (REB_Panel_v1.ui's own Pango <attributes>
+# block - see AXIS_LETTER_COLOR above, still used by
+# _load_panel_axis_display's read-only summary table), a row's letter
+# label never needs recoloring at runtime any more - removed along with
+# AXIS_LETTER_COLOR_CLASS/_AXIS_LETTER_COLOR_CLASSES.
 _DEPRESS_CSS = b"""
 button.reb-depressed,
 button.reb-depressed:hover,
@@ -628,32 +514,7 @@ button.reb-depressed:active {
     background-image: none;
     box-shadow: inset 2px 2px 4px rgba(0,0,0,0.6), inset -1px -1px 2px rgba(255,255,255,0.15);
 }
-label.reb-axis-yellow,
-label.reb-axis-red,
-label.reb-axis-blue {
-    font-family: "DejaVu Serif";
-    font-weight: bold;
-    /* Matches Sp0/Sp1's untouched font-desc="DejaVu Serif Bold 12" -
-       that "12" is POINTS (Pango's default unit in a font-desc string),
-       not pixels: CSS "12px" is only ~9pt at 96dpi, visibly smaller -
-       "pt" is the unit that actually matches. */
-    font-size: 12pt;
-}
-label.reb-axis-yellow { color: #e5a50a; }
-label.reb-axis-red    { color: #a51d2d; }
-label.reb-axis-blue   { color: #1a5fb4; }
 """
-
-# Letter -> which of the 3 CSS classes above matches AXIS_LETTER_COLOR's
-# grouping for that letter (X/U/A yellow, V/B red, Z/W/C blue) - see
-# _DEPRESS_CSS's comment for why this exists as CSS rather than reusing
-# AXIS_LETTER_COLOR's hex values directly via set_markup().
-AXIS_LETTER_COLOR_CLASS = {
-    "X": "reb-axis-yellow", "U": "reb-axis-yellow", "A": "reb-axis-yellow",
-    "V": "reb-axis-red", "B": "reb-axis-red",
-    "Z": "reb-axis-blue", "W": "reb-axis-blue", "C": "reb-axis-blue",
-}
-_AXIS_LETTER_COLOR_CLASSES = ("reb-axis-yellow", "reb-axis-red", "reb-axis-blue")
 
 def _install_depress_css():
     try:
@@ -986,28 +847,20 @@ class HandlerClass:
 
     def _load_panel_axis_controls(self):
         '''
-        Configures each of the 6 channel rows' *interactive* controls to
-        match its CURRENTLY assigned letter and type (CURRENT_LETTER/
-        CURRENT_TYPE), if this component owns the main panel's
-        widgets - the working counterpart to _load_panel_axis_display's
-        read-only table above. For each channel: sets the col-0 letter
-        label's text/color (AXIS_LETTER_COLOR, same styling approach as
-        _load_panel_axis_display); swaps both jog buttons' icon to the
-        one matching the assigned letter specifically, not just its type
-        (AXIS_JOG_IMAGE - a linear channel reassigned from X to V still
-        needs V's icon, not X's, since the icon encodes physical +/-
-        direction); reconfigures the Feed/Idx adjustments' numeric range,
-        precision, and (Feed only) default value to the assigned type's
-        profile (TYPE_ADJUSTMENT_PROFILE); and shows whichever of the two
-        column-11 widgets matches the type (deg/div radio pair if
-        angular, the static unit label if linear) while hiding the
-        other. Unit-label *text* (Feed_UOM/IdxDist_UOM/Scale_UOM) is
-        handled separately by _apply_measurement_system_labels, called
-        from _load_measurement_system right after this in __init__ -
-        that function already needs the same per-channel type check for
-        its own purpose (Metric/Imperial only means something for a
-        linear channel), so it owns all three unit-label texts rather
-        than splitting that responsibility across two methods.
+        Greys out (set_sensitive(False)) every widget belonging to a
+        role (one of the 8 axis letters or 2 spindles - PANEL_INTERNAL_IDS)
+        not currently assigned to any channel, if this component owns
+        the main panel's widgets.
+
+        Before REB_Panel_v1.ui's 18 September 2026 rebuild, this method
+        also had to swap each row's letter/color/jog images and
+        rewrite its Feed/Idx adjustment ranges at runtime, because a
+        row was a reassignable channel *slot* that could end up
+        showing any letter. Every role now has its own permanent row
+        with that content already correct and baked in statically (see
+        REB_Panel_v1.ui) - a role's identity never changes, only
+        whether it's currently assigned to a channel does, which is the
+        only thing left for this method to reflect.
 
         Populated once at this component's own startup, same as
         _load_panel_axis_display - a reassignment made on the Settings
@@ -1018,89 +871,19 @@ class HandlerClass:
         if self.builder.get_object("X_ENA") is None:
             return
 
-        images_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Images")
+        for axis in AXIS_SELECTION_LETTERS:
+            role_active = axis in _ACTIVE_ROLES_AT_STARTUP
+            for suffix in AXIS_ROW_FIELDS:
+                widget = self.builder.get_object(axis + suffix)
+                if widget is not None:
+                    widget.set_sensitive(role_active)
 
-        for axis in CHANNEL_DEFAULT_LETTER.values():
-            letter = CURRENT_LETTER[axis].upper()
-            angular = CURRENT_TYPE[axis] == "ANGULAR"
-
-            # Added 18 September 2026: is axis's OWN letter (its internal
-            # id) actually assigned to some channel right now, or has it
-            # been displaced entirely (e.g. B here, once A took over its
-            # default channel)? A displaced internal id's ENA button
-            # (<axis>_ENA, netted in REB_PostGUI_v1.hal to "<axis>-enable"
-            # forever - see that file) drives nothing real anymore: its
-            # own REB.hal role block is omitted whenever inactive (see
-            # REB_Setup/REB_Generate_Local_Ini.py's generate_local_hal_files),
-            # so the button would otherwise look identical to every other
-            # working ENA button while silently doing nothing - confirmed
-            # live 18 September 2026 (operator confusion after reassigning
-            # B's channel to A). Narrow, display-only fix: grey out that
-            # button and show this row's OWN true letter instead of the
-            # borrowed one below. Deliberately NOT touching `letter` itself
-            # (jog icons/feed/idx profile/G-code axis word below) - see
-            # CURRENT_LETTER's own comment for why those still assume the
-            # older per-channel-slot renaming model; reconciling that is a
-            # separate, bigger task.
-            role_active = axis in _CHANNEL_ASSIGNMENTS_AT_STARTUP.values()
-
-            ena_button = self.builder.get_object(axis + "_ENA")
-            if ena_button is not None:
-                ena_button.set_sensitive(role_active)
-
-            letter_label = self.builder.get_object(axis + "_Letter")
-            if letter_label is not None:
-                letter_label.set_text(letter if role_active else axis)
-                # Clear the static per-widget Pango attributes REB_Panel_v1.ui
-                # gives this label (font-desc/weight/foreground) - see
-                # _DEPRESS_CSS's comment for why those would otherwise
-                # win over the CSS color class applied below.
-                letter_label.set_attributes(None)
-                ctx = letter_label.get_style_context()
-                for css_class in _AXIS_LETTER_COLOR_CLASSES:
-                    ctx.remove_class(css_class)
-                css_class = AXIS_LETTER_COLOR_CLASS.get(letter if role_active else axis)
-                if css_class is not None:
-                    ctx.add_class(css_class)
-
-            neg_file, pos_file = AXIS_JOG_IMAGE.get(letter, AXIS_JOG_IMAGE["X"])
-            neg_button = self.builder.get_object(JOG_NEG_WIDGET[axis])
-            if neg_button is not None:
-                neg_button.set_image(Gtk.Image.new_from_file(os.path.join(images_dir, neg_file)))
-            pos_button = self.builder.get_object(JOG_POS_WIDGET[axis])
-            if pos_button is not None:
-                pos_button.set_image(Gtk.Image.new_from_file(os.path.join(images_dir, pos_file)))
-
-            profile = TYPE_ADJUSTMENT_PROFILE["ANGULAR" if angular else "LINEAR"]
-
-            feed_adj = self.builder.get_object(axis + "_Feed_Rate")
-            if feed_adj is not None:
-                feed_lower, feed_upper, feed_step, _, feed_default = profile["feed"]
-                feed_adj.set_lower(feed_lower)
-                feed_adj.set_upper(feed_upper)
-                feed_adj.set_step_increment(feed_step)
-                feed_adj.set_value(feed_default)
-            feed_spin = self.builder.get_object(axis + "_Feed")
-            if feed_spin is not None:
-                feed_spin.set_digits(profile["feed"][3])
-
-            idx_adj = self.builder.get_object(axis + "_Idx_Dis")
-            if idx_adj is not None:
-                idx_upper, idx_step, _ = profile["idx"]
-                idx_adj.set_upper(idx_upper)
-                idx_adj.set_step_increment(idx_step)
-            idx_spin = self.builder.get_object(axis + "_Idx_Dist")
-            if idx_spin is not None:
-                idx_spin.set_digits(profile["idx"][2])
-
-            degdiv_box = self.builder.get_object(axis + "_Idx_DegDiv_Box")
-            if degdiv_box is not None:
-                degdiv_box.set_visible(angular)
-            unit_label = self.builder.get_object(axis + "_IdxDist_UOM")
-            if unit_label is not None:
-                unit_label.set_visible(not angular)
-
-
+        for spindle_id, widget_ids in SPINDLE_ROW_FIELDS.items():
+            role_active = spindle_id in _ACTIVE_ROLES_AT_STARTUP
+            for widget_id in widget_ids:
+                widget = self.builder.get_object(widget_id)
+                if widget is not None:
+                    widget.set_sensitive(role_active)
 
     def _save_axis_comment(self, axis_id, text):
         '''
@@ -1362,13 +1145,22 @@ class HandlerClass:
             return
         self._save_axis_comment("B", _combo_selected_device(widget))
 
+    def A_Comment(self, widget):
+        if self._applying_axis_comments:
+            return
+        self._save_axis_comment("A", _combo_selected_device(widget))
+
+    def C_Comment(self, widget):
+        if self._applying_axis_comments:
+            return
+        self._save_axis_comment("C", _combo_selected_device(widget))
+
 # B's jog/feed/index/scale/ena handlers used to be hand-written here
 # (B_Move_Idx_Fwd/Rev, B_Set_Idx_Feed, B_Set_Idx_Dist, B_Set_Idx_DegDiv,
 # B_Set_Move_Dist, B_Set_Scale, B_Set_Ena) - they're now generated by the
-# same type-aware factories as every other channel (see "Generated
-# per-channel handlers" below, JOG_NEG_HANDLER/JOG_POS_HANDLER/
-# FEED_HANDLER for the handful of B-specific widget-id names those
-# factories still have to honor).
+# same factories as every other letter (see "Generated per-letter
+# handlers" below) - B's widget ids were renamed to match the rest
+# rather than the factories needing to carry a B-specific exception.
 
 # ********************************************************************
 #    AA     LL       LL              AA    XX    XX EEEEEEEE  SSSSSS 
@@ -2313,19 +2105,6 @@ class HandlerClass:
 #######################################################################
 
 #######################################################################
-# A_Set_Ena
-# Purpose:              See B_Set_Ena - same pattern, for A. Not folded
-#                       into the generic per-internal-id factory loop
-#                       below (CHANNEL_DEFAULT_LETTER only covers the 6
-#                       reassignable channels' full widget set - Idx_Dist/
-#                       Feed/Move_Dist/DegDiv - none of which A has); A
-#                       only has an ENA button, so it gets this one
-#                       hand-written handler instead, same as Sp0/Sp1.
-#######################################################################
-    def A_Set_Ena(self,widget,*args):
-        _clear_ena_override('A')
-
-#######################################################################
 # Sp0_Set_Ena
 # Purpose:              See B_Set_Ena - same pattern, for Sp0.
 #######################################################################
@@ -2691,26 +2470,23 @@ class HandlerClass:
         # call in every component other than the main panel.
         GLib.timeout_add(100, self._sync_run_operation_buttons)
 
-        # Per-channel state for all 6 reassignable channels (internal ids
-        # X/Z/U/V/W/B - CHANNEL_DEFAULT_LETTER's values), read/written by
-        # the generated Idx_Fwd/Idx_Rev/Set_Feed/etc. methods below via
-        # getattr/setattr. Defaults are picked from this SESSION's actual
-        # current type (CURRENT_TYPE), not the internal id's own
-        # historical type - a channel reassigned to Angular needs
-        # angular-shaped defaults even though its internal id is, say,
-        # "X". Idx_Deg/Idx_DegDiv are harmless to set on a currently-
-        # linear channel - they simply go unused until (if ever) that
-        # channel becomes angular after a future restart, the same
-        # moment this whole block re-runs with fresh CURRENT_TYPE values
-        # anyway. Sp0/Sp1 keep their own hand-written state above -
-        # genuinely different shape (Idx_Bool checkboxes, no Move_Dist).
-        for axis in CHANNEL_DEFAULT_LETTER.values():
-            if CURRENT_TYPE[axis] == "ANGULAR":
-                setattr(self, axis + "_Feed", TYPE_ADJUSTMENT_PROFILE["ANGULAR"]["feed"][4])
+        # Per-letter state for all 8 axis letters, read/written by the
+        # generated Idx_Fwd/Idx_Rev/Set_Feed/etc. methods below via
+        # getattr/setattr. Defaults are picked from the letter's own
+        # fixed type (_axis_type_for_letter - A/B/C angular, the rest
+        # linear; type has been purely letter-derived since the brief
+        # independent-Type experiment was retired 4 September 2026).
+        # Idx_Deg/Idx_DegDiv are harmless to set on a linear letter -
+        # they simply go unused. Sp0/Sp1 keep their own hand-written
+        # state above - genuinely different shape (Idx_Bool checkboxes,
+        # no Move_Dist).
+        for axis in AXIS_SELECTION_LETTERS:
+            if _axis_type_for_letter(axis) == "ANGULAR":
+                setattr(self, axis + "_Feed", TYPE_ADJUSTMENT_PROFILE["ANGULAR"])
                 setattr(self, axis + "_Idx_Dist", 90.0)
                 setattr(self, axis + "_Idx_Deg", 90.0)
             else:
-                setattr(self, axis + "_Feed", TYPE_ADJUSTMENT_PROFILE["LINEAR"]["feed"][4])
+                setattr(self, axis + "_Feed", TYPE_ADJUSTMENT_PROFILE["LINEAR"])
                 setattr(self, axis + "_Idx_Dist", 0.0)
                 setattr(self, axis + "_Idx_Deg", 0.0)
             setattr(self, axis + "_Idx_DegDiv", "Deg")
@@ -2718,32 +2494,33 @@ class HandlerClass:
             setattr(self, axis + "_Move_Dist", 0.0)
 
 # ------------------------------------------------------------------
-# Generated per-channel handlers, for all 6 reassignable channels
-# (X/Z/U/V/W/B - CHANNEL_DEFAULT_LETTER's values).
+# Generated per-letter handlers, for all 8 axis letters
+# (AXIS_SELECTION_LETTERS).
 #
-# Collapses the near-identical Idx_Fwd/Idx_Rev/Set_Feed/Set_Idx_Dist/
+# Collapses the near-identical Idx_Plus/Idx_Minus/Set_Feed/Set_Idx_Dist/
 # Set_Idx_DegDiv/Set_Move_Dist/Set_Scale methods - which used to be
 # hand-written once per axis (see docs/hitcounter-review.md, Issue 1),
 # then generated for the 5 linear axes only, with B kept separately
 # hand-written (different shape: Idx_Deg/Idx_DegDiv derivation, no
 # equivalent in the linear factories) - into one factory function per
-# pattern, looped over all 6 channels and bound onto HandlerClass via
+# pattern, looped over all 8 letters and bound onto HandlerClass via
 # setattr. This has to produce real, named methods rather than a
 # __getattr__ dispatcher: GladeVCP discovers handlers via dir(instance)
 # fed into builder.connect_signals(), and dir() does not enumerate names
 # that only exist through __getattr__ - such a button would silently
 # stop working with no error anywhere.
 #
-# Channels are no longer permanently linear or angular - which shape a
-# given channel's controls behave as is decided at CALL TIME by
-# CURRENT_TYPE[axis], since the operator can independently set any
-# channel's letter and Type via the Axis Selection tab (taking effect
-# on next restart, same as everywhere else this matters). Widget
-# ids themselves are NEVER renamed - REB_Panel_v1.ui's buttons still
-# have the ids they've always had; only B's jog buttons/Feed widget use
-# a different naming pattern than the rest (JOG_NEG_HANDLER/
-# JOG_POS_HANDLER/FEED_HANDLER below), a historical quirk from B being
-# hand-written for so long, not something worth renaming widgets over.
+# A letter is no longer permanently linear or angular in the sense that
+# used to matter here either - which shape a given letter's controls
+# behave as is decided at CALL TIME by _axis_type_for_letter(axis), the
+# one and only source of truth for TYPE. Since REB_Panel_v1.ui's 18
+# September 2026 rebuild, every letter follows the exact same
+# "<letter>_Idx_Plus"/"<letter>_Idx_Minus"/"<letter>_Set_Feed" widget-id
+# pattern - B's old exception (B_Idx_Fwd/B_Idx_Rev/B_Set_Idx_Feed) was
+# renamed to match, so the handler name for any letter can just be
+# computed directly instead of looked up (JOG_NEG_HANDLER/
+# JOG_POS_HANDLER/FEED_HANDLER, which used to carry that exception,
+# are gone).
 #
 # Set_Ena IS generated here (revised 2026-07-28): initially thought dead
 # (no .ui file wires a <signal> to any <Axis>_Set_Ena), but that's because
@@ -2765,29 +2542,17 @@ class HandlerClass:
 # (empirically verified independently for both X's Idx_Minus/Idx_Plus
 # and B's Move_Idx_Fwd/Rev - see the loop below) - that's what lets one
 # factory serve both naming patterns.
-JOG_NEG_HANDLER = {  # column 12, gcode sign "-"
-    "X": "X_Idx_Plus", "Z": "Z_Idx_Plus", "U": "U_Idx_Plus",
-    "V": "V_Idx_Plus", "W": "W_Idx_Plus", "B": "B_Move_Idx_Fwd",
-}
-JOG_POS_HANDLER = {  # column 13, gcode sign "+"
-    "X": "X_Idx_Minus", "Z": "Z_Idx_Minus", "U": "U_Idx_Minus",
-    "V": "V_Idx_Minus", "W": "W_Idx_Minus", "B": "B_Move_Idx_Rev",
-}
-FEED_HANDLER = {
-    "X": "X_Set_Feed", "Z": "Z_Set_Feed", "U": "U_Set_Feed",
-    "V": "V_Set_Feed", "W": "W_Set_Feed", "B": "B_Set_Idx_Feed",
-}
-
 def _axis_idx_move(axis, handler_name, gcode_sign):
     '''
-    handler_name is the exact method name GladeVCP dispatches to (see
-    JOG_NEG_HANDLER/JOG_POS_HANDLER - varies per channel, not derived
-    from axis here); gcode_sign ("+"/"-") is the actual sign sent in the
-    G-code, and also which way the Idx_Qty counter moves (matches B's
-    old Fwd=+1/Rev=-1 behavior, now applied to every channel instead of
-    just B). Whether this move uses Idx_Dist (linear) or the derived
-    Idx_Deg (angular) is decided at call time from the channel's current
-    type - see the module comment above.
+    handler_name is the exact method name GladeVCP dispatches to
+    ("<axis>_Idx_Plus"/"<axis>_Idx_Minus" - every letter follows this
+    pattern since REB_Panel_v1.ui's 18 September 2026 rebuild); gcode_sign
+    ("+"/"-") is the actual sign sent in the G-code, and also which way
+    the Idx_Qty counter moves (matches B's old Fwd=+1/Rev=-1 behavior,
+    now applied to every channel instead of just B). Whether this move
+    uses Idx_Dist (linear) or the derived Idx_Deg (angular) is decided
+    at call time from the letter's own fixed type - see the module
+    comment above.
     '''
     def handler(self, widget):
         print("=================================================")
@@ -2802,17 +2567,18 @@ def _axis_idx_move(axis, handler_name, gcode_sign):
                 c.mode(linuxcnc.MODE_MDI)
                 c.wait_complete()
 
-            angular = CURRENT_TYPE[axis] == "ANGULAR"
+            angular = _axis_type_for_letter(axis) == "ANGULAR"
             amount = getattr(self, axis + "_Idx_Deg") if angular else getattr(self, axis + "_Idx_Dist")
             feed = getattr(self, axis + "_Feed")
-            # The G-code axis word must be the CURRENTLY assigned letter
-            # for this channel (CURRENT_LETTER), not the fixed internal
-            # id "axis" - LinuxCNC only recognizes whatever letter is
-            # actually in [TRAJ]COORDINATES right now (see REB_Setup/
-            # REB_Generate_Local_Ini.py's _overlay_axis_assignment). All
-            # other uses of "axis" in this function (attribute names,
-            # handler naming) correctly stay the internal id.
-            gcode_axis = CURRENT_LETTER.get(axis, axis.lower()).upper()
+            # The G-code axis word is simply this row's own letter - a
+            # letter is a stable role identity now (see
+            # CHANNEL_DEFAULT_ROLE's comment above), so whichever
+            # physical channel currently backs it, LinuxCNC recognizes
+            # this exact letter in [TRAJ]COORDINATES as long as the role
+            # is assigned to some channel (which is the only thing that
+            # gates whether this handler is even reachable - see
+            # _load_panel_axis_controls).
+            gcode_axis = axis
             Gcode = "G1 " + gcode_axis + gcode_sign + str(amount) + " F" + str(feed)
 
             print(Gcode)
@@ -2850,7 +2616,7 @@ def _axis_set_idx_dist(axis):
         print("FUNCTION " + axis + "_Set_Idx_Dist")
         value = widget.get_value()
         setattr(self, axis + "_Idx_Dist", value)
-        if CURRENT_TYPE[axis] == "ANGULAR":
+        if _axis_type_for_letter(axis) == "ANGULAR":
             if getattr(self, axis + "_Idx_DegDiv") == "Deg":
                 setattr(self, axis + "_Idx_Deg", round(value, 1))
             else:
@@ -2904,30 +2670,23 @@ def _axis_set_ena(axis):
     handler.__name__ = axis + "_Set_Ena"
     return handler
 
-for _axis in CHANNEL_DEFAULT_LETTER.values():
+for _axis in AXIS_SELECTION_LETTERS:
     # Column 12 sends gcode sign "-", column 13 sends "+" - empirically
     # verified independently for X/U/V/Z/W's Idx_Minus/Idx_Plus (live
     # testing showed all five linear axes moving the physically wrong
     # way relative to their correct icons - the same class of bug
     # already found and fixed for the spindles' Fwd/Rev and Idx_Fwd/
     # Idx_Rev via live halcmd pin tracing, see Sp0_Move_Fwd's docstring)
-    # and for B's Move_Idx_Fwd/Rev (see that method's old banner comment,
-    # now folded into _axis_idx_move above) - see JOG_NEG_HANDLER/
-    # JOG_POS_HANDLER for why this holds regardless of the handler name.
-    setattr(HandlerClass, JOG_NEG_HANDLER[_axis], _axis_idx_move(_axis, JOG_NEG_HANDLER[_axis], "-"))
-    setattr(HandlerClass, JOG_POS_HANDLER[_axis], _axis_idx_move(_axis, JOG_POS_HANDLER[_axis], "+"))
-    setattr(HandlerClass, FEED_HANDLER[_axis], _axis_set_feed(_axis, FEED_HANDLER[_axis]))
+    # and for B's old Move_Idx_Fwd/Rev - every letter now uses the same
+    # "<letter>_Idx_Plus"/"<letter>_Idx_Minus" naming, so the handler
+    # name is computed directly rather than looked up.
+    setattr(HandlerClass, _axis + "_Idx_Plus", _axis_idx_move(_axis, _axis + "_Idx_Plus", "-"))
+    setattr(HandlerClass, _axis + "_Idx_Minus", _axis_idx_move(_axis, _axis + "_Idx_Minus", "+"))
+    setattr(HandlerClass, _axis + "_Set_Feed", _axis_set_feed(_axis, _axis + "_Set_Feed"))
     setattr(HandlerClass, _axis + "_Set_Ena", _axis_set_ena(_axis))
     setattr(HandlerClass, _axis + "_Set_Idx_Dist", _axis_set_idx_dist(_axis))
     setattr(HandlerClass, _axis + "_Set_Idx_DegDiv", _axis_set_idx_degdiv(_axis))
     setattr(HandlerClass, _axis + "_Set_Move_Dist", _axis_set_move_dist(_axis))
-    # No _Set_Scale binding here - Scale is bound per LETTER, not per
-    # internal id, in the unified AXIS_SELECTION_LETTERS loop below (see
-    # _axis_set_scale_letter's docstring for why: the widget labeled
-    # e.g. "B" must always mean "whichever channel currently wears
-    # letter B," not "channel 05, forever" - a real bug found live 3
-    # September 2026 when channel 00 was reassigned to letter B and its
-    # Scale edits were silently landing on channel 05's stepgen instead).
 del _axis
 
 
@@ -2945,13 +2704,9 @@ del _axis
 
 
 
-# No PID_AXES-based binding loop here for the 6 reassignable channels
-# (X/Z/B/U/V/W widgets) - PID is instead bound per LETTER, uniformly
-# for all 8 letters, via _pid_set_letter below (same fix as Scale/Max
-# Vel/Backlash - see _axis_set_scale_letter's docstring). PID_AXES
-# itself is kept and still used elsewhere (e.g. the Export/Save-
-# Settings snapshot's "is this a reassignable axis id" membership
-# check) - just no longer as a live-HAL-pin source here.
+# Scale/PID/Backlash editing lives entirely in REB_Settings.py now (see
+# that file and CLAUDE.md) - this file's main panel never reads or
+# writes those live HAL pins.
 
 
 

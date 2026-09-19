@@ -1008,9 +1008,10 @@ class HandlerClass:
         (CHANNEL_ROLES - all 8 axis letters plus Sp0/Sp1, since 13
         September 2026) and reselects that combo's own current role.
         Every role is always offered here - any channel is freely
-        selectable to any role, with duplicates flagged live instead
-        (see _update_duplicate_warnings) and only actually blocked from
-        being persisted, not from being picked in the first place.
+        selectable to any role, with duplicates (and Sp1-without-Sp0)
+        flagged live instead (see _update_validation_warnings) and only
+        actually blocked from being persisted, not from being picked in
+        the first place.
 
         Also refreshes each channel's Channel_0N_Type label -
         informational only (not itself selectable): Linear/Angular for
@@ -1043,41 +1044,65 @@ class HandlerClass:
                 else:
                     type_label.set_text(_axis_type_for_letter(current).title())
 
-    def _update_duplicate_warnings(self):
+    def _update_validation_warnings(self):
         '''
-        Flags every channel whose currently-selected letter is also
-        selected by at least one other channel, by setting its
-        Channel_0N_Warning label to a red "Duplicate!" notice (cleared
-        for channels with no conflict). A duplicate can be picked
-        freely, it's just flagged immediately rather than rejected.
+        Recomputes every channel's Channel_0N_Warning label from the
+        current in-memory assignment (self._channel_assignments) and
+        returns whether the whole assignment is safe to persist.
+
+        Two independent rules, checked together so neither's warning
+        can silently overwrite the other's on the same channel:
+          - a role picked on more than one channel ("Duplicate!")
+          - Sp1 assigned to a channel while Sp0 isn't assigned to any
+            ("Sp1 needs Sp0!") - Sp1's speed is always computed as a
+            percentage of Sp0's (see REB_main.py's Sp1_Set_Move_Pct/
+            _Sp1_Send_Pct), so running Sp1 without Sp0 assigned isn't
+            just unsupported, it's meaningless - there's no speed for
+            the percentage to apply to. Indexing is the one exception
+            (Sp0/Sp1 can be indexed independently or together - see
+            Sp0_Idx_Bool/Sp1_Idx_Bool in REB_main.py), but that doesn't
+            change this rule: both still need to be assigned to a
+            channel to be usable at all.
+        A channel can only ever trigger the first rule (duplicates are
+        per-channel) or the second (Sp1-specific, and there's at most
+        one channel holding Sp1), so the two never collide on the same
+        label.
+
+        Any role can still be picked freely at the dropdown - both
+        rules are flagged immediately rather than rejected there.
         Channel_0N_Axis_Changed uses this method's return value to
         decide whether the assignment is safe to persist - actually
         saving/showing the restart notice is refused for as long as any
-        duplicate remains, resuming automatically on whichever change
+        violation remains, resuming automatically on whichever change
         clears it.
 
-        Returns True if at least one duplicate exists (False, and every
+        Returns True if at least one violation exists (False, and every
         warning cleared, if the assignment is fully valid).
         '''
         if self.builder.get_object("Channel_00_Axis") is None:
             return False
 
-        letter_counts = {}
-        for letter in self._channel_assignments.values():
-            letter_counts[letter] = letter_counts.get(letter, 0) + 1
+        role_counts = {}
+        for role in self._channel_assignments.values():
+            role_counts[role] = role_counts.get(role, 0) + 1
 
-        any_duplicate = False
-        for channel_id, letter in self._channel_assignments.items():
+        sp0_assigned = "Sp0" in self._channel_assignments.values()
+
+        any_violation = False
+        for channel_id, role in self._channel_assignments.items():
             warning = self.builder.get_object("Channel_" + channel_id + "_Warning")
             if warning is None:
                 continue
-            if letter_counts[letter] > 1:
+            if role_counts[role] > 1:
                 warning.set_markup('<span foreground="red" weight="bold">Duplicate!</span>')
-                any_duplicate = True
+                any_violation = True
+            elif role == "Sp1" and not sp0_assigned:
+                warning.set_markup('<span foreground="red" weight="bold">Sp1 needs Sp0!</span>')
+                any_violation = True
             else:
                 warning.set_text("")
 
-        return any_duplicate
+        return any_violation
 
     def _load_channel_assignments(self):
         '''
@@ -1107,10 +1132,11 @@ class HandlerClass:
         self._applying_channel_assignments = False
 
         # _read_persisted_channel_assignments already falls back to the
-        # shipped defaults rather than ever returning a duplicate, so
-        # this should always clear every warning - called anyway so the
-        # tab's own state stays consistent if that ever changes.
-        self._update_duplicate_warnings()
+        # shipped defaults rather than ever returning a duplicate or a
+        # Sp1-without-Sp0 assignment, so this should always clear every
+        # warning - called anyway so the tab's own state stays
+        # consistent if that ever changes.
+        self._update_validation_warnings()
 
     def _load_max_jog_speed(self):
         '''
@@ -2446,12 +2472,13 @@ def _channel_axis_changed(channel_id):
     Records the new choice and refreshes every combo
     (_rebuild_all_channel_combo_items) - every role (any of the 8 axis
     letters or 2 spindles, since 13 September 2026) is always
-    selectable, duplicates are no longer prevented at the dropdown.
-    Instead, _update_duplicate_warnings flags every channel currently
-    sharing a role; as long as any duplicate remains, this handler
+    selectable, duplicates and an unassigned Sp0 with Sp1 assigned are
+    no longer prevented at the dropdown. Instead,
+    _update_validation_warnings flags every channel with either
+    problem; as long as any violation remains, this handler
     deliberately does NOT persist the assignment - that only happens
-    once the whole assignment is duplicate-free, at which point it
-    fires on that clearing change. No "restart required" notice is
+    once the whole assignment is valid, at which point it fires on
+    that clearing change. No "restart required" notice is
     shown here (unlike Measurement System/Max Jog Speed/velocity
     settings, which can be changed while LinuxCNC is running): this
     program refuses to run at all while LinuxCNC is up (see
@@ -2472,7 +2499,7 @@ def _channel_axis_changed(channel_id):
         self._rebuild_all_channel_combo_items()
         self._applying_channel_assignments = False
 
-        if self._update_duplicate_warnings():
+        if self._update_validation_warnings():
             return
 
         _save_channel_assignments(self._channel_assignments)

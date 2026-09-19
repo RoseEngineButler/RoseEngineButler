@@ -86,27 +86,18 @@
 #                                              a channel. Has its own
 #                                              panel ENA-toggle chain
 #                                              since 18 September 2026
-#                                              (see below) - no longer
-#                                              tied straight to
-#                                              machine-is-on.
-#   B      2       06    ANGULAR    3    P17   No panel ENA-toggle chain
-#                                              since 18 September 2026 -
-#                                              REB_Panel_v1.ui's B_ENA
-#                                              was replaced by A_ENA (A
-#                                              took over B's default
-#                                              channel). b-enable is
-#                                              driven straight from
-#                                              machine-is-on in REB.hal
-#                                              instead, same as C below.
+#                                              (see below).
+#   B      2       06    ANGULAR    3    P17   Panel ENA-toggle chain
+#                                              restored 19 September
+#                                              2026 (REB_Panel_v1.ui
+#                                              gave B its own row back,
+#                                              independent of A's - see
+#                                              CLAUDE.md).
 #   C      -       09    ANGULAR    -    --   Not currently assigned to
-#                                              a channel - no panel ENA
-#                                              button/toggle chain exists
-#                                              for C yet ("engine only"
-#                                              scope, 13 September 2026 -
-#                                              c-enable is driven
-#                                              straight from machine-is-on
-#                                              in REB.hal instead, see
-#                                              CLAUDE.md)
+#                                              a channel. Got its own
+#                                              panel ENA-toggle chain 19
+#                                              September 2026, same
+#                                              pattern as A/B.
 #
 #   U      3       04    LINEAR     4    P15
 #   V      4       01    LINEAR     5    P12
@@ -119,7 +110,7 @@
 # ********************************************************************
 # Setup the variables needed for the PyVCP Virtual Control Panels
 
-# ENA buttons (Sp0, Sp1, X, Z, U, V, W, A) are momentary HAL_Buttons;
+# ENA buttons (Sp0, Sp1, X, Z, U, V, W, A, B, C) are momentary HAL_Buttons;
 # each click toggles that axis's enable via a flipflop (a D-type
 # flip-flop - pins: data, clk, set, reset, out - made into a toggle
 # by feeding its own inverted output back into "data", so each clk
@@ -141,7 +132,7 @@
 # same as the main panel's own _clear_ena_override() already does in
 # the other direction.
 #
-# X/Z/U/V/W/A also AND in "machine-is-on" (a second and2 stage,
+# X/Z/U/V/W/A/B/C also AND in "machine-is-on" (a second and2 stage,
 # <axis>-estop-and) before the result reaches <axis>-enable - without
 # it, hm2_7i92.0.stepgen.NN.enable for these joints was driven solely by
 # the panel-toggle/override chain above, with no path back to E-stop/
@@ -154,22 +145,19 @@
 # stepgen.enable pins are driven by <axis>-enable (the panel-toggle
 # net) rather than by machine-is-on directly.
 #
-# C (added 13 September 2026, not currently assigned to a channel - see
-# CLAUDE.md) has no flipflop/not/and2/estop-and instances here at all
-# and no gladevcp.C_* pins to net against, since no main-panel widget
-# exists for it yet ("engine only" scope) - c-enable is wired directly
-# to machine-is-on in REB.hal instead, the same simpler pattern as
-# Sp0/Sp1's stepgen.enable. B joined C in this same no-widget/
-# machine-is-on-fallback state 18 September 2026, when its REB_Panel_v1.ui
-# widget (B_ENA) was replaced by A_ENA. A got its own real chain (above)
-# that same day.
+# B and C got the same chain 19 September 2026, once REB_Panel_v1.ui
+# gave every one of the 8 axis letters its own permanent, independent
+# row (no more one letter's ENA button standing in for another's
+# channel slot - see CLAUDE.md). Every axis letter now has this chain;
+# only Sp0/Sp1 stay on their simpler stepgen.enable-direct-to-
+# machine-is-on pattern (see above).
 #
 # All instances of a given realtime component must be declared in a
 # single loadrt line - the underlying kernel module can only be
 # inserted once.
-loadrt flipflop names=sp0-ena-flip,sp1-ena-flip,x-ena-flip,z-ena-flip,u-ena-flip,v-ena-flip,w-ena-flip,a-ena-flip
-loadrt not names=sp0-ena-not,sp1-ena-not,x-ena-not,z-ena-not,u-ena-not,v-ena-not,w-ena-not,a-ena-not
-loadrt and2 names=x-ena-and,z-ena-and,u-ena-and,v-ena-and,w-ena-and,sp0-ena-and,sp1-ena-and,x-estop-and,z-estop-and,u-estop-and,v-estop-and,w-estop-and,a-ena-and,a-estop-and
+loadrt flipflop names=sp0-ena-flip,sp1-ena-flip,x-ena-flip,z-ena-flip,u-ena-flip,v-ena-flip,w-ena-flip,a-ena-flip,b-ena-flip,c-ena-flip
+loadrt not names=sp0-ena-not,sp1-ena-not,x-ena-not,z-ena-not,u-ena-not,v-ena-not,w-ena-not,a-ena-not,b-ena-not,c-ena-not
+loadrt and2 names=x-ena-and,z-ena-and,u-ena-and,v-ena-and,w-ena-and,sp0-ena-and,sp1-ena-and,x-estop-and,z-estop-and,u-estop-and,v-estop-and,w-estop-and,a-ena-and,a-estop-and,b-ena-and,b-estop-and,c-ena-and,c-estop-and
 
 # ******************************************
 # Spindles
@@ -210,21 +198,11 @@ net spindle.1-enable                     => gladevcp.Sp1_ENA-light
 # ******************************************
 # Rotary Axes
 
-# B no longer has a main-panel ENA widget (REB_Panel_v1.ui's B_ENA was
-# replaced by A_ENA 18 September 2026 - A took over B's default channel
-# and needed a real enable control; see CLAUDE.md) - b-enable consumers
-# in REB.hal are wired straight to machine-is-on instead, same fallback
-# pattern C already uses.
-
 addf a-ena-not servo-thread
 addf a-ena-flip servo-thread
 addf a-ena-and servo-thread
 addf a-estop-and servo-thread
 
-# Added 18 September 2026 - A previously had no panel ENA-toggle chain
-# at all (see the header comment above) and its REB.hal enable consumers
-# were wired straight to "machine-is-on", so A could never be disabled
-# independently of the whole machine. Same pattern as B above.
 net a-ena-btn                            <= gladevcp.A_ENA-button
 net a-ena-btn                            => a-ena-flip.clk
 net a-ena-panel                          <= a-ena-flip.out
@@ -239,6 +217,57 @@ net a-ena-panel-allow                    => a-estop-and.in0
 net machine-is-on                        => a-estop-and.in1
 net a-enable                             <= a-estop-and.out
 net a-enable                             => gladevcp.A_ENA-light
+
+addf b-ena-not servo-thread
+addf b-ena-flip servo-thread
+addf b-ena-and servo-thread
+addf b-estop-and servo-thread
+
+# Restored 19 September 2026 - B had this same chain until 18 September,
+# when its REB_Panel_v1.ui widget (B_ENA) was temporarily replaced by
+# A_ENA (A had no row of its own yet and needed a real enable control
+# more urgently than B, which still had machine-is-on as a working
+# fallback). REB_Panel_v1.ui now gives every axis letter its own
+# permanent row, so B gets its real chain back, independent of A's.
+net b-ena-btn                            <= gladevcp.B_ENA-button
+net b-ena-btn                            => b-ena-flip.clk
+net b-ena-panel                          <= b-ena-flip.out
+net b-ena-panel                          => b-ena-and.in0
+net b-ena-panel                          => b-ena-not.in
+net b-ena-panel-inv                      <= b-ena-not.out
+net b-ena-panel-inv                      => b-ena-flip.data
+net b-ena-settings-allow                 <= gladevcp.B_Ena_Override
+net b-ena-settings-allow                 => b-ena-and.in1
+net b-ena-panel-allow                    <= b-ena-and.out
+net b-ena-panel-allow                    => b-estop-and.in0
+net machine-is-on                        => b-estop-and.in1
+net b-enable                             <= b-estop-and.out
+net b-enable                             => gladevcp.B_ENA-light
+
+addf c-ena-not servo-thread
+addf c-ena-flip servo-thread
+addf c-ena-and servo-thread
+addf c-estop-and servo-thread
+
+# Added 19 September 2026 - C previously had no panel ENA-toggle chain
+# at all (no main-panel widget existed for it - "engine only" scope,
+# 13 September 2026) and its REB.hal enable consumer was wired straight
+# to "machine-is-on", so C could never be disabled independently of the
+# whole machine. Same pattern as A/B above.
+net c-ena-btn                            <= gladevcp.C_ENA-button
+net c-ena-btn                            => c-ena-flip.clk
+net c-ena-panel                          <= c-ena-flip.out
+net c-ena-panel                          => c-ena-and.in0
+net c-ena-panel                          => c-ena-not.in
+net c-ena-panel-inv                      <= c-ena-not.out
+net c-ena-panel-inv                      => c-ena-flip.data
+net c-ena-settings-allow                 <= gladevcp.C_Ena_Override
+net c-ena-settings-allow                 => c-ena-and.in1
+net c-ena-panel-allow                    <= c-ena-and.out
+net c-ena-panel-allow                    => c-estop-and.in0
+net machine-is-on                        => c-estop-and.in1
+net c-enable                             <= c-estop-and.out
+net c-enable                             => gladevcp.C_ENA-light
 
 # ******************************************
 # Linear Axes

@@ -377,15 +377,13 @@ net jog-b-neg                               halui.axis.b.minus
 
 net jog-b-pos                               halui.axis.b.plus
 
-# B's panel ENA button (REB_Panel_v1.ui) was replaced by A's 18
-# September 2026 (A took over B's default channel and needed a real
-# enable control of its own; see CLAUDE.md) - B no longer has a
-# dedicated main-panel widget, so - same fallback pattern C already
-# uses - every B-enable consumer is wired straight to "machine-is-on"
-# instead of a panel-toggle chain. See REB_PostGUI_v1.hal.
-net machine-is-on                        => hm2_7i92.0.outm.00.out-05
-net machine-is-on                        => hm2_7i92.0.stepgen.05.enable
-net machine-is-on                        => pid.b.enable
+# B's panel ENA button (REB_Panel_v1.ui) was restored 19 September 2026
+# with its own independent row (temporarily replaced by A's 18 September
+# 2026, while A had no row of its own yet - see CLAUDE.md). See
+# REB_PostGUI_v1.hal for the panel-toggle chain b-enable is driven from.
+net b-enable                             => hm2_7i92.0.outm.00.out-05
+net b-enable                             => hm2_7i92.0.stepgen.05.enable
+net b-enable                             => pid.b.enable
 
 net b-home-sw                            => joint.2.home-sw-in
 
@@ -598,13 +596,12 @@ net jog-c-neg                               halui.axis.c.minus
 
 net jog-c-pos                               halui.axis.c.plus
 
-# See the matching A block above - no panel ENA-toggle button exists
-# for C either, same "engine only" reason, and same fix (every
-# C-enable consumer wired straight to machine-is-on itself, not a
-# separate "c-enable" signal).
-net machine-is-on                        => hm2_7i92.0.outm.00.out-09
-net machine-is-on                        => hm2_7i92.0.stepgen.09.enable
-net machine-is-on                        => pid.c.enable
+# C got its own panel ENA-toggle button 19 September 2026, matching
+# every other axis letter (see CLAUDE.md and REB_PostGUI_v1.hal for the
+# panel-toggle chain c-enable is driven from).
+net c-enable                             => hm2_7i92.0.outm.00.out-09
+net c-enable                             => hm2_7i92.0.stepgen.09.enable
+net c-enable                             => pid.c.enable
 
 net c-home-sw                            => joint.9.home-sw-in
 
