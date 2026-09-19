@@ -81,12 +81,12 @@
   <object class="GtkImage" id="Image_B_Idx_Plus">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
-    <property name="pixbuf">Images/Axis-Bpos.png</property>
+    <property name="pixbuf">Images/Axis-Bneg.png</property>
   </object>
   <object class="GtkImage" id="Image_B_Idx_Minus">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
-    <property name="pixbuf">Images/Axis-Bneg.png</property>
+    <property name="pixbuf">Images/Axis-Bpos.png</property>
   </object>
   <object class="GtkAdjustment" id="A_Feed_Rate">
     <property name="lower">-6000</property>
@@ -148,6 +148,16 @@
     <property name="pixbuf">Images/Spindleneg.png</property>
   </object>
   <object class="GtkImage" id="Image_Sp0_Idx_Rev">
+    <property name="visible">True</property>
+    <property name="can-focus">False</property>
+    <property name="pixbuf">Images/Spindlepos.png</property>
+  </object>
+  <object class="GtkImage" id="Image_Sp1_Idx_Fwd">
+    <property name="visible">True</property>
+    <property name="can-focus">False</property>
+    <property name="pixbuf">Images/Spindleneg.png</property>
+  </object>
+  <object class="GtkImage" id="Image_Sp1_Idx_Rev">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
     <property name="pixbuf">Images/Spindlepos.png</property>
@@ -626,6 +636,8 @@
                 <property name="receives-default">True</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
+                <property name="margin-top">2</property>
+                <property name="margin-bottom">2</property>
                 <property name="image">Image_B_Idx_Plus</property>
                 <property name="image-position">top</property>
                 <signal name="pressed" handler="B_Idx_Plus" swapped="no"/>
@@ -869,7 +881,7 @@
               <packing>
                 <property name="left-attach">5</property>
                 <property name="top-attach">3</property>
-                <property name="height">15</property>
+                <property name="height">17</property>
               </packing>
             </child>
             <child>
@@ -884,7 +896,7 @@
               <packing>
                 <property name="left-attach">9</property>
                 <property name="top-attach">3</property>
-                <property name="height">15</property>
+                <property name="height">17</property>
               </packing>
             </child>
             <child>
@@ -991,7 +1003,7 @@
                 <property name="can-focus">False</property>
                 <property name="halign">start</property>
                 <property name="hexpand">True</property>
-                <property name="label" translatable="yes">REB O/S 1.0 - alpha 14 September 2026</property>
+                <property name="label" translatable="yes">REB O/S 1.0 - alpha 19 September 2026</property>
                 <property name="justify">right</property>
                 <property name="width-chars">9</property>
                 <attributes>
@@ -1236,7 +1248,7 @@ feed rate</property>
                 <property name="receives-default">True</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
-                <property name="image">Image_Sp0_Idx_Fwd</property>
+                <property name="image">Image_Sp1_Idx_Fwd</property>
                 <property name="image-position">top</property>
                 <signal name="pressed" handler="Sp0_Move_Idx_Fwd" swapped="no"/>
               </object>
@@ -1253,7 +1265,7 @@ feed rate</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
                 <property name="margin-right">5</property>
-                <property name="image">Image_Sp0_Idx_Rev</property>
+                <property name="image">Image_Sp1_Idx_Rev</property>
                 <property name="use-underline">True</property>
                 <property name="image-position">top</property>
                 <signal name="pressed" handler="Sp0_Move_Idx_Rev" swapped="no"/>
@@ -2632,6 +2644,8 @@ feed rate</property>
                 <property name="receives-default">True</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
+                <property name="margin-top">2</property>
+                <property name="margin-bottom">2</property>
                 <property name="image">Image_C_Idx_Plus</property>
                 <property name="image-position">top</property>
                 <signal name="pressed" handler="C_Idx_Plus" swapped="no"/>
