@@ -234,6 +234,16 @@ AXIS_ROW_FIELDS = (
     "_Idx_Dist", "_IdxDist_UOM", "_Idx_DegDiv_Box",
 )
 
+# gladevcp's HAL_LightButton.expose() (hal_lightbutton.py) only dims an
+# insensitive button's existing light color to 30% alpha - it never
+# desaturates it - so an unassigned role's ENA light would otherwise
+# still render as a faded red rather than a neutral gray. Overriding
+# the widget's own light-off-color to gray (below, in
+# _load_panel_axis_controls) fixes this directly; light-on-color is
+# left alone since an unassigned role's -light HAL pin is never wired
+# to anything, so light_is_on can never go True.
+_UNASSIGNED_ENA_LIGHT_COLOR = Gdk.Color.parse("gray")[1]
+
 # Sp0/Sp1's own widget ids (not a per-letter suffix pattern - each
 # spindle's row has its own, genuinely different, set of controls; see
 # CLAUDE.md's "Specific Plans for REB_Panel_v1.ui" history). Used the
@@ -877,6 +887,8 @@ class HandlerClass:
                 widget = self.builder.get_object(axis + suffix)
                 if widget is not None:
                     widget.set_sensitive(role_active)
+                    if suffix == "_ENA" and not role_active:
+                        widget.set_property("light-off-color", _UNASSIGNED_ENA_LIGHT_COLOR)
 
         for spindle_id, widget_ids in SPINDLE_ROW_FIELDS.items():
             role_active = spindle_id in _ACTIVE_ROLES_AT_STARTUP
@@ -884,6 +896,8 @@ class HandlerClass:
                 widget = self.builder.get_object(widget_id)
                 if widget is not None:
                     widget.set_sensitive(role_active)
+                    if widget_id == spindle_id + "_ENA" and not role_active:
+                        widget.set_property("light-off-color", _UNASSIGNED_ENA_LIGHT_COLOR)
 
     def _save_axis_comment(self, axis_id, text):
         '''
