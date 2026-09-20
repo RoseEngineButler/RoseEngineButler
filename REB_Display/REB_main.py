@@ -255,7 +255,7 @@ SPINDLE_ROW_FIELDS = {
         "Sp0_Set_Idx_bW_Deg", "Sp0_Set_Idx_bW_Div", "Sp0_Set_Idx_OnOff",
     ),
     "Sp1": (
-        "Sp1_ENA", "Sp1_Set_Move_Pct", "Sp1_Idx_Fwd", "Sp1_Idx_Rev", "Sp1_Set_Idx_OnOff",
+        "Sp1_ENA", "Sp1_Set_Move_Pct", "Sp1_Set_Idx_OnOff",
     ),
 }
 

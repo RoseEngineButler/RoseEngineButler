@@ -152,16 +152,6 @@
     <property name="can-focus">False</property>
     <property name="pixbuf">Images/Spindlepos.png</property>
   </object>
-  <object class="GtkImage" id="Image_Sp1_Idx_Fwd">
-    <property name="visible">True</property>
-    <property name="can-focus">False</property>
-    <property name="pixbuf">Images/Spindleneg.png</property>
-  </object>
-  <object class="GtkImage" id="Image_Sp1_Idx_Rev">
-    <property name="visible">True</property>
-    <property name="can-focus">False</property>
-    <property name="pixbuf">Images/Spindlepos.png</property>
-  </object>
   <object class="GtkImage" id="Image_Stop">
     <property name="visible">True</property>
     <property name="can-focus">False</property>
@@ -1238,40 +1228,6 @@ feed rate</property>
               </object>
               <packing>
                 <property name="left-attach">4</property>
-                <property name="top-attach">8</property>
-              </packing>
-            </child>
-            <child>
-              <object class="HAL_Button" id="Sp1_Idx_Fwd">
-                <property name="visible">True</property>
-                <property name="can-focus">True</property>
-                <property name="receives-default">True</property>
-                <property name="halign">center</property>
-                <property name="valign">center</property>
-                <property name="image">Image_Sp1_Idx_Fwd</property>
-                <property name="image-position">top</property>
-                <signal name="pressed" handler="Sp0_Move_Idx_Fwd" swapped="no"/>
-              </object>
-              <packing>
-                <property name="left-attach">12</property>
-                <property name="top-attach">8</property>
-              </packing>
-            </child>
-            <child>
-              <object class="HAL_Button" id="Sp1_Idx_Rev">
-                <property name="visible">True</property>
-                <property name="can-focus">True</property>
-                <property name="receives-default">True</property>
-                <property name="halign">center</property>
-                <property name="valign">center</property>
-                <property name="margin-right">5</property>
-                <property name="image">Image_Sp1_Idx_Rev</property>
-                <property name="use-underline">True</property>
-                <property name="image-position">top</property>
-                <signal name="pressed" handler="Sp0_Move_Idx_Rev" swapped="no"/>
-              </object>
-              <packing>
-                <property name="left-attach">13</property>
                 <property name="top-attach">8</property>
               </packing>
             </child>
