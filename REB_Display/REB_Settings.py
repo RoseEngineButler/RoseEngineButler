@@ -933,9 +933,9 @@ class HandlerClass:
         is dropped entirely rather than ported as a permanent no-op.
         '''
         if system == "Metric":
-            scale_uom, vel_uom, accel_uom = "pulses\n/ mm", "mm\n/ sec", "mm\n/ sec²"
+            scale_uom, vel_uom, accel_uom = "pulses / mm", "mm / sec", "mm / sec²"
         else:
-            scale_uom, vel_uom, accel_uom = "pulses\n/ in", "in\n/ sec", "in\n/ sec²"
+            scale_uom, vel_uom, accel_uom = "pulses / in", "in / sec", "in / sec²"
 
         scale_label = self.builder.get_object("LinearAxes_Scale_UOM")
         if scale_label is not None:
