@@ -4979,6 +4979,32 @@ direction</property>
               </packing>
             </child>
             <child>
+              <!-- Sync Move tab only - shown/hidden by Panel_Mode_Switch.
+                   Overlaps the Sp0/Sp1 rows' Mode_Stack cells, whose
+                   "sync" pages are empty. max-width-chars keeps it from
+                   widening columns 10-13. -->
+              <object class="GtkLabel" id="Sync_Spindle_Note">
+                <property name="can-focus">False</property>
+                <property name="halign">start</property>
+                <property name="valign">center</property>
+                <property name="margin-left">6</property>
+                <property name="margin-right">6</property>
+                <property name="label" translatable="yes">Sp0 and Sp1 cannot be used for synchronized motion. Use an angular axis (A, B, or C) instead.</property>
+                <property name="wrap">True</property>
+                <property name="max-width-chars">36</property>
+                <property name="xalign">0</property>
+                <attributes>
+                  <attribute name="style" value="italic"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left-attach">10</property>
+                <property name="top-attach">7</property>
+                <property name="width">4</property>
+                <property name="height">2</property>
+              </packing>
+            </child>
+            <child>
               <!-- Sync Move tab only - shown/hidden by Panel_Mode_Switch. -->
               <object class="GtkBox" id="Sync_Button_Box">
                 <property name="can-focus">False</property>
@@ -4988,7 +5014,7 @@ direction</property>
                 <property name="homogeneous">True</property>
                 <child>
                   <object class="HAL_Button" id="Sync_Run">
-                    <property name="label" translatable="yes">Run Operation</property>
+                    <property name="label" translatable="yes">Sync Move</property>
                     <property name="visible">True</property>
                     <property name="can-focus">True</property>
                     <property name="receives-default">True</property>

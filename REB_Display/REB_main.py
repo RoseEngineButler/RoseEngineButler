@@ -282,6 +282,10 @@ STAT_POSITION_INDEX = {
 # "idx" and a "sync" page - see Panel_Mode_Switch.
 PANEL_MODE_STACK_PREFIX = "Mode_Stack_"
 
+# Sync Move tab widgets with no Indexing counterpart - shown/hidden
+# outright by Panel_Mode_Switch instead of living in a Mode_Stack.
+SYNC_TAB_ONLY_WIDGETS = ("Sync_Spindle_Note", "Sync_Button_Box")
+
 # A Return to Start move smaller than this (machine units) on every
 # axis counts as "already there".
 SYNC_POSITION_TOLERANCE = 0.0001
@@ -2366,8 +2370,8 @@ class HandlerClass:
         MainGrid's columns 10-13, one GtkStack per cell, so every row
         stays aligned with its letter/ENA/Feed Rate/Device - and since a
         GtkStack always sizes to its larger page, nothing moves or
-        resizes when switching. Only the Sync Move buttons' row (no
-        Indexing counterpart) is shown/hidden outright.
+        resizes when switching. Only SYNC_TAB_ONLY_WIDGETS (no Indexing
+        counterpart) are shown/hidden outright.
         '''
         print("=================================================")
         print("FUNCTION Panel_Mode_Switch, page " + str(page_num))
@@ -2378,7 +2382,8 @@ class HandlerClass:
         for child in grid.get_children():
             if (Gtk.Buildable.get_name(child) or "").startswith(PANEL_MODE_STACK_PREFIX):
                 child.set_visible_child_name(name)
-        self.builder.get_object("Sync_Button_Box").set_visible(page_num == 1)
+        for wid in SYNC_TAB_ONLY_WIDGETS:
+            self.builder.get_object(wid).set_visible(page_num == 1)
 
     def Sync_Set_Dir(self, widget):
         '''
@@ -2514,7 +2519,7 @@ class HandlerClass:
         print("=================================================")
         print("FUNCTION Sync_Return")
         if self._sync_start is None:
-            _show_settings_error(widget, "Nothing to return from - use Run Operation first.")
+            _show_settings_error(widget, "Nothing to return from - use Sync Move first.")
             return
         if not self._sync_ready_to_move(widget):
             return
