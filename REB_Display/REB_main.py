@@ -232,6 +232,8 @@ _ACTIVE_ROLES_AT_STARTUP = set(_CHANNEL_ASSIGNMENTS_AT_STARTUP.values())
 AXIS_ROW_FIELDS = (
     "_Letter", "_ENA", "_Feed", "_Feed_UOM", "_Comment",
     "_Idx_Dist", "_IdxDist_UOM", "_Idx_DegDiv_Box",
+    # Sync Move tab.
+    "_Sync_Dist_Box", "_Sync_Dist_UOM", "_Sync_Rev", "_Sync_Fwd",
 )
 
 # gladevcp's HAL_LightButton.expose() (hal_lightbutton.py) only dims an
@@ -258,6 +260,31 @@ SPINDLE_ROW_FIELDS = {
         "Sp1_ENA", "Sp1_Set_Move_Pct", "Sp1_Set_Idx_OnOff",
     ),
 }
+
+# Sync Move tab (REB_Panel_v1.ui's second Indexing/Sync Move tab):
+# Direction button suffix -> the G-code sign it sends. <letter>_Sync_Rev
+# sits in column 12 (headed "Rev"/"⊖") and <letter>_Sync_Fwd in column 13
+# ("Fwd"/"⊕"), in the same cells as - and showing the same icons as -
+# that letter's own Indexing tab buttons, which send "-" and "+"
+# respectively (see the generated <letter>_Idx_Plus/_Idx_Minus loop near
+# the end of this file) - so a given icon means the same physical
+# direction on both tabs.
+SYNC_DIR_SIGN = {"Rev": "-", "Fwd": "+"}
+
+# Axis letter -> its index in linuxcnc.stat().position (always the
+# fixed X Y Z A B C U V W order, regardless of [TRAJ]COORDINATES).
+STAT_POSITION_INDEX = {
+    "X": 0, "Y": 1, "Z": 2, "A": 3, "B": 4, "C": 5, "U": 6, "V": 7, "W": 8,
+}
+
+# REB_Panel_v1.ui's Indexing/Sync Move tabs: every MainGrid cell the two
+# tabs swap between is a GtkStack whose id starts with this, holding an
+# "idx" and a "sync" page - see Panel_Mode_Switch.
+PANEL_MODE_STACK_PREFIX = "Mode_Stack_"
+
+# A Return to Start move smaller than this (machine units) on every
+# axis counts as "already there".
+SYNC_POSITION_TOLERANCE = 0.0001
 
 # Max time (seconds) to wait for both Sp0 and Sp1 to report oriented in
 # Sp0_Move_Idx_Fwd/Rev's simultaneous-index path (see
@@ -2289,6 +2316,223 @@ class HandlerClass:
 
 
 #######################################################################
+# Sync Move tab (REB_Panel_v1.ui, second of the Indexing/Sync Move tabs)
+# Purpose:              Moves every checked axis letter by its own
+#                       distance, in its own direction, at its own row's
+#                       Feed Rate, as ONE G1 move so they all start and
+#                       finish together, then lets the operator put them
+#                       all back where they started. Only the main panel
+#                       component has these widgets; every other
+#                       component no-ops.
+# Updated:              ver 1.0, 22 September 2026, R. Colvin
+#######################################################################
+    def _load_sync_move_tab(self):
+        '''
+        One-time setup of the Sync Move tab: per-row state, and
+        unit-of-measure labels for the persisted Measurement System
+        (startup-only, like _load_panel_axis_controls - a Measurement
+        System change needs a restart to take effect anyway). The linear
+        rows' own Feed Rate/Indexing UOM labels are set here too: Sync
+        Move uses each row's existing Feed Rate, so its label has to be
+        right for Sync Move to be, and REB_Settings.py (see its
+        _apply_measurement_system_labels) no longer can - it's a
+        separate program. Unassigned letters are greyed out by
+        _load_panel_axis_controls (AXIS_ROW_FIELDS includes the Sync
+        widgets).
+        '''
+        if self.builder.get_object("Sync_Run") is None:
+            return
+
+        self._sync_dir = {axis: None for axis in AXIS_SELECTION_LETTERS}
+        self._sync_start = None      # stat().position when Run Operation last started
+        self._sync_feeds = {}        # letter -> feed rate used by that Run Operation
+        self._sync_poll_id = None
+
+        system = reb_settings_io.load_settings().get("measurement_system", "Imperial")
+        self._sync_metric = system == "Metric"
+
+        for axis in AXIS_SELECTION_LETTERS:
+            if _axis_type_for_letter(axis) == "ANGULAR":
+                continue
+            dist_uom = "mm" if self._sync_metric else "in"
+            self.builder.get_object(axis + "_Sync_Dist_UOM").set_text(dist_uom)
+            self.builder.get_object(axis + "_IdxDist_UOM").set_text(dist_uom)
+            self.builder.get_object(axis + "_Feed_UOM").set_text(dist_uom + " / min")
+
+    def Panel_Mode_Switch(self, notebook, page, page_num):
+        '''
+        Indexing (page 0) / Sync Move (page 1) tab switch. The tabs'
+        own pages are empty: both tabs' widgets live directly in
+        MainGrid's columns 10-13, one GtkStack per cell, so every row
+        stays aligned with its letter/ENA/Feed Rate/Device - and since a
+        GtkStack always sizes to its larger page, nothing moves or
+        resizes when switching. Only the Sync Move buttons' row (no
+        Indexing counterpart) is shown/hidden outright.
+        '''
+        print("=================================================")
+        print("FUNCTION Panel_Mode_Switch, page " + str(page_num))
+        grid = self.builder.get_object("MainGrid")
+        if grid is None or self.builder.get_object("Sync_Run") is None:
+            return
+        name = "sync" if page_num == 1 else "idx"
+        for child in grid.get_children():
+            if (Gtk.Buildable.get_name(child) or "").startswith(PANEL_MODE_STACK_PREFIX):
+                child.set_visible_child_name(name)
+        self.builder.get_object("Sync_Button_Box").set_visible(page_num == 1)
+
+    def Sync_Set_Dir(self, widget):
+        '''
+        Rev/Fwd pick for one row - radio-style: selecting one deselects
+        the other. Shown with _set_depressed rather than a
+        GtkToggleButton's own "checked" look, for the same visibility
+        reason given at _DEPRESS_CSS.
+        '''
+        axis, _, direction = Gtk.Buildable.get_name(widget).split("_")
+        self._sync_dir[axis] = direction
+        for d in SYNC_DIR_SIGN:
+            _set_depressed(self.builder.get_object(axis + "_Sync_" + d), d == direction)
+
+    def _sync_ready_to_move(self, widget):
+        '''
+        Common Run Operation/Return to Start precondition: machine on
+        and nothing else (a program, an MDI command, a previous Sync
+        move) currently running.
+        '''
+        s.poll()
+        if s.task_state != linuxcnc.STATE_ON:
+            _show_settings_error(widget, "The machine must be turned on first.")
+            return False
+        if self._sync_poll_id is not None or s.interp_state != linuxcnc.INTERP_IDLE:
+            _show_settings_error(widget, "Wait for the current motion to finish first.")
+            return False
+        return True
+
+    def _sync_start_move(self, widget, deltas, feeds):
+        '''
+        Sends deltas ({letter: signed incremental distance, in machine
+        units}) as a single G1. Each letter's own time is
+        |distance| / feed; the move is timed to the slowest of those via
+        inverse-time feed (G93, F = 1/minutes), so every axis starts and
+        stops together and none goes faster than the feed rate it was
+        given. Units (G20/G21), distance mode and feed mode are forced
+        for this one move and the operator's previous modal state is put
+        back afterwards, along with its modal F (see _sync_poll_move).
+        '''
+        minutes = max(abs(d) / feeds[axis] for axis, d in deltas.items())
+
+        modal = set(s.gcodes)
+        restore = []
+        restore.append("G21" if 210 in modal else "G20")
+        restore.append("G91" if 910 in modal else "G90")
+        restore.append("G93" if 930 in modal else "G95" if 950 in modal else "G94")
+        # The move's own inverse-time F would otherwise stay behind as
+        # the modal feed rate once G94 is back in effect.
+        restore.append("F%.4f" % s.settings[1])
+
+        words = " ".join("%s%.4f" % (axis, d) for axis, d in deltas.items())
+        gcode = ("G21" if self._sync_metric else "G20") + " G91 G93 G1 " + words + " F%.8f" % (1.0 / minutes)
+
+        if s.task_mode != linuxcnc.MODE_MDI:
+            c.mode(linuxcnc.MODE_MDI)
+            c.wait_complete()
+        print(gcode)
+        c.mdi(gcode)
+
+        for wid in ("Sync_Run", "Sync_Return"):
+            self.builder.get_object(wid).set_sensitive(False)
+        _set_depressed(widget, True)
+        # Polled rather than c.wait_complete()'d, so the tab (and AXIS's
+        # own Stop/ESC) stays responsive for however long the move takes.
+        self._sync_poll_id = GLib.timeout_add(
+            100, self._sync_poll_move, widget, " ".join(restore), time.time())
+
+    def _sync_poll_move(self, widget, restore_gcode, started):
+        s.poll()
+        # interp_state can still read idle for a moment right after
+        # c.mdi() - don't mistake that for "already finished".
+        if s.interp_state != linuxcnc.INTERP_IDLE or time.time() - started < 0.5:
+            return True
+        # Finished, or aborted from AXIS - either way, put the
+        # operator's own modal state back.
+        if s.task_state == linuxcnc.STATE_ON:
+            c.mdi(restore_gcode)
+            c.wait_complete()
+        print("Sync move done, restored: " + restore_gcode)
+        _set_depressed(widget, False)
+        for wid in ("Sync_Run", "Sync_Return"):
+            self.builder.get_object(wid).set_sensitive(True)
+        self._sync_poll_id = None
+        return False
+
+    def Sync_Run(self, widget):
+        print("=================================================")
+        print("FUNCTION Sync_Run")
+        deltas = {}
+        feeds = {}
+        for axis in AXIS_SELECTION_LETTERS:
+            if axis not in _ACTIVE_ROLES_AT_STARTUP:
+                continue
+            if not self.builder.get_object(axis + "_Sync_Use").get_active():
+                continue
+            dist_spin = self.builder.get_object(axis + "_Sync_Dist")
+            # The row's own (Indexing tab's) Feed Rate.
+            feed_spin = self.builder.get_object(axis + "_Feed")
+            # Commit anything typed but not yet Enter'd/tabbed out of.
+            dist_spin.update()
+            feed_spin.update()
+            distance = dist_spin.get_value()
+            feed = feed_spin.get_value()
+            if self._sync_dir[axis] is None:
+                _show_settings_error(widget, "Select a direction for " + axis + ".")
+                return
+            if distance <= 0:
+                _show_settings_error(widget, "Enter a distance for " + axis + ".")
+                return
+            if feed <= 0:
+                _show_settings_error(widget, "Enter a feed rate for " + axis + ".")
+                return
+            deltas[axis] = -distance if SYNC_DIR_SIGN[self._sync_dir[axis]] == "-" else distance
+            feeds[axis] = feed
+
+        if not deltas:
+            _show_settings_error(widget, "Check \"Use\" for at least one axis.")
+            return
+        if not self._sync_ready_to_move(widget):
+            return
+
+        self._sync_start = tuple(s.position)
+        self._sync_feeds = feeds
+        self._sync_start_move(widget, deltas, feeds)
+
+    def Sync_Return(self, widget):
+        '''
+        Moves every axis the last Run Operation used back to where it
+        was when that Run Operation started, at the same feed rates -
+        computed from where each axis actually is now, so this is still
+        correct after a Run Operation that was stopped part way.
+        '''
+        print("=================================================")
+        print("FUNCTION Sync_Return")
+        if self._sync_start is None:
+            _show_settings_error(widget, "Nothing to return from - use Run Operation first.")
+            return
+        if not self._sync_ready_to_move(widget):
+            return
+
+        deltas = {}
+        for axis in self._sync_feeds:
+            i = STAT_POSITION_INDEX[axis]
+            delta = self._sync_start[i] - s.position[i]
+            if abs(delta) >= SYNC_POSITION_TOLERANCE:
+                deltas[axis] = delta
+        if not deltas:
+            _show_settings_error(widget, "Already at the starting point.")
+            return
+
+        self._sync_start_move(widget, deltas, self._sync_feeds)
+
+
+#######################################################################
 # __init__
 # Purpose:              This is used to initialize everything.
 # Updated:              ver 1.0, 21 July 2026, R. Colvin
@@ -2428,6 +2672,9 @@ class HandlerClass:
         # match each channel's current type/letter (if owned by this
         # component).
         self._load_panel_axis_controls()
+
+        # Sync Move tab setup (if owned by this component).
+        self._load_sync_move_tab()
 
 
 
