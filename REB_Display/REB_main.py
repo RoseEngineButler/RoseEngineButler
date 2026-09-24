@@ -65,6 +65,7 @@ import hal
 import hal_glib
 import glib
 import time
+import math
 import os
 import linuxcnc
 import webbrowser
@@ -285,6 +286,55 @@ PANEL_MODE_STACK_PREFIX = "Mode_Stack_"
 # Sync Move tab widgets with no Indexing counterpart - shown/hidden
 # outright by Panel_Mode_Switch instead of living in a Mode_Stack.
 SYNC_TAB_ONLY_WIDGETS = ("Sync_Spindle_Note", "Sync_Button_Box")
+
+# Panel_Mode_Tabs page number -> the Mode_Stack page it shows. Threading
+# (page 2) has none: its whole form (Thread_Form) overlays columns 10-13,
+# and the stacks are unmapped instead - see Panel_Mode_Switch.
+PANEL_MODE_STACK_PAGE = {0: "idx", 1: "sync"}
+PANEL_MODE_THREAD_PAGE = 2
+
+# Column 10-13 header labels outside any Mode_Stack (Indexing/Sync Move's
+# Rev/Fwd and their ⊖/⊕), unmapped on the Threading tab since
+# Thread_Form covers them.
+MODE_HEADER_WIDGETS = ("Mode_Hdr_Rev", "Mode_Hdr_Fwd", "Title_Minus_Sign1", "Title_Plus_Sign1")
+
+# Every button that starts a polled Sync Move/Threading motion - all
+# disabled while any one of them is running (see _start_polled_mdi).
+MOTION_BUTTONS = ("Sync_Run", "Sync_Return", "Thread_Run", "Thread_Return")
+
+# Axis letters the Threading tab drives: X feeds the cutter in, Z moves
+# along the thread, C turns the work.
+THREAD_AXES = ("X", "Z", "C")
+
+# Threading tab defaults, per Measurement System - the Threading.xlsx
+# example Rich designed the tab from (4 TPI, 0.25" long, 60 degrees,
+# 0.1" first cut and clearance, 1 spring pass), converted to mm for
+# Metric, but single-start. Final depth isn't here: it starts at the
+# calculated max.
+THREAD_DEFAULTS = {
+    "Imperial": {"Thread_Starts": 1, "Thread_TPI": 4.0, "Thread_Length": 0.25,
+                 "Thread_Angle": 60.0, "Thread_Clearance": 0.1,
+                 "Thread_First_Depth": 0.1, "Thread_Spring": 1},
+    "Metric":   {"Thread_Starts": 1, "Thread_TPI": 6.35, "Thread_Length": 6.35,
+                 "Thread_Angle": 60.0, "Thread_Clearance": 2.54,
+                 "Thread_First_Depth": 2.54, "Thread_Spring": 1},
+}
+
+# Refuse a threading run with more passes per start than this - almost
+# certainly a mistyped First cut depth.
+THREAD_MAX_PASSES_PER_START = 200
+
+# reb_thread.ngc's progress code kinds (the thousands digit of
+# gladevcp.thread-status - see that file's header).
+THREAD_KIND_PASS = 1
+THREAD_KIND_FINAL = 2
+THREAD_KIND_SPRING = 3
+THREAD_KIND_INDEX = 8
+THREAD_KIND_DONE = 9
+
+# How long a Cut Thread's "Done"/"Stopped" message stays up before the
+# Threading tab's instructions come back.
+THREAD_RESULT_SECONDS = 20
 
 # A Return to Start move smaller than this (machine units) on every
 # axis counts as "already there".
@@ -864,7 +914,11 @@ class HandlerClass:
             return
 
         assignments = _read_persisted_channel_assignments()
-        types = {channel_id: _axis_type_for_letter(letter) for channel_id, letter in assignments.items()}
+        # Spindles aren't axes, so _axis_type_for_letter (angular or
+        # linear) doesn't apply to them - label them for what they are,
+        # whichever channel they're on.
+        types = {channel_id: "SPINDLE" if letter in SPINDLE_ROW_FIELDS else _axis_type_for_letter(letter)
+                 for channel_id, letter in assignments.items()}
         for channel_id, letter in assignments.items():
             axis_label = self.builder.get_object("Panel_Channel_" + channel_id + "_Axis")
             if axis_label is not None:
@@ -2365,25 +2419,40 @@ class HandlerClass:
 
     def Panel_Mode_Switch(self, notebook, page, page_num):
         '''
-        Indexing (page 0) / Sync Move (page 1) tab switch. The tabs'
-        own pages are empty: both tabs' widgets live directly in
-        MainGrid's columns 10-13, one GtkStack per cell, so every row
-        stays aligned with its letter/ENA/Feed Rate/Device - and since a
-        GtkStack always sizes to its larger page, nothing moves or
-        resizes when switching. Only SYNC_TAB_ONLY_WIDGETS (no Indexing
-        counterpart) are shown/hidden outright.
+        Indexing (page 0) / Sync Move (page 1) / Threading (page 2) tab
+        switch. The tabs' own pages are empty: Indexing's and Sync
+        Move's widgets live directly in MainGrid's columns 10-13, one
+        GtkStack per cell, so every row stays aligned with its
+        letter/ENA/Feed Rate/Device - and since a GtkStack always sizes
+        to its larger page, nothing moves or resizes when switching.
+        Only SYNC_TAB_ONLY_WIDGETS (no Indexing counterpart) are
+        shown/hidden outright.
+
+        Threading isn't per-row, so it's one form (Thread_Form) laid over
+        the same columns. Under it, the stacks and MODE_HEADER_WIDGETS
+        are unmapped with set_child_visible(False) rather than hidden:
+        that keeps their size request, so MainGrid's columns - and the
+        whole panel - stay exactly the same size on all three tabs
+        (hiding them, or switching the stacks to an empty page, lets
+        GtkGrid redistribute the spanning tab strip's width differently
+        and the panel shifts a few pixels).
         '''
         print("=================================================")
         print("FUNCTION Panel_Mode_Switch, page " + str(page_num))
         grid = self.builder.get_object("MainGrid")
         if grid is None or self.builder.get_object("Sync_Run") is None:
             return
-        name = "sync" if page_num == 1 else "idx"
+        threading = page_num == PANEL_MODE_THREAD_PAGE
         for child in grid.get_children():
             if (Gtk.Buildable.get_name(child) or "").startswith(PANEL_MODE_STACK_PREFIX):
-                child.set_visible_child_name(name)
+                if not threading:
+                    child.set_visible_child_name(PANEL_MODE_STACK_PAGE[page_num])
+                child.set_child_visible(not threading)
+        for wid in MODE_HEADER_WIDGETS:
+            self.builder.get_object(wid).set_child_visible(not threading)
         for wid in SYNC_TAB_ONLY_WIDGETS:
             self.builder.get_object(wid).set_visible(page_num == 1)
+        self.builder.get_object("Thread_Form").set_visible(threading)
 
     def Sync_Set_Dir(self, widget):
         '''
@@ -2424,18 +2493,28 @@ class HandlerClass:
         back afterwards, along with its modal F (see _sync_poll_move).
         '''
         minutes = max(abs(d) / feeds[axis] for axis, d in deltas.items())
+        words = " ".join("%s%.4f" % (axis, d) for axis, d in deltas.items())
+        gcode = ("G21" if self._sync_metric else "G20") + " G91 G93 G1 " + words + " F%.8f" % (1.0 / minutes)
+        self._start_polled_mdi(widget, gcode)
 
+    def _start_polled_mdi(self, widget, gcode, on_done=None):
+        '''
+        Sends one MDI command (a single move, or a whole subroutine
+        call) and polls until it finishes, with every MOTION_BUTTONS
+        button disabled meanwhile, then puts back the operator's own
+        units, distance mode, feed mode, lathe radius/diameter mode and
+        modal F - whichever of those the command changed - and calls
+        on_done(), if given. Shared by the Sync Move and Threading tabs.
+        '''
         modal = set(s.gcodes)
         restore = []
         restore.append("G21" if 210 in modal else "G20")
         restore.append("G91" if 910 in modal else "G90")
         restore.append("G93" if 930 in modal else "G95" if 950 in modal else "G94")
+        restore.append("G7" if 70 in modal else "G8")
         # The move's own inverse-time F would otherwise stay behind as
         # the modal feed rate once G94 is back in effect.
         restore.append("F%.4f" % s.settings[1])
-
-        words = " ".join("%s%.4f" % (axis, d) for axis, d in deltas.items())
-        gcode = ("G21" if self._sync_metric else "G20") + " G91 G93 G1 " + words + " F%.8f" % (1.0 / minutes)
 
         if s.task_mode != linuxcnc.MODE_MDI:
             c.mode(linuxcnc.MODE_MDI)
@@ -2443,15 +2522,15 @@ class HandlerClass:
         print(gcode)
         c.mdi(gcode)
 
-        for wid in ("Sync_Run", "Sync_Return"):
+        for wid in MOTION_BUTTONS:
             self.builder.get_object(wid).set_sensitive(False)
         _set_depressed(widget, True)
         # Polled rather than c.wait_complete()'d, so the tab (and AXIS's
         # own Stop/ESC) stays responsive for however long the move takes.
         self._sync_poll_id = GLib.timeout_add(
-            100, self._sync_poll_move, widget, " ".join(restore), time.time())
+            100, self._sync_poll_move, widget, " ".join(restore), time.time(), on_done)
 
-    def _sync_poll_move(self, widget, restore_gcode, started):
+    def _sync_poll_move(self, widget, restore_gcode, started, on_done=None):
         s.poll()
         # interp_state can still read idle for a moment right after
         # c.mdi() - don't mistake that for "already finished".
@@ -2462,11 +2541,13 @@ class HandlerClass:
         if s.task_state == linuxcnc.STATE_ON:
             c.mdi(restore_gcode)
             c.wait_complete()
-        print("Sync move done, restored: " + restore_gcode)
+        print("Sync/Threading move done, restored: " + restore_gcode)
         _set_depressed(widget, False)
-        for wid in ("Sync_Run", "Sync_Return"):
+        for wid in MOTION_BUTTONS:
             self.builder.get_object(wid).set_sensitive(True)
         self._sync_poll_id = None
+        if on_done is not None:
+            on_done()
         return False
 
     def Sync_Run(self, widget):
@@ -2535,6 +2616,316 @@ class HandlerClass:
             return
 
         self._sync_start_move(widget, deltas, self._sync_feeds)
+
+
+#######################################################################
+# Threading tab (REB_Panel_v1.ui, third of the Indexing/Sync Move/
+# Threading tabs)
+# Purpose:              Cuts a single- or multi-start thread with a
+#                       cutter held in the drilling spindle: X feeds the
+#                       cutter in, Z and C move together along the thread
+#                       (a helix), each start is cut to full depth, then
+#                       C indexes 360 / starts degrees to the next. Based
+#                       on Rich's Threading.xlsx, which planned this as a
+#                       G76 - REB_Subroutines/reb_thread.ngc cuts the same
+#                       passes G76 would (J, then J deeper each pass, K,
+#                       then H spring passes, from I clearance), but as
+#                       coordinated Z+C moves, since G76 syncs Z to
+#                       spindle.0 (which isn't what turns the work here)
+#                       and waits on an index pulse this machine has no
+#                       source for. Only the main panel component has
+#                       these widgets; every other component no-ops.
+# Updated:              ver 1.0, 24 September 2026, R. Colvin
+#######################################################################
+    def _load_threading_tab(self):
+        '''
+        One-time setup of the Threading tab: Measurement System labels
+        (Threads / inch for Imperial, Pitch in mm for Metric - startup-
+        only, like _load_sync_move_tab), default values, and the
+        calculated fields.
+        '''
+        if self.builder.get_object("Thread_Run") is None:
+            return
+
+        self._thread_start = None     # stat().position when Cut Thread last started
+        self._thread_metric = self._sync_metric
+        self._thread_running = False  # a Cut Thread is in progress - show its progress
+        self._thread_last_code = 0    # last progress code seen from reb_thread.ngc
+        self._thread_result_id = None # pending GLib timeout putting the instructions back
+        instructions = self.builder.get_object("Thread_Instructions")
+        self._thread_instructions = instructions.get_text()
+
+        # reb_thread.ngc's progress, via motion.analog-out-00 (net
+        # thread-status in REB_PostGUI_v1.hal) - see _on_thread_status.
+        self._thread_status_pin = hal_glib.GPin(
+            self.halcomp.newpin("thread-status", hal.HAL_FLOAT, hal.HAL_IN)
+        )
+        self._thread_status_pin.connect('value-changed', self._on_thread_status)
+
+        uom = "mm" if self._thread_metric else "in"
+        for wid in ("Thread_Length_UOM", "Thread_Clearance_UOM", "Thread_First_Depth_UOM",
+                    "Thread_Final_Depth_UOM", "Thread_Max_Depth_UOM"):
+            self.builder.get_object(wid).set_text(uom)
+        self.builder.get_object("Thread_Lead_UOM").set_text(uom + " / rev")
+        if self._thread_metric:
+            self.builder.get_object("Thread_TPI_Label").set_text("Pitch")
+            self.builder.get_object("Thread_TPI_UOM").set_text("mm")
+
+        defaults = THREAD_DEFAULTS["Metric" if self._thread_metric else "Imperial"]
+        for wid, value in defaults.items():
+            self.builder.get_object(wid).set_value(value)
+        # set_value above fires Thread_Pitch_Changed, but only for values
+        # that actually changed - make sure Final depth and the
+        # calculated fields are filled in regardless.
+        self.Thread_Pitch_Changed(None)
+
+    def _thread_value(self, wid):
+        spin = self.builder.get_object(wid)
+        # Commit anything typed but not yet Enter'd/tabbed out of.
+        spin.update()
+        return spin.get_value()
+
+    def _thread_geometry(self):
+        '''
+        (pitch, lead, max depth) from the current Starts, Threads / inch
+        (or Pitch) and Thread angle, or None while any is unusable.
+        Pitch is the distance between neighbouring threads (1 / TPI);
+        lead is how far one thread advances per turn of the work, pitch
+        x starts - what G76 calls P. Max depth is the sharp-V depth for
+        this pitch and angle, from the pitch, not the lead: a multi-start
+        thread's grooves are only one pitch apart.
+        '''
+        starts = int(self._thread_value("Thread_Starts"))
+        tpi = self._thread_value("Thread_TPI")
+        angle = self._thread_value("Thread_Angle")
+        if starts < 1 or tpi <= 0 or not 0 < angle < 180:
+            return None
+        pitch = tpi if self._thread_metric else 1.0 / tpi
+        return pitch, pitch * starts, (pitch / 2.0) / math.tan(math.radians(angle / 2.0))
+
+    def _thread_passes_per_start(self):
+        '''
+        How many passes reb_thread.ngc makes per start, including spring
+        passes, or None while First cut / Final depth are unusable.
+        '''
+        first = self._thread_value("Thread_First_Depth")
+        final = self._thread_value("Thread_Final_Depth")
+        if first <= 0 or final <= 0:
+            return None
+        # Passes at first, 2 x first, ... while short of final, then one
+        # at final - the small allowance keeps a final depth that's an
+        # exact multiple of first from counting one pass too many.
+        return max(1, int(math.ceil(final / first - 1e-9))) + int(self._thread_value("Thread_Spring"))
+
+    def Thread_Pitch_Changed(self, widget):
+        '''
+        Starts, Threads / inch (Pitch) or Thread angle changed: resets
+        Final depth to the new max (as Threading.xlsx does - it can be
+        changed afterwards) and updates the calculated fields.
+        '''
+        if self.builder.get_object("Thread_Run") is None:
+            return
+        geometry = self._thread_geometry()
+        if geometry is not None:
+            self.builder.get_object("Thread_Final_Depth").set_value(round(geometry[2], 4))
+        self.Thread_Recalc(None)
+
+    def Thread_Recalc(self, widget):
+        if self.builder.get_object("Thread_Run") is None:
+            return
+        geometry = self._thread_geometry()
+        passes = self._thread_passes_per_start()
+        lead_label = self.builder.get_object("Thread_Lead")
+        max_label = self.builder.get_object("Thread_Max_Depth")
+        passes_label = self.builder.get_object("Thread_Passes")
+        if geometry is None:
+            lead_label.set_text("-")
+            max_label.set_text("-")
+        else:
+            lead_label.set_text("%.4f" % geometry[1])
+            max_label.set_text("%.4f" % geometry[2])
+        if passes is None:
+            passes_label.set_text("-")
+        else:
+            starts = int(self._thread_value("Thread_Starts"))
+            passes_label.set_text("%d x %d starts" % (passes, starts) if starts > 1 else str(passes))
+
+    def Thread_Run(self, widget):
+        print("=================================================")
+        print("FUNCTION Thread_Run")
+        missing = [axis for axis in THREAD_AXES if axis not in _ACTIVE_ROLES_AT_STARTUP]
+        if missing:
+            _show_settings_error(widget, "Threading uses X, Z and C - assign "
+                                 + " and ".join(missing) + " on the Axis Selection tab first.")
+            return
+        feeds = {}
+        for axis in THREAD_AXES:
+            feed_spin = self.builder.get_object(axis + "_Feed")
+            feed_spin.update()
+            feeds[axis] = feed_spin.get_value()
+            if feeds[axis] <= 0:
+                _show_settings_error(widget, "Enter a feed rate for " + axis + ".")
+                return
+
+        geometry = self._thread_geometry()
+        if geometry is None:
+            _show_settings_error(widget, "Enter the starts, "
+                                 + ("pitch" if self._thread_metric else "threads / inch")
+                                 + " and thread angle.")
+            return
+        pitch, lead, max_depth = geometry
+        starts = int(self._thread_value("Thread_Starts"))
+        length = self._thread_value("Thread_Length")
+        clearance = self._thread_value("Thread_Clearance")
+        first = self._thread_value("Thread_First_Depth")
+        final = self._thread_value("Thread_Final_Depth")
+        spring = int(self._thread_value("Thread_Spring"))
+        passes = self._thread_passes_per_start()
+        if length <= 0:
+            _show_settings_error(widget, "Enter the thread length.")
+            return
+        if passes is None:
+            _show_settings_error(widget, "Enter the first cut depth and final depth.")
+            return
+        # Final depth is shown to 4 places - allow for that rounding.
+        if final > max_depth + 0.00005:
+            _show_settings_error(widget, "Final depth can't be more than the max depth (%.4f)." % max_depth)
+            return
+        if passes - spring > THREAD_MAX_PASSES_PER_START:
+            _show_settings_error(widget, "That's %d passes per start - check the first cut depth." % (passes - spring))
+            return
+        if not self._sync_ready_to_move(widget):
+            return
+
+        # Outside threads feed in toward the work's centre (-X), inside
+        # threads out toward the bore wall (+X) - the same convention as
+        # G76's I sign.
+        infeed = 1 if self.builder.get_object("Thread_Side").get_active_id() == "inside" else -1
+        z_sign = 1 if self.builder.get_object("Thread_Dir").get_active_id() == "l2r" else -1
+        # With the work turned by C (right-hand rule about +Z) under a
+        # fixed cutter, a right-hand thread needs C to turn opposite to
+        # Z's travel, a left-hand thread the same way.
+        c_sign = -z_sign if self.builder.get_object("Thread_Hand").get_active_id() == "right" else z_sign
+        c_travel = c_sign * length / lead * 360.0
+        # Smallest move back to the same C phase as the start of the pass.
+        c_return = math.remainder(-c_travel, 360.0)
+        # Time the helix to whichever of Z and C is slower at its own
+        # row's Feed Rate, the same way Sync Move does (G93 inverse time).
+        minutes = max(length / feeds["Z"], abs(c_travel) / feeds["C"])
+
+        args = (infeed, clearance, z_sign * length, c_travel, c_return,
+                first, final, spring, starts, 360.0 / starts,
+                feeds["X"], 1.0 / minutes, 21 if self._thread_metric else 20)
+        gcode = "o<reb_thread> call " + " ".join("[%.6f]" % a for a in args)
+
+        self._thread_start = tuple(s.position)
+        self._thread_running = True
+        self._thread_last_code = 0
+        self._thread_show_status("Starting...")
+        self._start_polled_mdi(widget, gcode, self._thread_finished)
+
+    @staticmethod
+    def _thread_ordinal(n):
+        suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+        return str(n) + suffix
+
+    def _thread_describe(self, code, stopped=False):
+        '''
+        Operator-facing sentence for one of reb_thread.ngc's progress
+        codes (start x 10000 + kind x 1000 + pass number) - what it's
+        doing now, or with stopped=True, what it was doing when stopped
+        - or None for 0 / anything unrecognised. The "- start N of M"
+        suffix only appears for a multi-start thread.
+        '''
+        start, rest = divmod(int(round(code)), 10000)
+        kind, number = divmod(rest, 1000)
+        if start < 1:
+            return None
+        starts = int(self._thread_value("Thread_Starts"))
+        of_starts = " - start %d of %d" % (start, starts) if starts > 1 else ""
+        if kind == THREAD_KIND_PASS:
+            phrase = self._thread_ordinal(number) + " pass" + of_starts
+        elif kind == THREAD_KIND_FINAL:
+            phrase = self._thread_ordinal(number) + " pass (final depth)" + of_starts
+        elif kind == THREAD_KIND_SPRING:
+            phrase = "spring pass %d%s" % (number, of_starts)
+        elif kind == THREAD_KIND_INDEX:
+            action = "indexing C to start %d of %d" % (start, starts)
+            return ("Stopped while " + action if stopped else action[0].upper() + action[1:]) + "."
+        elif kind == THREAD_KIND_DONE:
+            return "Done." if stopped else "Returning C to where it began."
+        else:
+            return None
+        return ("Stopped during the " if stopped else "Running ") + phrase + "."
+
+    def _thread_show_status(self, text):
+        '''
+        Shows a Cut Thread's progress in place of the Threading tab's
+        instructions (same spot, so nothing moves), in bold.
+        '''
+        if self._thread_result_id is not None:
+            GLib.source_remove(self._thread_result_id)
+            self._thread_result_id = None
+        self.builder.get_object("Thread_Instructions").set_markup(
+            "<b>" + GLib.markup_escape_text(text) + "</b>")
+
+    def _thread_restore_instructions(self):
+        self._thread_result_id = None
+        self.builder.get_object("Thread_Instructions").set_text(self._thread_instructions)
+        return False
+
+    def _on_thread_status(self, pin, data=None):
+        code = pin.get()
+        if not self._thread_running or code == 0:
+            return
+        text = self._thread_describe(code)
+        if text is None:
+            return
+        self._thread_last_code = code
+        self._thread_show_status(text)
+
+    def _thread_finished(self):
+        '''
+        Cut Thread's MDI call is over - finished, or stopped from AXIS.
+        reb_thread.ngc only reports THREAD_KIND_DONE once every pass is
+        cut, so any other last code means it was stopped part way.
+        '''
+        self._thread_running = False
+        # A stop during the final "returning C" move still counts as
+        # done - every pass was already cut.
+        text = self._thread_describe(self._thread_last_code, stopped=True) or "Stopped before the first pass."
+        self._thread_show_status(text)
+        self._thread_result_id = GLib.timeout_add_seconds(
+            THREAD_RESULT_SECONDS, self._thread_restore_instructions)
+
+    def Thread_Return(self, widget):
+        '''
+        Puts X, Z and C back where they were when Cut Thread last
+        started - X first, straight out, so the cutter clears the thread
+        even after a Cut Thread stopped part way, then Z and C together.
+        C only turns as far as it takes to get back in phase with where
+        it started, not back through every turn it made.
+        '''
+        print("=================================================")
+        print("FUNCTION Thread_Return")
+        if self._thread_start is None:
+            _show_settings_error(widget, "Nothing to return from - use Cut Thread first.")
+            return
+        if not self._sync_ready_to_move(widget):
+            return
+
+        deltas = {}
+        for axis in THREAD_AXES:
+            i = STAT_POSITION_INDEX[axis]
+            deltas[axis] = self._thread_start[i] - s.position[i]
+        deltas["C"] = math.remainder(deltas["C"], 360.0)
+        if all(abs(d) < SYNC_POSITION_TOLERANCE for d in deltas.values()):
+            _show_settings_error(widget, "Already at the starting point.")
+            return
+
+        args = (deltas["X"], deltas["Z"], deltas["C"], 21 if self._thread_metric else 20)
+        gcode = "o<reb_thread_return> call " + " ".join("[%.6f]" % a for a in args)
+        self._start_polled_mdi(widget, gcode)
 
 
 #######################################################################
@@ -2680,6 +3071,9 @@ class HandlerClass:
 
         # Sync Move tab setup (if owned by this component).
         self._load_sync_move_tab()
+
+        # Threading tab setup (if owned by this component).
+        self._load_threading_tab()
 
 
 

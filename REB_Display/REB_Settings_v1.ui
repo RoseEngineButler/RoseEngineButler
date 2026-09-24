@@ -747,7 +747,7 @@
                                 <property name="can-focus">False</property>
                                 <property name="halign">start</property>
                                 <property name="hexpand">True</property>
-                                <property name="label" translatable="yes">REB O/S 1.0 - alpha 22 September 2026</property>
+                                <property name="label" translatable="yes">REB O/S 1.0 - alpha 24 September 2026</property>
                                 <property name="justify">right</property>
                                 <property name="width-chars">9</property>
                                 <attributes>
@@ -2140,7 +2140,7 @@ from File</property>
                                 <property name="can-focus">False</property>
                                 <property name="halign">start</property>
                                 <property name="hexpand">True</property>
-                                <property name="label" translatable="yes">REB O/S 1.0 - alpha 22 September 2026</property>
+                                <property name="label" translatable="yes">REB O/S 1.0 - alpha 24 September 2026</property>
                                 <property name="justify">right</property>
                                 <property name="width-chars">9</property>
                                 <attributes>
@@ -6267,7 +6267,7 @@ from File</property>
                                 <property name="can-focus">False</property>
                                 <property name="halign">start</property>
                                 <property name="hexpand">True</property>
-                                <property name="label" translatable="yes">REB O/S 1.0 - alpha 22 September 2026</property>
+                                <property name="label" translatable="yes">REB O/S 1.0 - alpha 24 September 2026</property>
                                 <property name="justify">right</property>
                                 <property name="width-chars">9</property>
                                 <attributes>

@@ -406,3 +406,11 @@ net Sp1-idx-active                       <= gladevcp.Sp1-idx-active
 # is powered on. machine-is-on is defined in REB.hal, driven by
 # halui.machine.is-on.
 net machine-is-on                        => gladevcp.machine-is-on
+
+# ******************************************
+# Threading tab progress
+
+# REB_Subroutines/reb_thread.ngc reports which pass it's on through
+# motion.analog-out-00 (M67 E0) - REB_main.py's _on_thread_status shows
+# it on the Threading tab.
+net thread-status                        motion.analog-out-00 => gladevcp.thread-status

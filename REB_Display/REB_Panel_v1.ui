@@ -30,6 +30,7 @@
 # Version                                                             #
 #   1.0 - 21 July 2026, R. Colvin                                     #
 #   1.1 - 22 September 2026, R. Colvin - Indexing/Sync Move tabs      #
+#   1.2 - 24 September 2026, R. Colvin - Threading tab                #
 #                                                                     #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.             #
 #                                                                     #
@@ -407,6 +408,54 @@
     <property name="can-focus">False</property>
     <property name="pixbuf">Images/Axis-Cneg.png</property>
   </object>
+  <object class="GtkAdjustment" id="Thread_Starts_Adj">
+    <property name="lower">1</property>
+    <property name="upper">24</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">1</property>
+  </object>
+  <object class="GtkAdjustment" id="Thread_TPI_Adj">
+    <property name="lower">0.1</property>
+    <property name="upper">500</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="Thread_Length_Adj">
+    <property name="lower">0</property>
+    <property name="upper">9999</property>
+    <property name="step-increment">0.01</property>
+    <property name="page-increment">0.1</property>
+  </object>
+  <object class="GtkAdjustment" id="Thread_Angle_Adj">
+    <property name="lower">1</property>
+    <property name="upper">179</property>
+    <property name="step-increment">0.5</property>
+    <property name="page-increment">5</property>
+  </object>
+  <object class="GtkAdjustment" id="Thread_Clearance_Adj">
+    <property name="lower">0</property>
+    <property name="upper">999</property>
+    <property name="step-increment">0.01</property>
+    <property name="page-increment">0.1</property>
+  </object>
+  <object class="GtkAdjustment" id="Thread_First_Depth_Adj">
+    <property name="lower">0</property>
+    <property name="upper">999</property>
+    <property name="step-increment">0.001</property>
+    <property name="page-increment">0.01</property>
+  </object>
+  <object class="GtkAdjustment" id="Thread_Final_Depth_Adj">
+    <property name="lower">0</property>
+    <property name="upper">999</property>
+    <property name="step-increment">0.001</property>
+    <property name="page-increment">0.01</property>
+  </object>
+  <object class="GtkAdjustment" id="Thread_Spring_Adj">
+    <property name="lower">0</property>
+    <property name="upper">20</property>
+    <property name="step-increment">1</property>
+    <property name="page-increment">1</property>
+  </object>
   <object class="GtkWindow" id="window1">
     <property name="can-focus">False</property>
     <property name="halign">start</property>
@@ -586,6 +635,30 @@
                   </object>
                   <packing>
                     <property name="position">1</property>
+                    <property name="tab-fill">False</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkBox" id="Panel_Mode_Page_Thread">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                  </object>
+                  <packing>
+                    <property name="position">2</property>
+                  </packing>
+                </child>
+                <child type="tab">
+                  <object class="GtkLabel" id="Panel_Mode_Tab_Thread">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes">Threading</property>
+                    <attributes>
+                      <attribute name="font-desc" value="DejaVu Serif 12"/>
+                      <attribute name="weight" value="bold"/>
+                    </attributes>
+                  </object>
+                  <packing>
+                    <property name="position">2</property>
                     <property name="tab-fill">False</property>
                   </packing>
                 </child>
@@ -770,7 +843,7 @@
                 <property name="can-focus">False</property>
                 <property name="halign">start</property>
                 <property name="hexpand">True</property>
-                <property name="label" translatable="yes">REB O/S 1.0 - alpha 22 September 2026</property>
+                <property name="label" translatable="yes">REB O/S 1.0 - alpha 24 September 2026</property>
                 <property name="justify">right</property>
                 <property name="width-chars">9</property>
                 <attributes>
@@ -801,7 +874,7 @@
               </packing>
             </child>
             <child>
-              <object class="GtkLabel">
+              <object class="GtkLabel" id="Mode_Hdr_Fwd">
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
                 <property name="valign">end</property>
@@ -1012,7 +1085,7 @@ feed rate</property>
               </packing>
             </child>
             <child>
-              <object class="GtkLabel">
+              <object class="GtkLabel" id="Mode_Hdr_Rev">
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
                 <property name="valign">end</property>
@@ -2207,7 +2280,7 @@ W is parallel to Z</property>
                             <property name="orientation">vertical</property>
                             <property name="spacing">2</property>
                             <child>
-                              <object class="GtkLabel">
+                              <object class="GtkLabel" id="Panel_Channel_06_Axis">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
                                 <property name="halign">center</property>
@@ -2225,7 +2298,7 @@ W is parallel to Z</property>
                               </packing>
                             </child>
                             <child>
-                              <object class="GtkLabel">
+                              <object class="GtkLabel" id="Panel_Channel_06_Type">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
                                 <property name="halign">center</property>
@@ -2262,7 +2335,7 @@ W is parallel to Z</property>
                             <property name="orientation">vertical</property>
                             <property name="spacing">2</property>
                             <child>
-                              <object class="GtkLabel">
+                              <object class="GtkLabel" id="Panel_Channel_07_Axis">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
                                 <property name="halign">center</property>
@@ -2280,7 +2353,7 @@ W is parallel to Z</property>
                               </packing>
                             </child>
                             <child>
-                              <object class="GtkLabel">
+                              <object class="GtkLabel" id="Panel_Channel_07_Type">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
                                 <property name="halign">center</property>
@@ -5043,6 +5116,654 @@ direction</property>
                 <property name="left-attach">10</property>
                 <property name="top-attach">20</property>
                 <property name="width">4</property>
+              </packing>
+            </child>
+            <child>
+              <!-- Threading tab only - shown/hidden by Panel_Mode_Switch.
+                   Overlaps columns 10-13's Mode_Stack cells, which
+                   switch to an empty "thread" page (added at startup by
+                   _load_threading_tab) while this tab is showing. -->
+              <object class="GtkGrid" id="Thread_Form">
+                <property name="can-focus">False</property>
+                <property name="halign">start</property>
+                <property name="valign">start</property>
+                <property name="margin-left">6</property>
+                <property name="column-spacing">6</property>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="tooltip-text" translatable="yes">Number of separate threads (starts). C indexes 360 / Starts degrees between them.</property>
+                    <property name="label" translatable="yes">Starts</property>
+                    <property name="xalign">0</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">0</property>
+                    <property name="top-attach">0</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkSpinButton" id="Thread_Starts">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="tooltip-text" translatable="yes">Number of separate threads (starts). C indexes 360 / Starts degrees between them.</property>
+                    <property name="halign">end</property>
+                    <property name="width-chars">7</property>
+                    <property name="input-purpose">number</property>
+                    <property name="adjustment">Thread_Starts_Adj</property>
+                    <property name="digits">0</property>
+                    <property name="numeric">True</property>
+                    <property name="update-policy">if-valid</property>
+                    <signal name="value-changed" handler="Thread_Pitch_Changed" swapped="no"/>
+                  </object>
+                  <packing>
+                    <property name="left-attach">1</property>
+                    <property name="top-attach">0</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes"></property>
+                    <property name="xalign">0</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">2</property>
+                    <property name="top-attach">0</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="Thread_TPI_Label">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes">Threads / inch</property>
+                    <property name="xalign">0</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">0</property>
+                    <property name="top-attach">1</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkSpinButton" id="Thread_TPI">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="halign">end</property>
+                    <property name="width-chars">7</property>
+                    <property name="input-purpose">number</property>
+                    <property name="adjustment">Thread_TPI_Adj</property>
+                    <property name="digits">2</property>
+                    <property name="numeric">True</property>
+                    <property name="update-policy">if-valid</property>
+                    <signal name="value-changed" handler="Thread_Pitch_Changed" swapped="no"/>
+                  </object>
+                  <packing>
+                    <property name="left-attach">1</property>
+                    <property name="top-attach">1</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="Thread_TPI_UOM">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes">TPI</property>
+                    <property name="xalign">0</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">2</property>
+                    <property name="top-attach">1</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="tooltip-text" translatable="yes">How far the thread advances in one turn of the work: pitch x starts.</property>
+                    <property name="label" translatable="yes">Lead</property>
+                    <property name="xalign">0</property>
+                    <attributes>
+                      <attribute name="style" value="italic"/>
+                    </attributes>
+                  </object>
+                  <packing>
+                    <property name="left-attach">0</property>
+                    <property name="top-attach">2</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="Thread_Lead">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="tooltip-text" translatable="yes">How far the thread advances in one turn of the work: pitch x starts.</property>
+                    <property name="label" translatable="yes"></property>
+                    <property name="xalign">1</property>
+                    <attributes>
+                      <attribute name="style" value="italic"/>
+                    </attributes>
+                  </object>
+                  <packing>
+                    <property name="left-attach">1</property>
+                    <property name="top-attach">2</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="Thread_Lead_UOM">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes">in / rev</property>
+                    <property name="xalign">0</property>
+                    <attributes>
+                      <attribute name="style" value="italic"/>
+                    </attributes>
+                  </object>
+                  <packing>
+                    <property name="left-attach">2</property>
+                    <property name="top-attach">2</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes">Thread length</property>
+                    <property name="xalign">0</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">0</property>
+                    <property name="top-attach">3</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkSpinButton" id="Thread_Length">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="halign">end</property>
+                    <property name="width-chars">7</property>
+                    <property name="input-purpose">number</property>
+                    <property name="adjustment">Thread_Length_Adj</property>
+                    <property name="digits">3</property>
+                    <property name="numeric">True</property>
+                    <property name="update-policy">if-valid</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">1</property>
+                    <property name="top-attach">3</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="Thread_Length_UOM">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes">in</property>
+                    <property name="xalign">0</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">2</property>
+                    <property name="top-attach">3</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="tooltip-text" translatable="yes">Included angle of the thread cutter - 60 for standard threads.</property>
+                    <property name="label" translatable="yes">Thread angle</property>
+                    <property name="xalign">0</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">0</property>
+                    <property name="top-attach">4</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkSpinButton" id="Thread_Angle">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="tooltip-text" translatable="yes">Included angle of the thread cutter - 60 for standard threads.</property>
+                    <property name="halign">end</property>
+                    <property name="width-chars">7</property>
+                    <property name="input-purpose">number</property>
+                    <property name="adjustment">Thread_Angle_Adj</property>
+                    <property name="digits">1</property>
+                    <property name="numeric">True</property>
+                    <property name="update-policy">if-valid</property>
+                    <signal name="value-changed" handler="Thread_Pitch_Changed" swapped="no"/>
+                  </object>
+                  <packing>
+                    <property name="left-attach">1</property>
+                    <property name="top-attach">4</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes">deg</property>
+                    <property name="xalign">0</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">2</property>
+                    <property name="top-attach">4</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes">Hand</property>
+                    <property name="xalign">0</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">0</property>
+                    <property name="top-attach">5</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkComboBoxText" id="Thread_Hand">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="active-id">right</property>
+                    <items>
+                      <item id="right" translatable="yes">Right hand</item>
+                      <item id="left" translatable="yes">Left hand</item>
+                    </items>
+                  </object>
+                  <packing>
+                    <property name="left-attach">1</property>
+                    <property name="top-attach">5</property>
+                    <property name="width">2</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes">Cutting on</property>
+                    <property name="xalign">0</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">0</property>
+                    <property name="top-attach">6</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkComboBoxText" id="Thread_Side">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="active-id">outside</property>
+                    <items>
+                      <item id="outside" translatable="yes">Outside</item>
+                      <item id="inside" translatable="yes">Inside</item>
+                    </items>
+                  </object>
+                  <packing>
+                    <property name="left-attach">1</property>
+                    <property name="top-attach">6</property>
+                    <property name="width">2</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="tooltip-text" translatable="yes">Which way Z moves while cutting.</property>
+                    <property name="label" translatable="yes">Direction</property>
+                    <property name="xalign">0</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">0</property>
+                    <property name="top-attach">7</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkComboBoxText" id="Thread_Dir">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="tooltip-text" translatable="yes">Which way Z moves while cutting.</property>
+                    <property name="active-id">l2r</property>
+                    <items>
+                      <item id="l2r" translatable="yes">Left to Right</item>
+                      <item id="r2l" translatable="yes">Right to Left</item>
+                    </items>
+                  </object>
+                  <packing>
+                    <property name="left-attach">1</property>
+                    <property name="top-attach">7</property>
+                    <property name="width">2</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="tooltip-text" translatable="yes">Distance from the cutter tip to the work surface at the starting position.</property>
+                    <property name="label" translatable="yes">Clearance</property>
+                    <property name="xalign">0</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">0</property>
+                    <property name="top-attach">8</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkSpinButton" id="Thread_Clearance">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="tooltip-text" translatable="yes">Distance from the cutter tip to the work surface at the starting position.</property>
+                    <property name="halign">end</property>
+                    <property name="width-chars">7</property>
+                    <property name="input-purpose">number</property>
+                    <property name="adjustment">Thread_Clearance_Adj</property>
+                    <property name="digits">3</property>
+                    <property name="numeric">True</property>
+                    <property name="update-policy">if-valid</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">1</property>
+                    <property name="top-attach">8</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="Thread_Clearance_UOM">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes">in</property>
+                    <property name="xalign">0</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">2</property>
+                    <property name="top-attach">8</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="tooltip-text" translatable="yes">Depth of the first pass. Each following pass goes this much deeper, until the final depth.</property>
+                    <property name="label" translatable="yes">First cut depth</property>
+                    <property name="xalign">0</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">0</property>
+                    <property name="top-attach">9</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkSpinButton" id="Thread_First_Depth">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="tooltip-text" translatable="yes">Depth of the first pass. Each following pass goes this much deeper, until the final depth.</property>
+                    <property name="halign">end</property>
+                    <property name="width-chars">7</property>
+                    <property name="input-purpose">number</property>
+                    <property name="adjustment">Thread_First_Depth_Adj</property>
+                    <property name="digits">4</property>
+                    <property name="numeric">True</property>
+                    <property name="update-policy">if-valid</property>
+                    <signal name="value-changed" handler="Thread_Recalc" swapped="no"/>
+                  </object>
+                  <packing>
+                    <property name="left-attach">1</property>
+                    <property name="top-attach">9</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="Thread_First_Depth_UOM">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes">in</property>
+                    <property name="xalign">0</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">2</property>
+                    <property name="top-attach">9</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="tooltip-text" translatable="yes">Full thread depth. Resets to the maximum whenever Starts, Threads / inch or Thread angle change.</property>
+                    <property name="label" translatable="yes">Final depth</property>
+                    <property name="xalign">0</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">0</property>
+                    <property name="top-attach">10</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkSpinButton" id="Thread_Final_Depth">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="tooltip-text" translatable="yes">Full thread depth. Resets to the maximum whenever Starts, Threads / inch or Thread angle change.</property>
+                    <property name="halign">end</property>
+                    <property name="width-chars">7</property>
+                    <property name="input-purpose">number</property>
+                    <property name="adjustment">Thread_Final_Depth_Adj</property>
+                    <property name="digits">4</property>
+                    <property name="numeric">True</property>
+                    <property name="update-policy">if-valid</property>
+                    <signal name="value-changed" handler="Thread_Recalc" swapped="no"/>
+                  </object>
+                  <packing>
+                    <property name="left-attach">1</property>
+                    <property name="top-attach">10</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="Thread_Final_Depth_UOM">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes">in</property>
+                    <property name="xalign">0</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">2</property>
+                    <property name="top-attach">10</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="tooltip-text" translatable="yes">Depth of a sharp V thread for this pitch and angle.</property>
+                    <property name="label" translatable="yes">Max depth</property>
+                    <property name="xalign">0</property>
+                    <attributes>
+                      <attribute name="style" value="italic"/>
+                    </attributes>
+                  </object>
+                  <packing>
+                    <property name="left-attach">0</property>
+                    <property name="top-attach">11</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="Thread_Max_Depth">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="tooltip-text" translatable="yes">Depth of a sharp V thread for this pitch and angle.</property>
+                    <property name="label" translatable="yes"></property>
+                    <property name="xalign">1</property>
+                    <attributes>
+                      <attribute name="style" value="italic"/>
+                    </attributes>
+                  </object>
+                  <packing>
+                    <property name="left-attach">1</property>
+                    <property name="top-attach">11</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="Thread_Max_Depth_UOM">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes">in</property>
+                    <property name="xalign">0</property>
+                    <attributes>
+                      <attribute name="style" value="italic"/>
+                    </attributes>
+                  </object>
+                  <packing>
+                    <property name="left-attach">2</property>
+                    <property name="top-attach">11</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="tooltip-text" translatable="yes">Extra passes at the final depth, to clean up.</property>
+                    <property name="label" translatable="yes">Spring passes</property>
+                    <property name="xalign">0</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">0</property>
+                    <property name="top-attach">12</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkSpinButton" id="Thread_Spring">
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="tooltip-text" translatable="yes">Extra passes at the final depth, to clean up.</property>
+                    <property name="halign">end</property>
+                    <property name="width-chars">7</property>
+                    <property name="input-purpose">number</property>
+                    <property name="adjustment">Thread_Spring_Adj</property>
+                    <property name="digits">0</property>
+                    <property name="numeric">True</property>
+                    <property name="update-policy">if-valid</property>
+                    <signal name="value-changed" handler="Thread_Recalc" swapped="no"/>
+                  </object>
+                  <packing>
+                    <property name="left-attach">1</property>
+                    <property name="top-attach">12</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes"></property>
+                    <property name="xalign">0</property>
+                  </object>
+                  <packing>
+                    <property name="left-attach">2</property>
+                    <property name="top-attach">12</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes">Passes</property>
+                    <property name="xalign">0</property>
+                    <attributes>
+                      <attribute name="style" value="italic"/>
+                    </attributes>
+                  </object>
+                  <packing>
+                    <property name="left-attach">0</property>
+                    <property name="top-attach">13</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="Thread_Passes">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes"></property>
+                    <property name="xalign">1</property>
+                    <attributes>
+                      <attribute name="style" value="italic"/>
+                    </attributes>
+                  </object>
+                  <packing>
+                    <property name="left-attach">1</property>
+                    <property name="top-attach">13</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes"></property>
+                    <property name="xalign">0</property>
+                    <attributes>
+                      <attribute name="style" value="italic"/>
+                    </attributes>
+                  </object>
+                  <packing>
+                    <property name="left-attach">2</property>
+                    <property name="top-attach">13</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkBox" id="Thread_Button_Box">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="spacing">6</property>
+                    <property name="homogeneous">True</property>
+                    <child>
+                      <object class="HAL_Button" id="Thread_Run">
+                        <property name="label" translatable="yes">Cut Thread</property>
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="receives-default">True</property>
+                        <signal name="clicked" handler="Thread_Run" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="expand">True</property>
+                        <property name="fill">True</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_Button" id="Thread_Return">
+                        <property name="label" translatable="yes">Return to Start</property>
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="receives-default">True</property>
+                        <signal name="clicked" handler="Thread_Return" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="expand">True</property>
+                        <property name="fill">True</property>
+                      </packing>
+                    </child>
+                  </object>
+                  <packing>
+                    <property name="left-attach">0</property>
+                    <property name="top-attach">14</property>
+                    <property name="width">3</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="Thread_Instructions">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <property name="label" translatable="yes">X feeds in, Z runs along the thread, C turns the work. Hold the cutter in the drilling spindle and start it. Begin at the thread start, Clearance off the work.</property>
+                    <property name="wrap">True</property>
+                    <property name="max-width-chars">40</property>
+                    <property name="xalign">0</property>
+                    <attributes>
+                      <attribute name="font-desc" value="Sans 9"/>
+                      <attribute name="style" value="italic"/>
+                    </attributes>
+                  </object>
+                  <packing>
+                    <property name="left-attach">0</property>
+                    <property name="top-attach">15</property>
+                    <property name="width">3</property>
+                  </packing>
+                </child>
+              </object>
+              <packing>
+                <property name="left-attach">10</property>
+                <property name="top-attach">4</property>
+                <property name="width">4</property>
+                <property name="height">17</property>
               </packing>
             </child>
           </object>
