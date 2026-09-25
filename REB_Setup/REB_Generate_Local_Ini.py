@@ -22,7 +22,8 @@
 #   RoseEngineButlerLocal) from this repo's tracked REB.ini, overlaying
 #   whatever local Max Jog Speed / the five VELOCITY_SETTINGS jog-speed
 #   values (Default/Max/Min Angular, Default/Min Linear) / Measurement
-#   System / channel-role assignment choices are currently persisted in
+#   System / channel-role assignment / per-axis backlash choices are
+#   currently persisted in
 #   /home/reuben/Documents/REBset_v1.ini. Also regenerates REB.local.hal
 #   (REB_PostGUI_v1.local.hal is copied unchanged - see
 #   generate_local_hal_files).
@@ -514,6 +515,47 @@ def _overlay_measurement_system(text, settings):
     return text, (system, n1, n2)
 
 
+def _overlay_backlash(text, settings, role_layout):
+    '''
+    Writes each active axis letter's persisted backlash (REBset_v1.ini
+    axes.<letter>.backlash) into its own [JOINT_n]BACKLASH, n being this
+    launch's joint number for that letter - so must run after
+    _overlay_role_assignment has renumbered the [JOINT_n] sections.
+
+    This is the only way a persisted backlash reaches LinuxCNC at
+    startup: LinuxCNC 2.9 has no joint.N.backlash HAL parameter to set
+    after the fact (its only live handle is inihal's ini.N.backlash pin,
+    which REB_Settings.py's Backlash fields set while running, and which
+    doesn't exist yet when REB.hal loads). Spindles have no [JOINT_n]
+    and no backlash compensation of their own, so they're skipped.
+    Returns (text, list of "letter=value" applied).
+    '''
+    axes = settings.get("axes", {})
+    applied = []
+    for letter, joint_num in role_layout.joint_number.items():
+        try:
+            value = float(axes.get(letter, {})["backlash"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        header = "[JOINT_" + str(joint_num) + "]"
+        start = text.find("\n" + header + "\n")
+        if start < 0:
+            continue
+        end = text.find("\n[", start + 1)
+        if end < 0:
+            end = len(text)
+        section, n = re.subn(
+            r'(?m)^(BACKLASH\s*= )\S+',
+            lambda m: m.group(1) + "%.6f" % value,
+            text[start:end],
+            count=1,
+        )
+        if n:
+            text = text[:start] + section + text[end:]
+            applied.append(letter + "=" + "%g" % value)
+    return text, applied
+
+
 # ----------------------------------------------------------------------
 # REB.hal regeneration. REB_PostGUI_v1.hal needs no per-launch
 # substitution at all (see this file's own header) and is simply copied
@@ -761,6 +803,9 @@ def main():
     text, role_summary = _overlay_role_assignment(text, role_layout)
     if role_summary:
         print("Overlaid role assignment: " + role_summary)
+
+    text, backlash_applied = _overlay_backlash(text, settings, role_layout)
+    print("Overlaid BACKLASH: " + (", ".join(backlash_applied) or "none"))
 
     text, jog_result = _overlay_max_jog_speed(text, settings)
     if jog_result:

@@ -1043,6 +1043,30 @@ used for Measurement System/velocity settings (a different root cause -
 those are read once at LinuxCNC process startup - but the same
 operator-facing fix: restart to see it).
 
+### Backlash never actually reached LinuxCNC - fixed (24 September 2026)
+
+"Backlash added to the Settings tab" above assumed `joint.N.backlash` is
+a runtime-settable HAL parameter. It isn't in LinuxCNC 2.9 - every
+launch logged `parameter or pin 'joint.N.backlash' not found` (restore)
+and every shutdown `pin or parameter ... not found` (persist), so no
+backlash value ever took effect. LinuxCNC 2.9 reads backlash from
+`[JOINT_n]BACKLASH` at startup, and its only live handle is inihal's
+`ini.N.backlash` pin (N = joint number). Now:
+
+- **Launch:** `REB_Setup/REB_Generate_Local_Ini.py`'s `_overlay_backlash`
+  writes each active letter's persisted `backlash` into its
+  `[JOINT_n]BACKLASH` in `REB.local.ini` (after joints are renumbered
+  for the current channel assignment).
+- **Live:** `REB_Settings.py`'s `_axis_set_backlash_letter` saves the new
+  value to `REBset_v1.ini` immediately and, while LinuxCNC is running,
+  sets `ini.N.backlash`, which milltask applies on its next cycle.
+- **Removed:** the backlash restore in `REB_Settings_Restore.py` and the
+  backlash read in `REB_Scale_Persist.py` (it runs at shutdown, when
+  milltask's `ini.*` pins may already be gone).
+
+Spindles still keep a persisted `backlash` value, but have no joint and
+so no backlash compensation.
+
 ## Testing plan
 
 Per this repo's `CLAUDE.md`, this can only be verified live in LinuxCNC (real

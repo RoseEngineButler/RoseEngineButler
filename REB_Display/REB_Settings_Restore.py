@@ -4,9 +4,9 @@ REB_Settings_Restore.py
 
 At LinuxCNC startup, reads REBset_v1.ini and pushes each Rose Engine
 Butler axis's persisted stepgen position-scale, maxvel/maxaccel,
-P/I/D/FF0/FF1/FF2 pid.* gains, and (axis letters only - see below)
-joint.N.backlash onto the live HAL parameters those values actually
-live on. This is the load-side counterpart to REB_Display/
+and P/I/D/FF0/FF1/FF2 pid.* gains onto the live HAL parameters those
+values actually live on. (Not backlash - see the note at the end of
+this docstring.) This is the load-side counterpart to REB_Display/
 REB_Scale_Persist.py (which does the same job in reverse, at shutdown)
 - together they're what makes a value retuned in REB_Settings survive
 to the next session.
@@ -54,6 +54,15 @@ CLAUDE.md). Restoring backlash for a spindle against a stale/guessed
 joint number risked writing to whatever REAL axis letter now actually
 owns that joint number instead - silently corrupting a different
 axis's backlash. Dropped rather than risk that.
+
+Backlash restore removed entirely, 24 September 2026: it wrote
+joint.N.backlash, which doesn't exist in LinuxCNC 2.9 (every launch
+logged "parameter or pin 'joint.N.backlash' not found"), so no
+persisted backlash ever reached LinuxCNC. Backlash is an INI value
+there - REB_Setup/REB_Generate_Local_Ini.py's _overlay_backlash now
+writes each active letter's persisted value into its [JOINT_n]BACKLASH
+at launch, and REB_Settings.py changes it live through inihal's
+ini.N.backlash pin.
 """
 
 import subprocess
@@ -168,19 +177,13 @@ def set_pid_gain(hal_component, param, value):
     _setp(hal_component + "." + PID_PARAM_PIN[param], value)
 
 
-def set_backlash(joint_num, value):
-    _setp("joint." + str(joint_num) + ".backlash", value)
-
-
 def main():
     '''
     Restores exactly what REB_Scale_Persist.py's main() persists, in
     the same order, keyed the same way: all 10 CHANNEL_ROLES, resolved
     through _ROLE_LAYOUT.channel_of, skipping any role not currently
     assigned to a channel this session (nothing live to push it onto).
-    Backlash is restored for axis letters only - see this file's own
-    header for why spindles no longer have a joint number to restore it
-    against.
+    Backlash isn't restored here - see this file's own header.
     '''
     settings = reb_settings_io.load_settings()
     axes = settings.get("axes", {})
@@ -218,21 +221,6 @@ def main():
                 print("halcmd not found - is the LinuxCNC environment sourced?")
                 sys.exit(1)
 
-    def restore_backlash(axis_id, joint_num):
-        axis_entry = axes.get(axis_id)
-        if axis_entry is None or "backlash" not in axis_entry:
-            print("No stored backlash found for axis " + axis_id)
-            return
-        value = float(axis_entry["backlash"])
-        try:
-            set_backlash(joint_num, value)
-            print("Restored " + axis_id + " backlash = " + str(value))
-        except subprocess.CalledProcessError as e:
-            print("Error restoring backlash for axis " + axis_id + ": " + e.stderr)
-        except FileNotFoundError:
-            print("halcmd not found - is the LinuxCNC environment sourced?")
-            sys.exit(1)
-
     def restore_pid(axis_id, block_tag, hal_component):
         axis_entry = axes.get(axis_id)
         if axis_entry is None:
@@ -267,7 +255,6 @@ def main():
         restore_stepgen_max(role, channel_id)
 
         if role in AXIS_SELECTION_LETTERS:
-            restore_backlash(role, _ROLE_LAYOUT.joint_number[role])
             restore_pid(role, "pid", "pid." + role.lower())
         else:
             for suffix, hal_component in PID_SPINDLE_LOOPS[role].items():

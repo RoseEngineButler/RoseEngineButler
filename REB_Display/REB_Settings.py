@@ -841,24 +841,19 @@ class HandlerClass:
     def _load_backlash_settings(self):
         '''
         Reads persisted axis backlash values from REBset_v1.ini (each
-        axis's <backlash> element) and applies them to the Backlash
-        spin buttons and the live joint.N.backlash HAL parameters -
-        mirrors _load_scale_settings above (same per-letter resolution
-        via JOINT_NUMBER for all 8 AXIS_SELECTION_LETTERS).
-        REB_Scale_Persist.py is what writes these back into
-        REBset_v1.ini at shutdown, the same as it already does for
-        scale and PID gains.
+        axis's "backlash") into the Backlash spin buttons. No live push:
+        REB_Setup/REB_Generate_Local_Ini.py already wrote each active
+        letter's value into its [JOINT_n]BACKLASH in REB.local.ini, so
+        LinuxCNC started with it. (LinuxCNC 2.9 has no joint.N.backlash
+        HAL parameter - the old live push here never worked. The only
+        live handle is inihal's ini.N.backlash pin, which
+        _axis_set_backlash_letter uses for changes made on this page.)
+        set_value below still fires each letter's handler, which finds
+        the value unchanged and does nothing.
 
         Sp0/Sp1's Backlash spin buttons still load/save their persisted
-        value (see _axis_set_backlash below), but since 13 September
-        2026 never attempt a live joint.N.backlash push at all: joint
-        numbers are now dynamic, computed fresh each session from
-        whichever axis letters are active (see REB_Setup/
-        REB_Generate_Local_Ini.py), and spindles no longer have one of
-        their own - a fixed/guessed joint number for a spindle risked
-        colliding with, and silently corrupting, whatever REAL axis
-        letter happens to own that joint number this session once 7 or
-        8 letters can be simultaneously active.
+        value (see _axis_set_backlash below), but spindles have no
+        joint, so no backlash compensation, live or at startup.
         '''
         if self.builder.get_object("X_Set_Backlash") is None:
             return
@@ -874,11 +869,7 @@ class HandlerClass:
             if widget is not None:
                 widget.set_value(float(axis_entry["backlash"]))
 
-        # All 8 letters (X,Z,U,V,W,A,B,C): letter-keyed, no fixed joint
-        # number of their own - always load the persisted value into the
-        # spin button, but only push it live if this letter is currently
-        # assigned to a channel this session (_ROLE_CHANNEL_OF/
-        # JOINT_NUMBER), same pattern as _load_scale_settings.
+        # All 8 letters (X,Z,U,V,W,A,B,C), assigned to a channel or not.
         for letter in AXIS_SELECTION_LETTERS:
             axis_entry = axes.get(letter)
             if axis_entry is None or "backlash" not in axis_entry:
@@ -891,23 +882,6 @@ class HandlerClass:
             widget = self.builder.get_object(letter + "_Set_Backlash")
             if widget is not None:
                 widget.set_value(value)
-
-            if letter not in JOINT_NUMBER or not self._linuxcnc_running:
-                continue
-
-            hal_pin = "joint." + str(JOINT_NUMBER[letter]) + ".backlash"
-            try:
-                subprocess.run(
-                    ["halcmd", "setp", hal_pin, str(value)],
-                    check=True,
-                    capture_output=True,
-                    text=True
-                )
-                print("Restored " + hal_pin + " = " + str(value) + " (" + letter + ")")
-            except subprocess.CalledProcessError as e:
-                print("Error restoring " + hal_pin + ": " + e.stderr)
-            except FileNotFoundError:
-                print("halcmd not found - is the LinuxCNC environment sourced?")
 
     def _apply_measurement_system_labels(self, system):
         '''
@@ -2346,16 +2320,33 @@ def _axis_set_backlash_letter(letter):
     '''
     Value-changed handler for one of the 8 letter-labeled Backlash spin
     buttons (<letter>_Set_Backlash, letter in AXIS_SELECTION_LETTERS).
-    letter has no fixed joint number of its own, so the live
-    joint.N.backlash pin is resolved through JOINT_NUMBER at call time.
+
+    Saves the value to REBset_v1.ini straight away (the next launch
+    writes it into [JOINT_n]BACKLASH - see REB_Setup/
+    REB_Generate_Local_Ini.py's _overlay_backlash) and, if LinuxCNC is
+    running and letter is assigned to a channel, applies it live
+    through inihal's ini.N.backlash pin, N being letter's joint number
+    this session (JOINT_NUMBER). milltask picks up a change to that pin
+    on its next cycle. Saved here rather than at shutdown because
+    REB_Scale_Persist.py runs after milltask - and with it the ini.N.*
+    pins - may already be gone. Does nothing if the value matches
+    what's already saved (as when _load_backlash_settings fills the
+    field in).
     '''
     def handler(self, widget):
-        if letter not in JOINT_NUMBER:
-            print(letter + " is not currently assigned to a channel - value kept, no live HAL write")
-            return
-
-        hal_pin = "joint." + str(JOINT_NUMBER[letter]) + ".backlash"
         value = widget.get_value()
+        settings = reb_settings_io.load_settings()
+        axis_entry = settings.setdefault("axes", {}).setdefault(letter, {})
+        if axis_entry.get("backlash") == value:
+            return
+        axis_entry["backlash"] = value
+        reb_settings_io.save_settings(settings)
+        print("Saved " + letter + " backlash = " + str(value))
+
+        if letter not in JOINT_NUMBER or not self._linuxcnc_running:
+            print(letter + " backlash takes effect the next time LinuxCNC starts")
+            return
+        hal_pin = "ini." + str(JOINT_NUMBER[letter]) + ".backlash"
         try:
             subprocess.run(
                 ["halcmd", "setp", hal_pin, str(value)],

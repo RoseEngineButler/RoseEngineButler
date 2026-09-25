@@ -18,15 +18,12 @@ that carries a retuned gain forward into the next session - exactly
 mirroring how scale already worked before PID gains were added to this
 file.
 
-Also persists each axis LETTER's live joint.N.backlash HAL parameter
-into that axis's "backlash" value the same way. Set live from
-REB_Settings_v1.ini by REB_main.py's _load_backlash_settings() at
-Settings-tab load and by each Backlash spin button's value-changed
-handler while running (see REB.ini for why it's no longer relied on
-directly at LinuxCNC startup beyond an initial default). Spindles no
-longer have a joint number at all (see this file's own header note in
-REB_Settings_Restore.py) so their backlash is no longer persisted here
-either - nothing would ever restore it.
+Doesn't persist backlash: REB_Settings.py saves it to REBset_v1.ini the
+moment it's changed. (Until 24 September 2026 this read a
+joint.N.backlash HAL parameter here, which LinuxCNC 2.9 doesn't have -
+every shutdown logged "pin or parameter 'joint.N.backlash' not found"
+and nothing was saved. Its live replacement, inihal's ini.N.backlash,
+belongs to milltask, which may already be gone by the time this runs.)
 
 Invoked from REB_Shutdown.hal:
     loadusr -w python3 REB_Display/REB_Scale_Persist.py
@@ -171,17 +168,6 @@ def get_pid_gain(hal_component, param):
     return float(result.stdout.strip())
 
 
-def get_backlash(joint_num):
-    hal_pin = "joint." + str(joint_num) + ".backlash"
-    result = subprocess.run(
-        ["halcmd", "getp", hal_pin],
-        check=True,
-        capture_output=True,
-        text=True
-    )
-    return float(result.stdout.strip())
-
-
 def main():
     settings = reb_settings_io.load_settings()
     axes = settings.setdefault("axes", {})
@@ -229,17 +215,6 @@ def main():
             else:
                 axes.setdefault(role, {}).setdefault("pid", {}).update(values)
                 print("Saved " + role + " PID gains = " + str(values))
-
-            try:
-                value = get_backlash(_ROLE_LAYOUT.joint_number[role])
-            except subprocess.CalledProcessError as e:
-                print("Error reading backlash for axis " + role + ": " + e.stderr)
-            except FileNotFoundError:
-                print("halcmd not found - is the LinuxCNC environment sourced?")
-                sys.exit(1)
-            else:
-                axes.setdefault(role, {})["backlash"] = value
-                print("Saved " + role + " backlash = " + str(value))
         else:
             for suffix, hal_component in PID_SPINDLE_LOOPS[role].items():
                 block_tag = "pid_pos" if suffix == "Pos" else "pid_vel"
