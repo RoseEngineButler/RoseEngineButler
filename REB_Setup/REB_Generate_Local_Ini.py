@@ -384,7 +384,12 @@ def _overlay_role_assignment(text, role_layout):
 
     coordinates = "".join(role_layout.active_letters)
     joints = len(role_layout.active_letters)
-    spindles = len(role_layout.active_spindles)
+    # Never 0, even with neither Sp0 nor Sp1 assigned: LinuxCNC 2.9's
+    # milltask refuses [TRAJ]SPINDLES = 0 ("emcTrajSetSpindles failing:
+    # spindles=0") and never finishes starting. With no spindle role
+    # active, spindle.0 just exists unconnected - REB.local.hal leaves
+    # out both spindle blocks regardless.
+    spindles = max(1, len(role_layout.active_spindles))
 
     text, n1 = re.subn(
         r'(?m)^(JOINTS\s*= )\S+',
