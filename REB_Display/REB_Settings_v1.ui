@@ -16,12 +16,13 @@
 # LinuxCNC configuration for use with a Rose Engine                   #
 #                                                                     #
 # File:                                                               #
-#   REB_Tab_Settings_v1.ui                                            #
+#   REB_Settings_v1.ui                                                #
 #                                                                     #
 # Purpose:                                                            #
-#   This is a Glade VCP panel used to provide the user the ability    #
-#   to modify the axis scales without having to edit a text file,     #
-#   or to stop and then re-start LinuxCNC.                            #
+#   This is the screen for the standalone Settings program            #
+#   (REB_Settings.py), used to provide the user the ability to        #
+#   modify axis scales, tuning, and other settings without having     #
+#   to edit a text file. Run it while LinuxCNC is not running.        #
 #                                                                     #
 # End User Customisation:                                             #
 #   The end user of the Rose Engine Butler system should not modify   #

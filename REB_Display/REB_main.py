@@ -997,197 +997,6 @@ class HandlerClass:
 
 
 
-#######################################################################
-# Measurement_System_Changed
-# Purpose:              User picked Metric or Imperial in the Settings
-#                           tab's "Other" section. Updates this
-#                           component's own unit-of-measure labels for
-#                           immediate feedback, persists the choice to
-#                           REBset_v1.ini, and warns that a restart
-#                           is needed for the new units to actually take
-#                           effect. REB.ini itself is never patched here
-#                           any more - REB_Launch.sh overlays
-#                           this persisted choice onto a fresh copy of
-#                           REB.ini (REB.local.ini, written next to
-#                           REB.ini in this repo's own directory - see
-#                           REB_Generate_Local_Ini.py for why it can't
-#                           live in RoseEngineButlerLocal) on every
-#                           LinuxCNC launch, so a `git pull` of REB.ini
-#                           can never clobber it (see
-#                           REB_Setup/REB_Generate_Local_Ini.py).
-# Updated:              ver 1.1, 1 August 2026, Claude
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Tab_Settings_v1
-#   Widget:              Measurement_System  (GtkComboBoxText)
-#   Signal:              GtkComboBoxText/changed
-#######################################################################
-
-
-#######################################################################
-# Max_Jog_Speed_Changed
-# Purpose:              User changed the Max Jog Speed on the Settings
-#                           tab's "General" section. Persists the value
-#                           to REBset_v1.ini and warns that a
-#                           restart is needed. REB.ini itself is never
-#                           patched here any more - REB_Launch.sh
-#                           overlays this persisted value onto a fresh
-#                           copy of REB.ini (REB.local.ini, written next
-#                           to REB.ini in this repo's own directory - see
-#                           REB_Generate_Local_Ini.py for why it can't
-#                           live in RoseEngineButlerLocal) on every
-#                           LinuxCNC launch, so a `git pull` of REB.ini
-#                           can never clobber it (see
-#                           REB_Setup/REB_Generate_Local_Ini.py).
-# Updated:              ver 1.1, 1 August 2026, Claude
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Tab_Settings_v1
-#   Widget:              Max_Jog_Speed  (GtkSpinButton)
-#   Signal:              GtkSpinButton/value-changed
-#######################################################################
-
-#######################################################################
-# Open_User_Manual
-# Purpose:              Opens the Rose Engine Butler User Manual's Axis
-#                           Configuration File page in the default web
-#                           browser.
-# Updated:              ver 1.0, 6 August 2026, Claude
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Tab_Settings_v1
-#   Button:              Open User Manual  (HAL_Button)
-#   Signal:              GtkButton/pressed
-#######################################################################
-
-#######################################################################
-# Settings_Save
-# Purpose:              Writes the live scale/backlash/PID values -
-#                           read straight from this tab's own widgets,
-#                           which already mirror the live HAL pins via
-#                           their own value-changed handlers - into
-#                           SETTINGS_PATH (/home/reuben/Documents/
-#                           REBset_v1.ini), in the same XML shape
-#                           REB_Scale_Persist.py already writes there at
-#                           shutdown. This is an on-demand trigger of
-#                           that same patch -
-#                           Measurement System/Max Jog Speed/the five
-#                           VELOCITY_SETTINGS values aren't touched here
-#                           since each of those already writes itself
-#                           into SETTINGS_PATH immediately on change.
-# Updated:              ver 2.0, 2 August 2026, Claude
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Tab_Settings_v1
-#   Button:              Settings_Save  (GtkButton)
-#   Signal:              GtkButton/clicked
-#######################################################################
-
-
-#######################################################################
-# Settings_Save_As
-# Purpose:              Same live-value snapshot as Settings_Save, but
-#                           written to a file the operator picks instead
-#                           of always overwriting SETTINGS_PATH - e.g.
-#                           for a dated backup before a retune (hence the
-#                           dialog's default filename of today's date,
-#                           not SETTINGS_PATH's own name - see below).
-#                           Refreshes SETTINGS_PATH first (via
-#                           _write_rebset_snapshot, the same call
-#                           Settings_Save makes) so the copy reflects the
-#                           current live values, then copies that file
-#                           byte-for-byte to the chosen path. This does
-#                           not change which file Settings_Save/
-#                           Settings_Load use afterward - unlike the
-#                           retired named-.settings.ini mechanism, there is
-#                           no "current file" to switch to.
-# Updated:              ver 1.1, 8 August 2026, Claude
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Tab_Settings_v1
-#   Button:              Settings_Save_As  (GtkButton)
-#   Signal:              GtkButton/clicked
-#######################################################################
-
-#######################################################################
-# Settings_Load
-# Purpose:              Lets the operator pick a REBset_v1.ini-shaped
-#                           settings file (SETTINGS_PATH itself, or a
-#                           Settings_Save_As backup of it) and applies
-#                           whatever axis Scale/Backlash/PID/comment and
-#                           Measurement System values it contains to the
-#                           live widgets, via the same _apply_settings_root
-#                           helper Import_Settings uses - see that
-#                           function for why each value goes through its
-#                           own widget handler rather than being written
-#                           to disk directly, and for the comment-restart
-#                           caveat. Differs from Import_Settings only in
-#                           the file it expects (a full snapshot, using
-#                           <usercomment> - see docs/settings_file.md -
-#                           rather than Export's smaller <comment>-tagged
-#                           subset) and in not restricting to a hand-picked
-#                           subset of axes.
-# Updated:              ver 1.0, 8 August 2026, Claude
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Tab_Settings_v1
-#   Button:              Settings_Load  (GtkButton)
-#   Signal:              GtkButton/clicked
-#######################################################################
-
-
-#######################################################################
-# Export_Settings
-# Purpose:              Lets the operator pick which axes to export (each
-#                           selected axis's Scale, Backlash, and Stepper
-#                           Motor Tuning/PID all go together as one unit -
-#                           see _run_export_selection_dialog), and/or
-#                           Measurement System, and export just that
-#                           subset to a small <comment>.REBset_v1.ini
-#                           file, named after the single device name
-#                           comment picked for the export - or today's
-#                           date if the selected axes name more than one
-#                           distinct device - for quick, ad hoc sharing
-#                           (e.g. "just my B-axis calibration"), distinct
-#                           from the full REBset_v1.ini snapshot. See
-#                           docs/settings_file.md.
-# Updated:              ver 1.3, 8 August 2026, Claude
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Tab_Settings_v1
-#   Button:              Export_Settings  (GtkButton)
-#   Signal:              GtkButton/clicked
-#######################################################################
-
-
-
-#######################################################################
-# Import_Settings
-# Purpose:              Reads a <comment>.REBset_v1.ini export file and
-#                           applies whatever
-#                           subset of axis Scale/Backlash/PID/
-#                           Measurement System values it contains to the
-#                           current settings - everything else on the
-#                           Settings tab is left untouched. Applies each
-#                           value through the same widget handlers a
-#                           live edit would use (<Axis>_Set_Scale/
-#                           <Axis>_Set_Backlash/Measurement_System_Changed),
-#                           so the usual per-axis safety checks (motion
-#                           abort, disable-if-enabled) and dirty-tracking
-#                           all apply exactly as if the operator had
-#                           typed/selected each value themselves. The
-#                           actual per-axis apply loop lives in
-#                           _apply_settings_root, shared with Settings_Load.
-# Updated:              ver 1.2, 8 August 2026, Claude
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Tab_Settings_v1
-#   Button:              Import_Settings  (GtkButton)
-#   Signal:              GtkButton/clicked
-#######################################################################
-
-
-
     def _on_machine_is_on_changed(self, hal_pin, data=None):
         '''
         Grays out the main panel's whole grid of axis/spindle controls
@@ -1364,38 +1173,6 @@ class HandlerClass:
         print(Prt1)
 
 #######################################################################
-# OpenPidTuningReference
-# Purpose:              Opens LinuxCNC's own documentation for the pid
-#                           HAL component (the control loop the Stepper
-#                           Motor Tuning tab's P/I/D/FF0/FF1/FF2 spin
-#                           buttons drive) in a web browser - the same
-#                           content as the locally-installed `man pid`
-#                           page, which is also where the per-widget
-#                           tooltip text on that tab was sourced from.
-# Updated:              ver 1.0, 1 August 2026, Claude
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Tab_Settings_v1
-#   Button:              PID_Tuning_Reference  (GtkButton)
-#   Signal:              GtkButton/clicked
-#######################################################################
-
-#######################################################################
-# OpenPidControllerWikipedia
-# Purpose:              Opens Wikipedia's PID controller article -
-#                           general background on what a PID controller
-#                           is, separate from LinuxCNC's own
-#                           pid-HAL-component-specific reference
-#                           (OpenPidTuningReference above).
-# Updated:              ver 1.0, 1 August 2026, Claude
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Tab_Settings_v1
-#   Button:              PID_Controller_Wikipedia  (GtkButton)
-#   Signal:              GtkButton/clicked
-#######################################################################
-
-#######################################################################
 # OpenLibrary
 # Purpose:              This is used to open the Rose Engine Butler
 #                       web page.
@@ -1404,7 +1181,6 @@ class HandlerClass:
 # Called from:
 #   UI:                 REB_Panel
 #                       REB_Tab_Help
-#                       REB_Tab_Settings
 #   Button:             Library
 #   Signal:             GtkButton/pressed
 # ---------------------------------------------------------------------
@@ -2180,30 +1956,6 @@ class HandlerClass:
         idx_log("Sp0_Idx_Bool = " + str(self.Sp0_Idx_Bool))
 
 #######################################################################
-# Sp0_Set_Scale
-# Purpose:              This is used to set the scale distance for the
-#                           Sp0 Spindle.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Tab_Settings
-#   Button:             Sp0_Set_Scale (on setting the value)
-#   Signal:             HAL_SpinButton/value-changed
-# ---------------------------------------------------------------------
-# Data
-#   Read from UI:       (none)
-#   Program Variables
-#       Referenced:     (none)
-#       Set:            (none)
-#   Written to UI:      (none)
-# ---------------------------------------------------------------------
-# Gcodes Called:        (none)
-# ---------------------------------------------------------------------
-# HAL Commands:         halcmd setp hm2_7i92.0.stepgen.04.position-scale
-#                              (value)
-#######################################################################
-
-#######################################################################
 # Sp0_Set_Ena
 # Purpose:              See B_Set_Ena - same pattern, for Sp0.
 #######################################################################
@@ -2340,30 +2092,6 @@ class HandlerClass:
         c.wait_complete()
 
         return False  # one-shot timeout, not a repeating GLib source
-
-#######################################################################
-# Sp1_Set_Scale
-# Purpose:              This is used to set the scale distance for the
-#                           Sp1 Spindle.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
-# ---------------------------------------------------------------------
-# Called from:
-#   UI:                 REB_Tab_Settings
-#   Button:             Sp1_Set_Scale (on setting the value)
-#   Signal:             HAL_SpinButton/value-changed
-# ---------------------------------------------------------------------
-# Data
-#   Read from UI:       (none)
-#   Program Variables
-#       Referenced:     (none)
-#       Set:            (none)
-#   Written to UI:      (none)
-# ---------------------------------------------------------------------
-# Gcodes Called:        (none)
-# ---------------------------------------------------------------------
-# HAL Commands:         halcmd setp hm2_7i92.0.stepgen.04.position-scale
-#                              (value)
-#######################################################################
 
 #######################################################################
 # Sp1_Set_Ena

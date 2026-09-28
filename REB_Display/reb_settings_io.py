@@ -140,9 +140,9 @@ CHANNEL_ROLES = tuple(a for a in AXIS_IDS if a not in SPINDLE_IDS) + SPINDLE_IDS
 
 PID_PARAMS = ("P", "I", "D", "FF0", "FF1", "FF2")
 
-# REB.ini's own documented generic starting PID gains (see
-# generic_example.settings.ini, and REB.ini's [JOINT_n]/[SPINDLE_n]
-# comments) - what a brand-new axis entry should start from.
+# REB.ini's own documented generic starting PID gains (see REB.ini's
+# [JOINT_n]/[SPINDLE_n] comments) - what a brand-new axis entry should
+# start from.
 _DEFAULT_PID = {"P": 5, "I": 1, "D": 1.2, "FF0": 0, "FF1": 1, "FF2": 0}
 _DEFAULT_SPINDLE_PID_POS = {"P": 2, "I": 1, "D": 1.2, "FF0": 0, "FF1": 0, "FF2": 0}
 _DEFAULT_SPINDLE_PID_VEL = {"P": 35.1, "I": 20, "D": 1.2, "FF0": 1, "FF1": 0, "FF2": 0}
