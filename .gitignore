@@ -15,6 +15,7 @@ __pycache__/
 /REB_Display/REB_PostGUI_v1.local.hal
 /sim.var
 /sim.var.bak
+/halshow.preferences
 REB_Display/idx_debug.log
 /memory.md
 /scripts/
