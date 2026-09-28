@@ -95,6 +95,15 @@
 #  Sp0     7       06      n/a     n/a   P17
 #  Sp1     6       07      n/a     n/a   P18  Previously the C axis
 #
+# Limit switches: 3 GX-12 limit jacks (normally-closed switches), each
+#   optionally assigned in REB Settings (Axis Selection page) to one end
+#   of an axis's travel (min/max) or both ends wired in series. Every
+#   joint's neg-lim-sw-in/pos-lim-sw-in is wired entirely by
+#   REB_Generate_Local_Ini.py (_limit_jack_hal), which knows this launch's
+#   joint numbers - nothing in this template touches them, so a joint
+#   with no jack keeps them false (no limit). Spindles have no limit
+#   switches.
+#
 
 # ********************************************************************
 # Details about the fields are available in the
@@ -105,7 +114,11 @@ loadrt [KINS]KINEMATICS
 loadrt [EMCMOT]EMCMOT servo_period_nsec=[EMCMOT]SERVO_PERIOD num_joints=[KINS]JOINTS num_spindles=[TRAJ]SPINDLES
 loadrt encoder num_chan=2
 loadrt hostmot2
-loadrt hm2_eth board_ip="192.168.1.121" config="num_encoders=0 num_pwmgens=0 num_stepgens=8"
+# num_inms=0: the firmware's InM (debounced input) module is left off so
+# its 8 pins (Input0-7) become plain GPIO - the limit jacks and E-stop
+# button read them as hm2_7i92.0.gpio.NNN.in, and a spare one can be an
+# output (the signal tower's buzzer). See REB_Generate_Local_Ini.py.
+loadrt hm2_eth board_ip="192.168.1.121" config="num_encoders=0 num_inms=0 num_pwmgens=0 num_stepgens=8"
 loadrt orient count=2
 loadrt sum2
 # mux2.0/mux2.1 select spindle velocity source; mux2.2/mux2.3 select the
@@ -116,6 +129,8 @@ loadrt mux2 count=4
 # path's own trigger bit for Sp0/Sp1 respectively - see the Sp0/Sp1 sections
 # below.
 loadrt or2 count=2
+# Latches the optional hardware E-stop button - see "E-stop" below.
+loadrt estop_latch
 # pid.a/pid.c added 13 September 2026 (any of X,Z,U,V,W,A,B,C,Sp0,Sp1
 # can now be assigned to any of the 8 physical channels - see CLAUDE.md
 # and REB_Setup/REB_Generate_Local_Ini.py) - loaded unconditionally
@@ -176,8 +191,6 @@ net x-index-enable                       => pid.x.index-enable
 
 net x-is-homed                              halui.joint.0.is-homed
 
-net x-neg-limit                          => joint.0.neg-lim-sw-in
-
 net x-output                            <=  pid.x.output
 net x-output                             => hm2_7i92.0.stepgen.04.velocity-cmd
 
@@ -187,8 +200,6 @@ net x-pos-cmd                            => pid.x.command
 net x-pos-fb                            <=  hm2_7i92.0.stepgen.04.position-fb
 net x-pos-fb                             => joint.0.motor-pos-fb
 net x-pos-fb                             => pid.x.feedback
-
-net x-pos-limit                          => joint.0.pos-lim-sw-in
 
 # net x-scale                                 hm2_7i92.0.stepgen.04.position-scale
 
@@ -292,8 +303,6 @@ net z-index-enable                       => pid.z.index-enable
 
 net z-is-homed                              halui.joint.1.is-homed
 
-net z-neg-limit                          => joint.1.neg-lim-sw-in
-
 net z-output                            <=  pid.z.output
 net z-output                             => hm2_7i92.0.stepgen.01.velocity-cmd
 
@@ -303,8 +312,6 @@ net z-pos-cmd                            => pid.z.command
 net z-pos-fb                            <=  hm2_7i92.0.stepgen.01.position-fb
 net z-pos-fb                             => joint.1.motor-pos-fb
 net z-pos-fb                             => pid.z.feedback
-
-net z-pos-limit                          => joint.1.pos-lim-sw-in
 
 net z-vel-cmd                           <=  joint.1.vel-cmd
 
@@ -391,12 +398,8 @@ net b-index-enable                       => pid.b.index-enable
 
 net b-is-homed                              halui.joint.2.is-homed
 
-net b-neg-limit                          => joint.2.neg-lim-sw-in
-
 net b-output                            <=  pid.b.output
 net b-output                             => hm2_7i92.0.stepgen.05.velocity-cmd
-
-net b-pos-limit                          => joint.2.pos-lim-sw-in
 
 net b-pos-cmd                           <=  joint.2.motor-pos-cmd
 net b-pos-cmd                            => pid.b.command
@@ -504,12 +507,8 @@ net a-index-enable                       => pid.a.index-enable
 
 net a-is-homed                              halui.joint.8.is-homed
 
-net a-neg-limit                          => joint.8.neg-lim-sw-in
-
 net a-output                            <=  pid.a.output
 net a-output                             => hm2_7i92.0.stepgen.08.velocity-cmd
-
-net a-pos-limit                          => joint.8.pos-lim-sw-in
 
 net a-pos-cmd                           <=  joint.8.motor-pos-cmd
 net a-pos-cmd                            => pid.a.command
@@ -609,12 +608,8 @@ net c-index-enable                       => pid.c.index-enable
 
 net c-is-homed                              halui.joint.9.is-homed
 
-net c-neg-limit                          => joint.9.neg-lim-sw-in
-
 net c-output                            <=  pid.c.output
 net c-output                             => hm2_7i92.0.stepgen.09.velocity-cmd
-
-net c-pos-limit                          => joint.9.pos-lim-sw-in
 
 net c-pos-cmd                           <=  joint.9.motor-pos-cmd
 net c-pos-cmd                            => pid.c.command
@@ -704,8 +699,6 @@ net u-index-enable                       => pid.u.index-enable
 
 net u-is-homed                              halui.joint.3.is-homed
 
-net u-neg-limit                          => joint.3.neg-lim-sw-in
-
 net u-output                            <=  pid.u.output
 net u-output                             => hm2_7i92.0.stepgen.02.velocity-cmd
 
@@ -715,8 +708,6 @@ net u-pos-cmd                           <=  joint.3.motor-pos-cmd
 net u-pos-fb                            <=  hm2_7i92.0.stepgen.02.position-fb
 net u-pos-fb                             => joint.3.motor-pos-fb
 net u-pos-fb                             => pid.u.feedback
-
-net u-pos-limit                          => joint.3.pos-lim-sw-in
 
 net u-vel-cmd                           <=  joint.3.vel-cmd
 
@@ -799,8 +790,6 @@ net v-index-enable                       => pid.v.index-enable
 
 net v-is-homed                              halui.joint.4.is-homed
 
-net v-neg-limit                          => joint.4.neg-lim-sw-in
-
 net v-output                            <=  pid.v.output
 net v-output                             => hm2_7i92.0.stepgen.03.velocity-cmd
 
@@ -810,8 +799,6 @@ net v-pos-cmd                            => pid.v.command
 net v-pos-fb                            <=  hm2_7i92.0.stepgen.03.position-fb
 net v-pos-fb                             => joint.4.motor-pos-fb
 net v-pos-fb                             => pid.v.feedback
-
-net v-pos-limit                          => joint.4.pos-lim-sw-in
 
 net v-vel-cmd                           <=  joint.4.vel-cmd
 
@@ -894,8 +881,6 @@ net w-index-enable                       => pid.w.index-enable
 
 net w-is-homed                              halui.joint.5.is-homed
 
-net w-neg-limit                          => joint.5.neg-lim-sw-in
-
 net w-pos-cmd                           <=  joint.5.motor-pos-cmd
 net w-pos-cmd                            => pid.w.command
 
@@ -905,8 +890,6 @@ net w-pos-fb                             => pid.w.feedback
 
 net w-output                            <=  pid.w.output
 net w-output                             => hm2_7i92.0.stepgen.00.velocity-cmd
-
-net w-pos-limit                          => joint.5.pos-lim-sw-in
 
 # W used to have no PID (open-loop stepgen, fed joint.5's velocity
 # command straight to the stepgen instead of through pid.w.output) -
@@ -1336,8 +1319,27 @@ sets spindle.1-at-speed                     true
 #  Modified 13 Jul 26 by R. Colvin
 # ********************************************************************
 
+# E-stop: the optional E-stop button (GX-16/2 plug, normally-closed,
+# between P1 pin 21 / hm2_7i92.0.gpio.031 and ground) feeds estop-latch.0's
+# fault-in via the estop-button net - but only when the operator has
+# marked it connected in REB Settings (Axis Selection page), in which
+# case REB_Generate_Local_Ini.py adds the net to REB.local.hal. Without
+# it fault-in stays false and this chain behaves like the plain
+# user-enable-out -> emc-enable-in loop it replaced. With it, pressing
+# the button (or a broken wire / unplugged button) lets the 7i92's
+# pull-up take the input high, which latches a fault and drops LinuxCNC
+# into E-stop until the button is released AND the operator turns
+# E-stop off in AXIS (F1), which pulses user-request-enable into reset.
+addf estop-latch.0                          servo-thread
+
 net estop-out                           <=  iocontrol.0.user-enable-out
-net estop-out                            => iocontrol.0.emc-enable-in
+net estop-out                            => estop-latch.0.ok-in
+
+net estop-reset                         <=  iocontrol.0.user-request-enable
+net estop-reset                          => estop-latch.0.reset
+
+net estop-ok                            <=  estop-latch.0.ok-out
+net estop-ok                             => iocontrol.0.emc-enable-in
 
 net in-position                         <=  motion.in-position
 

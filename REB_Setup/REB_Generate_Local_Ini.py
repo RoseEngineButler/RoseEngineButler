@@ -219,6 +219,56 @@ AXIS_TEMPLATE_JOINT_NUMBER = {
 JOINT_NUMBER_CANONICAL_ORDER = ("X", "Z", "B", "U", "V", "W", "A", "C")
 SPINDLE_NUMBER_CANONICAL_ORDER = ("Sp0", "Sp1")
 
+# The 3 GX-12 limit jacks -> the 7i92 I/O pin each is wired to, read as
+# plain GPIO (hm2_7i92.0.gpio.NNN.in - REB.hal loads the card with
+# num_inms=0, so the firmware's InM pins are GPIO). Jacks 1-3 are
+# Input0-2: P2 pins 3, 7, 13. Each jack takes one normally-closed
+# limit switch (or both ends of an axis's travel wired in series) and
+# may be left empty. What a jack protects, if anything, is the
+# operator's choice on REB Settings' Axis Selection page, persisted in
+# REBset_v1.ini's "limit_switches" dict: jack -> "<letter>" (both ends of
+# that axis, switches in series), "<letter> min" (negative end only),
+# "<letter> max" (positive end only), or "" (not used).
+# Duplicated in REB_Display/REB_Settings.py's LIMIT_JACKS.
+LIMIT_JACK_INPUT = {
+    "1": "002",
+    "2": "006",
+    "3": "010",
+}
+
+# The optional E-stop button's GX-16/2 plug (normally-closed, P1 pin 21)
+# -> its 7i92 I/O pin (GPIO, as above). Wired into REB.hal's estop-latch.0 only when
+# REBset_v1.ini's "estop_button" is true (REB Settings' Axis Selection
+# page); otherwise that latch has no fault source and behaves like a
+# plain software E-stop loop.
+ESTOP_BUTTON_INPUT = "031"
+
+# The optional signal tower's GX-12/4 plug: each light/sounder is
+# switched by a relay driven from one 7i92 I/O pin used as a GPIO output.
+# Green (P1 pin 25) and red (P2 pin 25) are the firmware's two unassigned
+# pins; the buzzer (P1 pin 13) is Input6, freed up by num_inms=0 and kept
+# clear of Input3 (P2 pin 21) so more limit jacks can go next to jacks
+# 1-3. Only configured as outputs when REBset_v1.ini's "signal_tower"
+# is true (REB Settings, Axis Selection page).
+# The end(s) of travel a limit jack can cover, by the suffix its
+# limit_switches value carries ("" = both ends).
+LIMIT_ENDS = {"": "both", " min": "min", " max": "max"}
+
+SIGNAL_TOWER_OUTPUT = {
+    "green": "033",
+    "red": "016",
+    "buzzer": "027",
+}
+
+# True for relay boards that switch ON when their input is pulled LOW.
+# The 7i92's pull-ups hold every pin high whenever LinuxCNC isn't driving
+# it (power-up, after exit), so active-low relays stay off then; an
+# active-high board would light/sound everything at every boot.
+SIGNAL_TOWER_ACTIVE_LOW = True
+
+# How long the buzzer sounds each time the red light comes on.
+SIGNAL_TOWER_BUZZER_SECONDS = 3.0
+
 
 def _read_channel_assignments(settings):
     '''
@@ -240,6 +290,210 @@ def _read_channel_assignments(settings):
         return dict(CHANNEL_DEFAULT_ROLE)
 
     return assignments
+
+
+def _parse_limit_value(value):
+    '''
+    "X" -> ("X", "both"), "X min" -> ("X", "min"), "X max" -> ("X", "max");
+    anything else (including "") -> None. Mirrors REB_Settings.py's
+    _parse_limit_value.
+    '''
+    for suffix, end in LIMIT_ENDS.items():
+        letter = value[:len(value) - len(suffix)] if suffix else value
+        if value == letter + suffix and letter in AXIS_SELECTION_LETTERS:
+            return letter, end
+    return None
+
+
+def _limit_ends_conflict(end_a, end_b):
+    '''
+    Two jacks on the same axis conflict unless one is min and the other
+    max - "both" already covers either end.
+    '''
+    return not ({end_a, end_b} == {"min", "max"})
+
+
+def _read_limit_jacks(settings):
+    '''
+    Reads REBset_v1.ini's limit_switches dict (written by REB_Settings.py's
+    _save_limit_jacks) into jack -> (letter, end), for in-use jacks only.
+    An absent, empty, or unrecognized entry means the jack isn't used.
+    Defensively (REBset_v1.ini isn't meant to be hand-edited), a jack
+    that conflicts with a lower-numbered jack on the same axis (anything
+    but a min/max pair) is ignored rather than generating two sources for
+    one joint limit pin.
+    '''
+    jacks = {}
+    stored = settings.get("limit_switches", {})
+    for jack in sorted(LIMIT_JACK_INPUT):
+        parsed = _parse_limit_value(stored.get(jack, ""))
+        if parsed is None:
+            continue
+        letter, end = parsed
+        clash = [j for j, (l, e) in jacks.items() if l == letter and _limit_ends_conflict(e, end)]
+        if clash:
+            print("Limit jack " + jack + ": conflicts with limit jack " + clash[0]
+                  + " on axis " + letter + " - ignoring this one")
+            continue
+        jacks[jack] = (letter, end)
+    return jacks
+
+
+def _read_estop_button(settings):
+    '''
+    Whether REBset_v1.ini marks the optional E-stop button as connected
+    (REB_Settings.py's _save_estop_button). Absent means not connected.
+    '''
+    return settings.get("estop_button") is True
+
+
+def _read_signal_tower(settings):
+    '''
+    Whether REBset_v1.ini marks the optional signal tower as connected
+    (REB_Settings.py's _save_signal_tower). Absent means not connected.
+    '''
+    return settings.get("signal_tower") is True
+
+
+def _signal_tower_hal(signal_tower, limit_nets, role_layout):
+    '''
+    Returns HAL text driving the optional signal tower's three relay
+    outputs when signal_tower is True:
+      - green: on while the interpreter isn't idle - a G-code program
+        or an MDI command (Sync Move, Threading, ...) is executing.
+        Fed straight from halui.program.is-idle, with the GPIO's own
+        invert_output doing the inversion.
+      - red: on while any active joint has exceeded its following error
+        (joint.N.f-errored, which LinuxCNC holds until the machine is
+        turned back on) or any in-use limit jack is tripped (limit_nets,
+        from _limit_jack_hal) - both turn the machine off by themselves.
+        OR'd by a logic component.
+      - buzzer: a SIGNAL_TOWER_BUZZER_SECONDS pulse from a oneshot each
+        time red rises.
+    With the tower off the pins are left as inputs, so nothing drives
+    the relays. Pin levels follow SIGNAL_TOWER_ACTIVE_LOW.
+    '''
+    lines = [
+        "",
+        "# ********************************************************************",
+        "# Signal tower - generated by REB_Generate_Local_Ini.py from",
+        "# REBset_v1.ini's signal_tower (REB Settings, Axis Selection page).",
+        "# ********************************************************************",
+    ]
+    if not signal_tower:
+        lines.append("# (signal tower not connected)")
+        return "\n".join(lines) + "\n"
+
+    # A GPIO output pin's level is .out XOR .invert_output. Each entry:
+    # (color, net, whether .out is true when the light/sounder is ON).
+    red_sources = ["joint." + str(j) + ".f-errored"
+                   for j in sorted(role_layout.joint_number.values())]
+    red_sources += sorted(limit_nets)
+
+    lines += [
+        "loadrt logic names=tower-red-or personality=0x2%02x" % len(red_sources),
+        "loadrt oneshot names=tower-buzz",
+        "addf tower-red-or".ljust(44) + "servo-thread",
+        "addf tower-buzz".ljust(44) + "servo-thread",
+        "setp tower-buzz.width".ljust(44) + str(SIGNAL_TOWER_BUZZER_SECONDS),
+        "",
+    ]
+    for i, source in enumerate(red_sources):
+        if source.startswith("joint."):
+            net = "tower-ferror-" + source.split(".")[1]
+            lines.append(("net " + net).ljust(40) + "<=  " + source)
+        else:
+            net = source
+        lines.append(("net " + net).ljust(41) + "=> tower-red-or.in-%02d" % i)
+    lines += [
+        "",
+        "net tower-green-idle".ljust(40) + "<=  halui.program.is-idle",
+        "net tower-green-idle".ljust(41) + "=> hm2_7i92.0.gpio." + SIGNAL_TOWER_OUTPUT["green"] + ".out",
+        "net tower-red".ljust(40) + "<=  tower-red-or.or",
+        "net tower-red".ljust(41) + "=> hm2_7i92.0.gpio." + SIGNAL_TOWER_OUTPUT["red"] + ".out",
+        "net tower-red".ljust(41) + "=> tower-buzz.in",
+        "net tower-buzzer".ljust(40) + "<=  tower-buzz.out",
+        "net tower-buzzer".ljust(41) + "=> hm2_7i92.0.gpio." + SIGNAL_TOWER_OUTPUT["buzzer"] + ".out",
+        "",
+    ]
+    # green's .out is is-idle, i.e. true when the light should be OFF.
+    out_true_means_on = {"green": False, "red": True, "buzzer": True}
+    for color in ("green", "red", "buzzer"):
+        pin = "hm2_7i92.0.gpio." + SIGNAL_TOWER_OUTPUT[color]
+        # Active-low: ON must drive the pin low, so invert exactly when
+        # .out is true for ON. Active-high: the opposite.
+        invert = out_true_means_on[color] == SIGNAL_TOWER_ACTIVE_LOW
+        lines.append(("setp " + pin + ".is_output").ljust(44) + "1")
+        lines.append(("setp " + pin + ".invert_output").ljust(44) + ("1" if invert else "0"))
+    return "\n".join(lines) + "\n"
+
+
+def _limit_jack_hal(limit_jacks, role_layout):
+    '''
+    Returns (HAL text, summary list, limit net names) wiring each in-use
+    limit jack's 7i92 input straight to its axis's joint limit pin(s):
+    "min" -> joint.N.neg-lim-sw-in (net <letter>-limit-min), "max" ->
+    joint.N.pos-lim-sw-in (<letter>-limit-max), "both" -> both pins
+    (<letter>-limit-sw, the switches at each end wired in series). REB.hal
+    doesn't touch those pins at all, so a joint with no jack keeps them
+    false. Separate min/max jacks let LinuxCNC tell which end tripped, so
+    the operator can jog away from it without Override Limits. A jack
+    whose axis isn't assigned to any channel this launch is skipped.
+
+    Uses the GPIO's .in (not .in_not): a normally-closed switch to ground
+    holds the input low; a tripped switch or broken wire lets the 7i92's
+    pull-up take it high, which reads as a limit hit.
+    '''
+    lines = [
+        "",
+        "# ********************************************************************",
+        "# Limit switch jacks - generated by REB_Generate_Local_Ini.py from",
+        "# REBset_v1.ini's limit_switches (REB Settings, Axis Selection page).",
+        "# ********************************************************************",
+    ]
+    summary = []
+    nets = []
+    for jack in sorted(limit_jacks):
+        letter, end = limit_jacks[jack]
+        if letter not in role_layout.channel_of:
+            print("Limit jack " + jack + ": axis " + letter
+                  + " isn't assigned to a channel - jack ignored this launch")
+            continue
+        joint = "joint." + str(role_layout.joint_number[letter])
+        net = letter.lower() + ("-limit-sw" if end == "both" else "-limit-" + end)
+        pins = {"min": ["neg-lim-sw-in"], "max": ["pos-lim-sw-in"],
+                "both": ["neg-lim-sw-in", "pos-lim-sw-in"]}[end]
+        lines.append(("net " + net).ljust(40) + "<=  hm2_7i92.0.gpio." + LIMIT_JACK_INPUT[jack] + ".in")
+        for pin in pins:
+            lines.append(("net " + net).ljust(41) + "=> " + joint + "." + pin)
+        summary.append("jack " + jack + " -> " + letter + ("" if end == "both" else " " + end))
+        nets.append(net)
+    if not summary:
+        lines.append("# (no limit jacks in use)")
+    return "\n".join(lines) + "\n", summary, nets
+
+
+def _estop_button_hal(estop_button):
+    '''
+    Returns HAL text wiring the optional E-stop button's 7i92 input into
+    REB.hal's estop-latch.0 fault-in when estop_button is True. GPIO
+    .in, same reasoning as _limit_jack_hal: a normally-closed button
+    to ground holds it low; pressed, broken, or unplugged reads high,
+    which latches E-stop.
+    '''
+    lines = [
+        "",
+        "# ********************************************************************",
+        "# E-stop button - generated by REB_Generate_Local_Ini.py from",
+        "# REBset_v1.ini's estop_button (REB Settings, Axis Selection page).",
+        "# ********************************************************************",
+    ]
+    if estop_button:
+        lines.append("net estop-button".ljust(40) + "<=  hm2_7i92.0.gpio." + ESTOP_BUTTON_INPUT + ".in")
+        lines.append("net estop-button".ljust(41) + "=> estop-latch.0.fault-in")
+    else:
+        lines.append("# (E-stop button not connected - software E-stop only)")
+    return "\n".join(lines) + "\n"
 
 
 class RoleLayout(object):
@@ -651,13 +905,16 @@ def _retarget_spindle_block(block_text, spindle_id, channel_id, spindle_num, pro
     return block_text
 
 
-def generate_local_hal_files(role_layout):
+def generate_local_hal_files(role_layout, limit_jacks=None, estop_button=False,
+                             signal_tower=False):
     '''
     Regenerates REB.local.hal from the tracked REB.hal: for each of the
     8 currently-active roles, retargets its own isolated
     ROLE_BLOCK-delimited region's channel number (and joint number for
     an axis letter, or spindle index for a spindle) and keeps it; the 2
-    currently-inactive roles' entire block is omitted. Copies
+    currently-inactive roles' entire block is omitted. Then appends the
+    in-use limit jacks', E-stop button's and signal tower's wiring
+    (_limit_jack_hal/_estop_button_hal/_signal_tower_hal). Copies
     REB_PostGUI_v1.hal to REB_PostGUI_v1.local.hal unchanged (see this
     file's own header for why no substitution is needed there).
 
@@ -719,6 +976,17 @@ def generate_local_hal_files(role_layout):
     pieces.append(hal_text[cursor:])
     hal_text = "".join(pieces)
 
+    # Goes just before REB.hal's closing "NOTHING FOLLOWS" banner, if
+    # present, so that banner still ends the file.
+    limit_text, limit_summary, limit_nets = _limit_jack_hal(limit_jacks or {}, role_layout)
+    limit_text += _estop_button_hal(estop_button)
+    limit_text += _signal_tower_hal(signal_tower, limit_nets, role_layout)
+    end_banner = hal_text.rfind("\n# *********************** NOTHING FOLLOWS")
+    if end_banner == -1:
+        hal_text += limit_text
+    else:
+        hal_text = hal_text[:end_banner] + limit_text + hal_text[end_banner:]
+
     if problems:
         print("REFUSING to write REB.local.hal - generation problem(s):")
         for problem in problems:
@@ -735,6 +1003,9 @@ def generate_local_hal_files(role_layout):
         return False
 
     print("Regenerated REB.local.hal: " + ", ".join(retargeted))
+    print("Limit jacks: " + (", ".join(limit_summary) or "none in use"))
+    print("E-stop button: " + ("connected" if estop_button else "not connected"))
+    print("Signal tower: " + ("connected" if signal_tower else "not connected"))
     if role_layout.inactive_roles:
         print("Not currently assigned to any channel: " + ", ".join(role_layout.inactive_roles))
     print("Wrote " + LOCAL_HAL_PATH + " and " + LOCAL_POSTGUI_HAL_PATH + " (unchanged copy)")
@@ -786,7 +1057,9 @@ def main():
     # realtime wiring can't be regenerated safely, don't write a
     # REB.local.ini that would point at it (or at a stale previous
     # .local.hal left over from a different assignment) anyway.
-    if not generate_local_hal_files(role_layout):
+    if not generate_local_hal_files(role_layout, _read_limit_jacks(settings),
+                                    _read_estop_button(settings),
+                                    _read_signal_tower(settings)):
         sys.exit(1)
 
     text, hal_files_result = _overlay_hal_files(text)

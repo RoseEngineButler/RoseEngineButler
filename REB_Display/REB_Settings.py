@@ -227,6 +227,119 @@ def _read_persisted_channel_assignments():
 
     return assignments
 
+# The 3 GX-12 limit jacks on the panel. Each takes one normally-closed
+# limit switch (or both ends of an axis's travel wired in series) and
+# may be left empty; the Axis Selection page's Limit_Jack_N_Axis combo
+# picks what, if anything, it protects: both ends of an axis (switches in
+# series), or just its min (negative) or max (positive) end - e.g. a
+# curvilinear slide with a switch at each end uses two jacks, "B min" and
+# "B max", so LinuxCNC knows which end tripped and allows jogging away
+# from it. Persisted in REBset_v1.ini's "limit_switches" dict (jack ->
+# "B", "B min", "B max", or "" = not used)
+# and wired into HAL at the next launch by REB_Generate_Local_Ini.py,
+# whose LIMIT_JACK_INPUT maps each jack to its 7i92 input.
+LIMIT_JACKS = ("1", "2", "3")
+LIMIT_JACK_NOT_USED = "Not used"
+
+# limit_switches value suffix -> which end(s) of travel it covers, and
+# the text the combo shows for it (after the letter).
+LIMIT_ENDS = {"": "both", " min": "min", " max": "max"}
+LIMIT_END_LABELS = {"": " (both ends)", " min": " min", " max": " max"}
+
+def _parse_limit_value(value):
+    '''
+    "X" -> ("X", "both"), "X min" -> ("X", "min"), "X max" -> ("X", "max");
+    anything else (including "") -> None. Mirrors
+    REB_Generate_Local_Ini.py's _parse_limit_value.
+    '''
+    for suffix, end in LIMIT_ENDS.items():
+        letter = value[:len(value) - len(suffix)] if suffix else value
+        if value == letter + suffix and letter in AXIS_SELECTION_LETTERS:
+            return letter, end
+    return None
+
+def _limit_ends_conflict(end_a, end_b):
+    '''
+    Two jacks on the same axis conflict unless one is min and the other
+    max - "both" already covers either end.
+    '''
+    return not ({end_a, end_b} == {"min", "max"})
+
+def _limit_value_label(value):
+    '''The combo text for a limit_switches value ("" -> "Not used").'''
+    parsed = _parse_limit_value(value)
+    if parsed is None:
+        return LIMIT_JACK_NOT_USED
+    suffix = value[len(parsed[0]):]
+    return parsed[0] + LIMIT_END_LABELS[suffix]
+
+def _save_limit_jacks(jacks):
+    '''
+    Persists the Axis Selection page's limit jack choices into
+    REBset_v1.ini's "limit_switches" dict. jacks is a dict of jack
+    ("1".."3") -> "<letter>", "<letter> min", "<letter> max", or "" for
+    a jack that isn't used.
+    '''
+    settings = reb_settings_io.load_settings()
+    settings["limit_switches"] = {jack: jacks.get(jack, "") for jack in LIMIT_JACKS}
+    reb_settings_io.save_settings(settings)
+    print("Saved limit jacks: " + str(settings["limit_switches"]))
+
+def _read_persisted_limit_jacks():
+    '''
+    Reads the persisted limit jack map (jack -> limit_switches value). A
+    missing or unrecognized entry means the jack isn't used - the safe
+    default for a machine that has never set one up. A jack conflicting
+    with a lower-numbered one on the same axis (anything but a min/max
+    pair) is dropped, matching what REB_Generate_Local_Ini.py's
+    _read_limit_jacks will actually wire.
+    '''
+    jacks = {jack: "" for jack in LIMIT_JACKS}
+    stored = reb_settings_io.load_settings().get("limit_switches", {})
+    for jack in LIMIT_JACKS:
+        value = stored.get(jack, "")
+        parsed = _parse_limit_value(value)
+        if parsed is None:
+            continue
+        clash = False
+        for other in jacks.values():
+            other_parsed = _parse_limit_value(other)
+            if other_parsed and other_parsed[0] == parsed[0] and _limit_ends_conflict(other_parsed[1], parsed[1]):
+                clash = True
+        if not clash:
+            jacks[jack] = value
+    return jacks
+
+# The optional E-stop button (GX-16/2 plug, normally-closed). The Axis
+# Selection page's Estop_Button_Connected checkbox records whether one
+# is plugged in, persisted as REBset_v1.ini's "estop_button" (absent =
+# not connected); REB_Generate_Local_Ini.py wires it into HAL at the
+# next launch only when true, since an empty plug would otherwise hold
+# the machine in E-stop.
+def _save_estop_button(connected):
+    settings = reb_settings_io.load_settings()
+    settings["estop_button"] = bool(connected)
+    reb_settings_io.save_settings(settings)
+    print("Saved E-stop button: " + ("connected" if connected else "not connected"))
+
+def _read_persisted_estop_button():
+    return reb_settings_io.load_settings().get("estop_button") is True
+
+# The optional signal tower (GX-12/4 plug; green/red lights and a
+# sounder, each switched by a relay). The Axis Selection page's
+# Signal_Tower_Connected checkbox records whether one is fitted,
+# persisted as REBset_v1.ini's "signal_tower" (absent = not connected);
+# REB_Generate_Local_Ini.py only sets up its three output pins at the
+# next launch when true.
+def _save_signal_tower(connected):
+    settings = reb_settings_io.load_settings()
+    settings["signal_tower"] = bool(connected)
+    reb_settings_io.save_settings(settings)
+    print("Saved signal tower: " + ("connected" if connected else "not connected"))
+
+def _read_persisted_signal_tower():
+    return reb_settings_io.load_settings().get("signal_tower") is True
+
 # This session's channel -> role assignment, as persisted at the time
 # REB_Generate_Local_Ini.py generated REB.local.hal/REB.local.ini for
 # this LinuxCNC launch (see CLAUDE.md). Read once at module import: a
@@ -1111,6 +1224,138 @@ class HandlerClass:
         # warning - called anyway so the tab's own state stays
         # consistent if that ever changes.
         self._update_validation_warnings()
+
+    def _load_limit_jacks(self):
+        '''
+        Reads the persisted limit jack -> axis letter map (REBset_v1.ini's
+        "limit_switches") and populates the Axis Selection page's three
+        Limit_Jack_N_Axis combos (see _rebuild_limit_jack_combos).
+        '''
+        if self.builder.get_object("Limit_Jack_1_Axis") is None:
+            return
+
+        self._limit_jacks = _read_persisted_limit_jacks()
+        self._limit_jack_notices = {}
+        if self._rebuild_limit_jack_combos():
+            _save_limit_jacks(self._limit_jacks)
+        self._update_limit_jack_warnings()
+
+    def _rebuild_limit_jack_combos(self):
+        '''
+        Repopulates every Limit_Jack_N_Axis combo with "Not used" plus,
+        for each axis letter currently assigned to a channel only, its
+        "(both ends)", "min" and "max" choices - a jack can't be pointed
+        at an axis that isn't configured for use. A jack
+        whose axis is no longer assigned (a channel was changed, or the
+        persisted file names one) is switched to "Not used", with a
+        notice saying so (self._limit_jack_notices, shown by
+        _update_limit_jack_warnings until that jack is next changed).
+        Returns True if any jack was switched, so the caller can persist.
+        '''
+        if self.builder.get_object("Limit_Jack_1_Axis") is None:
+            return False
+
+        assigned = set(self._channel_assignments.values())
+        values = ("",) + tuple(
+            letter + suffix
+            for letter in AXIS_SELECTION_LETTERS if letter in assigned
+            for suffix in LIMIT_ENDS)
+
+        cleared = False
+        self._applying_limit_jacks = True
+        for jack in LIMIT_JACKS:
+            parsed = _parse_limit_value(self._limit_jacks[jack])
+            if parsed and parsed[0] not in assigned:
+                self._limit_jacks[jack] = ""
+                self._limit_jack_notices[jack] = parsed[0] + " not assigned - cleared"
+                cleared = True
+            combo = self.builder.get_object("Limit_Jack_" + jack + "_Axis")
+            combo.remove_all()
+            for value in values:
+                combo.append(value, _limit_value_label(value))
+            combo.set_active(values.index(self._limit_jacks[jack]))
+        self._applying_limit_jacks = False
+        return cleared
+
+    def _load_estop_button(self):
+        '''
+        Reads the persisted E-stop button choice (REBset_v1.ini's
+        "estop_button") into the Axis Selection page's checkbox.
+        '''
+        check = self.builder.get_object("Estop_Button_Connected")
+        if check is None:
+            return
+        self._applying_estop_button = True
+        check.set_active(_read_persisted_estop_button())
+        self._applying_estop_button = False
+
+    def Estop_Button_Toggled(self, widget):
+        '''
+        Persists the E-stop button checkbox. Takes effect at the next
+        LinuxCNC launch (REB_Generate_Local_Ini.py).
+        '''
+        if self._applying_estop_button:
+            return
+        _save_estop_button(widget.get_active())
+
+    def _load_signal_tower(self):
+        '''
+        Reads the persisted signal tower choice (REBset_v1.ini's
+        "signal_tower") into the Axis Selection page's checkbox.
+        '''
+        check = self.builder.get_object("Signal_Tower_Connected")
+        if check is None:
+            return
+        self._applying_signal_tower = True
+        check.set_active(_read_persisted_signal_tower())
+        self._applying_signal_tower = False
+
+    def Signal_Tower_Toggled(self, widget):
+        '''
+        Persists the signal tower checkbox. Takes effect at the next
+        LinuxCNC launch (REB_Generate_Local_Ini.py).
+        '''
+        if self._applying_signal_tower:
+            return
+        _save_signal_tower(widget.get_active())
+
+    def _update_limit_jack_warnings(self):
+        '''
+        Recomputes every Limit_Jack_N_Warning label and returns whether
+        the jack choices are safe to persist:
+          - two jacks covering the same end of the same axis blocks
+            saving, same as a duplicate channel role: an identical choice
+            shows "Duplicate!", an overlapping one (e.g. "B (both ends)"
+            with "B min") shows "Conflict!". A min/max pair is fine.
+          - otherwise, any notice left by _rebuild_limit_jack_combos
+            for a jack it switched to "Not used" (informational only).
+        Returns True if a blocking violation exists.
+        '''
+        if self.builder.get_object("Limit_Jack_1_Warning") is None:
+            return False
+
+        parsed = {jack: _parse_limit_value(self._limit_jacks[jack]) for jack in LIMIT_JACKS}
+        any_violation = False
+        for jack in LIMIT_JACKS:
+            warning = self.builder.get_object("Limit_Jack_" + jack + "_Warning")
+            problem = None
+            if parsed[jack]:
+                for other in LIMIT_JACKS:
+                    if other == jack or not parsed[other] or parsed[other][0] != parsed[jack][0]:
+                        continue
+                    if parsed[other] == parsed[jack]:
+                        problem = "Duplicate!"
+                    elif _limit_ends_conflict(parsed[other][1], parsed[jack][1]):
+                        problem = problem or "Conflict!"
+            if problem:
+                warning.set_markup('<span foreground="red" weight="bold">' + problem + '</span>')
+                any_violation = True
+            elif jack in self._limit_jack_notices:
+                warning.set_markup('<span foreground="#c06000" weight="bold">'
+                                   + self._limit_jack_notices[jack] + '</span>')
+            else:
+                warning.set_text("")
+        return any_violation
 
     def _load_max_jog_speed(self):
         '''
@@ -2114,6 +2359,18 @@ class HandlerClass:
         # combos.
         self._applying_channel_assignments = False
 
+        # Same suppression as above, for _load_limit_jacks driving the
+        # three Limit_Jack_N_Axis combos.
+        self._applying_limit_jacks = False
+
+        # Same suppression as above, for _load_estop_button driving the
+        # Estop_Button_Connected checkbox.
+        self._applying_estop_button = False
+
+        # Same suppression as above, for _load_signal_tower driving the
+        # Signal_Tower_Connected checkbox.
+        self._applying_signal_tower = False
+
         # Restore persisted axis scale values (REBset_v1.ini) into the
         # spin buttons and the real stepgen scale pins.
         self._load_scale_settings()
@@ -2144,6 +2401,20 @@ class HandlerClass:
         # Restore the persisted channel -> axis letter assignment
         # (REBset_v1.ini) into the Axis Selection tab's six combos.
         self._load_channel_assignments()
+
+        # Restore the persisted limit jack -> axis letter choices
+        # (REBset_v1.ini) into the Axis Selection tab's three Limit Jack
+        # combos. Must follow _load_channel_assignments - its "Axis not
+        # assigned" notice checks the channel assignment.
+        self._load_limit_jacks()
+
+        # Restore the persisted E-stop button choice (REBset_v1.ini) into
+        # the Axis Selection tab's E-Stop Button checkbox.
+        self._load_estop_button()
+
+        # Restore the persisted signal tower choice (REBset_v1.ini) into
+        # the Axis Selection tab's Signal Tower checkbox.
+        self._load_signal_tower()
 
         # Restore the persisted Max Jog Speed (REBset_v1.ini) into the
         # Max Jog Speed spin button.
@@ -2493,6 +2764,15 @@ def _channel_axis_changed(channel_id):
         if self._update_validation_warnings():
             return
 
+        # Only once the channel assignment is valid (and being saved):
+        # the limit jack combos only offer assigned axes, so refresh them
+        # - a jack whose axis just lost its channel switches to "Not
+        # used". Not done while a duplicate is showing, so a transient
+        # duplicate mid-rearrangement can't wipe a jack's axis.
+        if self._rebuild_limit_jack_combos():
+            _save_limit_jacks(self._limit_jacks)
+        self._update_limit_jack_warnings()
+
         _save_channel_assignments(self._channel_assignments)
     handler.__name__ = "Channel_" + channel_id + "_Axis_Changed"
     return handler
@@ -2500,6 +2780,35 @@ def _channel_axis_changed(channel_id):
 for _channel_id in CHANNEL_DEFAULT_ROLE:
     setattr(HandlerClass, "Channel_" + _channel_id + "_Axis_Changed", _channel_axis_changed(_channel_id))
 del _channel_id
+
+def _limit_jack_axis_changed(jack):
+    '''
+    Generic "changed" handler for one Limit_Jack_N_Axis combo. Records
+    the choice and persists all three jacks unless the choices now
+    contain a duplicate axis (flagged by _update_limit_jack_warnings,
+    saved automatically once cleared - same pattern as
+    _channel_axis_changed). Takes effect at the next LinuxCNC launch.
+    '''
+    def handler(self, widget):
+        if self._applying_limit_jacks:
+            return
+
+        value = widget.get_active_id()
+        if value is None or (value and _parse_limit_value(value) is None):
+            return
+        self._limit_jack_notices.pop(jack, None)
+        self._limit_jacks[jack] = value
+
+        if self._update_limit_jack_warnings():
+            return
+
+        _save_limit_jacks(self._limit_jacks)
+    handler.__name__ = "Limit_Jack_" + jack + "_Axis_Changed"
+    return handler
+
+for _jack in LIMIT_JACKS:
+    setattr(HandlerClass, "Limit_Jack_" + _jack + "_Axis_Changed", _limit_jack_axis_changed(_jack))
+del _jack
 
 def _pid_set(hal_pin):
     '''

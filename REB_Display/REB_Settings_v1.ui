@@ -806,21 +806,115 @@
                           </packing>
                         </child>
                         <child>
-                          <object class="GtkLabel">
+                          <object class="GtkBox" id="Axis_Selection_Intro_Columns">
                             <property name="visible">True</property>
                             <property name="can-focus">False</property>
-                            <property name="halign">start</property>
-                            <property name="valign">center</property>
-                            <property name="label" translatable="yes">Choose which axes you wish to use, and the plug on the box to which each is assigned.
+                            <property name="spacing">15</property>
+                            <property name="homogeneous">True</property>
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="halign">start</property>
+                                <property name="valign">start</property>
+                                <property name="label" translatable="yes">Choose which axes you wish to use, and the plug on the box to which each is assigned.
                     
 Each plug is a channel in LinuxCNC, and each must use a different letter.
     * X, Z, U, V, &amp; W are linear (Y cannot be used),
     * A, B, &amp; C are angular (rotary), and
-    * Sp0 and Sp1 can not be changed.</property>
-                            <property name="wrap">True</property>
-                            <attributes>
-                              <attribute name="font-desc" value="DejaVu Serif 10"/>
-                            </attributes>
+    * Sp0 and Sp1 are spindles and can use any plug, but Sp1 needs Sp0 (its speed is set as a percentage of Sp0's).</property>
+                                <property name="wrap">True</property>
+                                <property name="xalign">0</property>
+                                <attributes>
+                                  <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                </attributes>
+                              </object>
+                              <packing>
+                                <property name="expand">True</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkBox">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="spacing">15</property>
+                                <child>
+                                  <object class="GtkSeparator">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="orientation">vertical</property>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">False</property>
+                                    <property name="fill">True</property>
+                                    <property name="position">0</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkBox" id="Axis_Selection_Limit_Notes">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="orientation">vertical</property>
+                                    <child>
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">start</property>
+                                        <property name="label" translatable="yes">Limit Switches</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 16"/>
+                                          <attribute name="weight" value="bold"/>
+                                          <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                                        </attributes>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">0</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">start</property>
+                                        <property name="valign">start</property>
+                                        <property name="label" translatable="yes">Each limit jack takes a normally-closed limit switch. For each jack choose:
+    * &lt;axis&gt; min - the switch at the negative end of travel, where the axis stops when moving in the minus (-) direction,
+    * &lt;axis&gt; max - the switch at the positive end of travel, where the axis stops when moving in the plus (+) direction, or
+    * &lt;axis&gt; (both ends) - a switch at each end, wired in series into one jack.
+
+Use a min jack and a max jack on the same axis (for example, one at each end of a curvilinear slide) so LinuxCNC knows which end was hit and you can jog back off it. With (both ends), check Override Limits in LinuxCNC to jog off a switch.
+
+Choose Not used for any jack with nothing plugged into it.</property>
+                                        <property name="wrap">True</property>
+                                        <property name="xalign">0</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                        </attributes>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">1</property>
+                                      </packing>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="expand">True</property>
+                                    <property name="fill">True</property>
+                                    <property name="position">1</property>
+                                  </packing>
+                                </child>
+                              </object>
+                              <packing>
+                                <property name="expand">True</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
                           </object>
                           <packing>
                             <property name="expand">False</property>
@@ -849,7 +943,7 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                             <property name="can-focus">False</property>
                             <property name="spacing">10</property>
                             <child>
-                              <!-- n-columns=5 n-rows=4 -->
+                              <!-- n-columns=5 n-rows=6 -->
                               <object class="GtkGrid">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
@@ -1613,6 +1707,307 @@ Each plug is a channel in LinuxCNC, and each must use a different letter.
                                   <packing>
                                     <property name="left-attach">4</property>
                                     <property name="top-attach">3</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-right">10</property>
+                                    <property name="margin-end">10</property>
+                                    <property name="margin-top">10</property>
+                                    <property name="label" translatable="yes">Inputs</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 12"/>
+                                      <attribute name="weight" value="bold"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">0</property>
+                                    <property name="top-attach">4</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkFrame">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label-xalign">0</property>
+                                    <child>
+                                      <object class="GtkBox">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <property name="orientation">vertical</property>
+                                        <property name="spacing">2</property>
+                                        <child>
+                                          <object class="GtkComboBoxText" id="Limit_Jack_1_Axis">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="tooltip-text" translatable="yes">What the normally-closed limit switch plugged into limit jack 1 protects: both ends of an axis (a switch at each end, wired in series), or only its min (negative) or max (positive) end - use two jacks, one min and one max, when you want LinuxCNC to know which end tripped, e.g. a switch at each end of a curvilinear slide. Only axes assigned to a channel are listed. Choose Not used when nothing is plugged in - an empty jack that's in use reads as a tripped limit. Takes effect the next time LinuxCNC starts.</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <signal name="changed" handler="Limit_Jack_1_Axis_Changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="Limit_Jack_1_Warning">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <property name="use-markup">True</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child type="label">
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">Limit Jack 1</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                          <attribute name="weight" value="bold"/>
+                                        </attributes>
+                                      </object>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">1</property>
+                                    <property name="top-attach">4</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkFrame">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label-xalign">0</property>
+                                    <child>
+                                      <object class="GtkBox">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <property name="orientation">vertical</property>
+                                        <property name="spacing">2</property>
+                                        <child>
+                                          <object class="GtkComboBoxText" id="Limit_Jack_2_Axis">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="tooltip-text" translatable="yes">What the normally-closed limit switch plugged into limit jack 2 protects: both ends of an axis (a switch at each end, wired in series), or only its min (negative) or max (positive) end - use two jacks, one min and one max, when you want LinuxCNC to know which end tripped, e.g. a switch at each end of a curvilinear slide. Only axes assigned to a channel are listed. Choose Not used when nothing is plugged in - an empty jack that's in use reads as a tripped limit. Takes effect the next time LinuxCNC starts.</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <signal name="changed" handler="Limit_Jack_2_Axis_Changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="Limit_Jack_2_Warning">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <property name="use-markup">True</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child type="label">
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">Limit Jack 2</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                          <attribute name="weight" value="bold"/>
+                                        </attributes>
+                                      </object>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">2</property>
+                                    <property name="top-attach">4</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkFrame">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label-xalign">0</property>
+                                    <child>
+                                      <object class="GtkBox">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <property name="orientation">vertical</property>
+                                        <property name="spacing">2</property>
+                                        <child>
+                                          <object class="GtkComboBoxText" id="Limit_Jack_3_Axis">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="tooltip-text" translatable="yes">What the normally-closed limit switch plugged into limit jack 3 protects: both ends of an axis (a switch at each end, wired in series), or only its min (negative) or max (positive) end - use two jacks, one min and one max, when you want LinuxCNC to know which end tripped, e.g. a switch at each end of a curvilinear slide. Only axes assigned to a channel are listed. Choose Not used when nothing is plugged in - an empty jack that's in use reads as a tripped limit. Takes effect the next time LinuxCNC starts.</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <signal name="changed" handler="Limit_Jack_3_Axis_Changed" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="Limit_Jack_3_Warning">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <property name="use-markup">True</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
+                                      </object>
+                                    </child>
+                                    <child type="label">
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">Limit Jack 3</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                          <attribute name="weight" value="bold"/>
+                                        </attributes>
+                                      </object>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">3</property>
+                                    <property name="top-attach">4</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkFrame">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label-xalign">0</property>
+                                    <child>
+                                      <object class="GtkCheckButton" id="Estop_Button_Connected">
+                                        <property name="label" translatable="yes">Connected</property>
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="receives-default">False</property>
+                                        <property name="tooltip-text" translatable="yes">Check when a normally-closed E-stop button is plugged into the E-stop (GX-16/2) plug. Leave unchecked when nothing is plugged in - an empty plug that's marked connected holds the machine in E-stop. Takes effect the next time LinuxCNC starts.</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <property name="draw-indicator">True</property>
+                                        <signal name="toggled" handler="Estop_Button_Toggled" swapped="no"/>
+                                      </object>
+                                    </child>
+                                    <child type="label">
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">E-Stop Button</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                          <attribute name="weight" value="bold"/>
+                                        </attributes>
+                                      </object>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">4</property>
+                                    <property name="top-attach">4</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="halign">start</property>
+                                    <property name="valign">center</property>
+                                    <property name="margin-right">10</property>
+                                    <property name="margin-end">10</property>
+                                    <property name="label" translatable="yes">Outputs</property>
+                                    <attributes>
+                                      <attribute name="font-desc" value="DejaVu Serif 12"/>
+                                      <attribute name="weight" value="bold"/>
+                                    </attributes>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">0</property>
+                                    <property name="top-attach">5</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkFrame">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label-xalign">0</property>
+                                    <child>
+                                      <object class="GtkCheckButton" id="Signal_Tower_Connected">
+                                        <property name="label" translatable="yes">Connected</property>
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="receives-default">False</property>
+                                        <property name="tooltip-text" translatable="yes">Check when a signal tower is plugged into the signal tower (GX-12/4) plug. Green is lit while a program or MDI command is running; red is lit after a following error or a tripped limit switch, with a short sound from the buzzer when it comes on. Takes effect the next time LinuxCNC starts.</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <property name="draw-indicator">True</property>
+                                        <signal name="toggled" handler="Signal_Tower_Toggled" swapped="no"/>
+                                      </object>
+                                    </child>
+                                    <child type="label">
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">Signal Tower</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                          <attribute name="weight" value="bold"/>
+                                        </attributes>
+                                      </object>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">1</property>
+                                    <property name="top-attach">5</property>
                                   </packing>
                                 </child>
                                 <child>
