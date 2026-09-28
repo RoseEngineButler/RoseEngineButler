@@ -39,7 +39,7 @@
 #   1.1 - 23 Dec 2025, R. Colvin - Changed text from "upgrade" to
 #         "update".
 #
-# Copyright (c) 2025 Colvin Tools and Brainwave Embedded.
+# Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #
 # The following MIT/X Consortium License applies to the Rose Engine
 # Butler system.  Use of this system constitutes consent to the terms
