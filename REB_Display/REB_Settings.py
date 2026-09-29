@@ -316,6 +316,30 @@ def _read_persisted_limit_jacks():
 # not connected); REB_Generate_Local_Ini.py wires it into HAL at the
 # next launch only when true, since an empty plug would otherwise hold
 # the machine in E-stop.
+# Makes the Axis Selection page's E-Stop Button frame (named
+# Estop_Frame in REB_Settings_v1.ui) look like a safety control -
+# safety-yellow background and a heavier dark border, with its title in
+# red set in the .ui itself - so it stands apart from the Limit Jack
+# frames beside it. Scoped to that one widget name, nothing else.
+ESTOP_FRAME_CSS = b"""
+#Estop_Frame > border {
+    background-color: #FFE680;
+    border: 2px solid #3d3d3d;
+    border-radius: 3px;
+}
+"""
+
+ESTOP_WARNING_MARKUP = ('<span foreground="#c01c28" weight="bold">Machine stays in E-stop '
+                        'unless the button is plugged in</span>')
+
+def _install_estop_frame_style():
+    provider = Gtk.CssProvider()
+    provider.load_from_data(ESTOP_FRAME_CSS)
+    screen = Gdk.Screen.get_default()
+    if screen is not None:
+        Gtk.StyleContext.add_provider_for_screen(
+            screen, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
 def _save_estop_button(connected):
     settings = reb_settings_io.load_settings()
     settings["estop_button"] = bool(connected)
@@ -1285,15 +1309,32 @@ class HandlerClass:
         check = self.builder.get_object("Estop_Button_Connected")
         if check is None:
             return
+        _install_estop_frame_style()
         self._applying_estop_button = True
         check.set_active(_read_persisted_estop_button())
         self._applying_estop_button = False
+        self._update_estop_warning(check.get_active())
+
+    def _update_estop_warning(self, connected):
+        '''
+        Shows a warning under the E-Stop Button checkbox while it's
+        checked: with the button marked connected, an empty plug holds
+        the machine in E-stop.
+        '''
+        warning = self.builder.get_object("Estop_Button_Warning")
+        if warning is None:
+            return
+        if connected:
+            warning.set_markup(ESTOP_WARNING_MARKUP)
+        else:
+            warning.set_text("")
 
     def Estop_Button_Toggled(self, widget):
         '''
         Persists the E-stop button checkbox. Takes effect at the next
         LinuxCNC launch (REB_Generate_Local_Ini.py).
         '''
+        self._update_estop_warning(widget.get_active())
         if self._applying_estop_button:
             return
         _save_estop_button(widget.get_active())

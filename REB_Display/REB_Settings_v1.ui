@@ -1922,21 +1922,57 @@ Choose Not used for any jack with nothing plugged into it.</property>
                                   </packing>
                                 </child>
                                 <child>
-                                  <object class="GtkFrame">
+                                  <object class="GtkFrame" id="Estop_Frame">
+                                    <property name="name">Estop_Frame</property>
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
                                     <property name="label-xalign">0</property>
                                     <child>
-                                      <object class="GtkCheckButton" id="Estop_Button_Connected">
-                                        <property name="label" translatable="yes">Connected</property>
+                                      <object class="GtkBox">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
-                                        <property name="receives-default">False</property>
-                                        <property name="tooltip-text" translatable="yes">Check when a normally-closed E-stop button is plugged into the E-stop (GX-16/2) plug. Leave unchecked when nothing is plugged in - an empty plug that's marked connected holds the machine in E-stop. Takes effect the next time LinuxCNC starts.</property>
                                         <property name="halign">center</property>
                                         <property name="valign">center</property>
-                                        <property name="draw-indicator">True</property>
-                                        <signal name="toggled" handler="Estop_Button_Toggled" swapped="no"/>
+                                        <property name="orientation">vertical</property>
+                                        <property name="spacing">2</property>
+                                        <child>
+                                          <object class="GtkCheckButton" id="Estop_Button_Connected">
+                                            <property name="label" translatable="yes">Connected</property>
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="receives-default">False</property>
+                                            <property name="tooltip-text" translatable="yes">Check when a normally-closed E-stop button is plugged into the E-stop (GX-16/2) plug. Leave unchecked when nothing is plugged in - an empty plug that's marked connected holds the machine in E-stop. Takes effect the next time LinuxCNC starts.</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <property name="draw-indicator">True</property>
+                                            <signal name="toggled" handler="Estop_Button_Toggled" swapped="no"/>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="Estop_Button_Warning">
+                                            <property name="visible">True</property>
+                                            <property name="can-focus">False</property>
+                                            <property name="halign">center</property>
+                                            <property name="valign">center</property>
+                                            <property name="justify">center</property>
+                                            <property name="wrap">True</property>
+                                            <property name="max-width-chars">13</property>
+                                            <property name="use-markup">True</property>
+                                            <attributes>
+                                              <attribute name="font-desc" value="DejaVu Serif 9"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="expand">False</property>
+                                            <property name="fill">True</property>
+                                            <property name="position">1</property>
+                                          </packing>
+                                        </child>
                                       </object>
                                     </child>
                                     <child type="label">
@@ -1947,6 +1983,7 @@ Choose Not used for any jack with nothing plugged into it.</property>
                                         <attributes>
                                           <attribute name="font-desc" value="DejaVu Serif 10"/>
                                           <attribute name="weight" value="bold"/>
+                                          <attribute name="foreground" value="#c0c01c1c2828"/>
                                         </attributes>
                                       </object>
                                     </child>
