@@ -572,7 +572,7 @@ VELOCITY_SETTINGS = {
     "Default_Linear_Velocity":  ("default_linear_velocity",  0.250000),
     "Min_Linear_Velocity":      ("min_linear_velocity",      0.016670),
     "Max_Angular_Velocity":     ("max_angular_velocity",     10.000000),
-    "Default_Angular_Velocity": ("default_angular_velocity", 5.000000),
+    "Default_Angular_Velocity": ("default_angular_velocity", 5.833333),
     "Min_Angular_Velocity":     ("min_angular_velocity",     1.666667),
 }
 

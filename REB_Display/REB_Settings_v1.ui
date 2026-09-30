@@ -7120,7 +7120,7 @@ from File</property>
                                     <property name="valign">center</property>
                                     <property name="margin-top">4</property>
                                     <property name="margin-bottom">4</property>
-                                    <property name="text" translatable="yes">1.0000</property>
+                                    <property name="text" translatable="yes">10.0000</property>
                                     <property name="input-purpose">number</property>
                                     <property name="adjustment">Max_Angular_Velocity_adj</property>
                                     <property name="climb-rate">0.10</property>
@@ -7142,7 +7142,7 @@ from File</property>
                                     <property name="valign">center</property>
                                     <property name="margin-top">4</property>
                                     <property name="margin-bottom">4</property>
-                                    <property name="text" translatable="yes">12.0000</property>
+                                    <property name="text" translatable="yes">5.8333</property>
                                     <property name="input-purpose">number</property>
                                     <property name="adjustment">Default_Angular_Velocity_adj</property>
                                     <property name="climb-rate">0.10</property>
