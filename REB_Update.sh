@@ -1,4 +1,4 @@
-#! /home/reuben/linuxcnc/
+#!/bin/bash
 #######################################################################
 #                    RRRRRR    EEEEEEEE  BBBBBBB                      #
 #                    RR   RR   EE        BB    BB                     #
@@ -99,12 +99,42 @@ echo -e "${TITLE}                                                               
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
 echo -e "${TITLE}Pull latest files from GitHub                                          ${NOCOLOR}"
 cd /home/reuben/linuxcnc/configs/RoseEngineButler
-git stash
+
+# Set aside any local changes to tracked files - e.g. the operator's tool
+# table (REB_Custom/REB_Tool.tbl) or HAL additions (REB_Custom/REB_Custom.hal)
+# - so they can't make the pull fail, then put them back afterwards.
+# (This used to stash and never restore, so those edits looked lost after
+# every update.)
+stashes_before=$(git stash list | wc -l)
+git stash push -m "REB_Update $(date '+%Y-%m-%d %H:%M')"
+stashes_after=$(git stash list | wc -l)
+stashed=false
+if [ "$stashes_after" -gt "$stashes_before" ]; then
+    stashed=true
+fi
+
 git pull
 if [ $? != 0 ]; then
     echo -e "${KEYNOTE}ERROR: git pull failed.                                              ${NOCOLOR}"
+    if [ "$stashed" = true ]; then
+        git stash pop
+    fi
     echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-    exit $?
+    exit 1
+fi
+
+if [ "$stashed" = true ]; then
+    if git stash pop; then
+        echo -e "${TITLE}Local changes (e.g. tool table) restored                               ${NOCOLOR}"
+    else
+        # The update changed the same lines. Leave the files exactly as
+        # pulled (no half-merged conflict markers for LinuxCNC to trip
+        # over); the local changes stay safe in the stash.
+        git reset --hard -q HEAD
+        echo -e "${KEYNOTE}WARNING: local changes could not be re-applied automatically.       ${NOCOLOR}"
+        echo -e "${KEYNOTE}They are saved - see 'git stash list' (REB_Update ...) and the       ${NOCOLOR}"
+        echo -e "${KEYNOTE}Support Manual page 'Updates and Branches' to restore them.           ${NOCOLOR}"
+    fi
 fi
 echo -e "${TITLE}Latest files pulled from GitHub                                        ${NOCOLOR}"
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
@@ -113,7 +143,7 @@ sudo apt update
 if [ $? != 0 ]; then
     echo -e "${KEYNOTE}ERROR: Package update failed                                         ${NOCOLOR}"
     echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-    exit $?
+    exit 1
 fi
 echo -e "${TITLE}Latest package updates secured                                         ${NOCOLOR}"
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
@@ -122,7 +152,7 @@ sudo apt upgrade -y
 if [ $? != 0 ]; then
     echo -e "${KEYNOTE}ERROR: System upgrade failed                                         ${NOCOLOR}"
     echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-    exit $?
+    exit 1
 fi
 echo -e "${TITLE}System Updated                                                         ${NOCOLOR}"
 echo -e "${TITLE}#######################################################################${NOCOLOR}"

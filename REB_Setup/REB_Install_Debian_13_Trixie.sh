@@ -259,12 +259,12 @@ if [ $? != 0 ]; then
 fi
 
 claude --version
-(:tableend:)
 
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
 echo -e "${TITLE}Step 9 - Install Chromium                                              ${NOCOLOR}"
 echo -e "${TITLE}                                                                       ${NOCOLOR}"
-echo "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" | sudo tee /etc/apt/sources.list.d/debian.list
+# Chromium comes from Trixie's own repository - do not add the Bookworm
+# package source here; mixing Debian releases can break later upgrades.
 sudo apt update
 
 sudo apt install -y chromium
@@ -273,7 +273,6 @@ if [ $? != 0 ]; then
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
    exit $?
 fi
-(:tableend:)
 
 # ********************************************************************
 # Success
