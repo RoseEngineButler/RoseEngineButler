@@ -152,8 +152,8 @@ _DEFAULT_SPINDLE_PID_VEL = {"P": 35.1, "I": 20, "D": 1.2, "FF0": 1, "FF1": 0, "F
 VELOCITY_DEFAULTS = {
     "default_linear_velocity": 0.250000,
     "min_linear_velocity": 0.016670,
-    "max_angular_velocity": 1.000000,
-    "default_angular_velocity": 12.000000,
+    "max_angular_velocity": 10.000000,
+    "default_angular_velocity": 5.000000,
     "min_angular_velocity": 1.666667,
 }
 

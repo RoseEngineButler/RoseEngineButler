@@ -7115,7 +7115,7 @@ from File</property>
                                   <object class="GtkSpinButton" id="Max_Angular_Velocity">
                                     <property name="visible">True</property>
                                     <property name="can-focus">True</property>
-                                    <property name="tooltip-text" translatable="yes">Caps how fast the B axis can move under manual jog, in machine units per second.</property>
+                                    <property name="tooltip-text" translatable="yes">Caps how fast the rotary axes (A, B, C) can move under manual jog, in machine units per second.</property>
                                     <property name="halign">start</property>
                                     <property name="valign">center</property>
                                     <property name="margin-top">4</property>
@@ -7137,7 +7137,7 @@ from File</property>
                                   <object class="GtkSpinButton" id="Default_Angular_Velocity">
                                     <property name="visible">True</property>
                                     <property name="can-focus">True</property>
-                                    <property name="tooltip-text" translatable="yes">The initial jog speed for the B axis when LinuxCNC starts, in machine units per second.</property>
+                                    <property name="tooltip-text" translatable="yes">The initial jog speed for the A, B, and C axes when LinuxCNC starts, in machine units per second.</property>
                                     <property name="halign">start</property>
                                     <property name="valign">center</property>
                                     <property name="margin-top">4</property>
@@ -7159,7 +7159,7 @@ from File</property>
                                   <object class="GtkSpinButton" id="Min_Angular_Velocity">
                                     <property name="visible">True</property>
                                     <property name="can-focus">True</property>
-                                    <property name="tooltip-text" translatable="yes">Approximate lowest value of the B axis jog speed slider, in machine units per second.</property>
+                                    <property name="tooltip-text" translatable="yes">Approximate lowest value of the rotary (A, B, C) jog speed slider, in machine units per second.</property>
                                     <property name="halign">start</property>
                                     <property name="valign">center</property>
                                     <property name="margin-top">4</property>
@@ -7209,7 +7209,7 @@ from File</property>
                                 <property name="margin-start">12</property>
                                 <property name="margin-end">4</property>
                                 <property name="hexpand">False</property>
-                                <property name="label" translatable="yes">Jog speed for the B axis.  This is used when moving under Manual Control [F3].</property>
+                                <property name="label" translatable="yes">Jog speed for the A, B, &amp; C axes.  This is used when moving under Manual Control [F3].</property>
                                 <property name="wrap">True</property>
                               </object>
                               <packing>

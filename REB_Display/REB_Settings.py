@@ -501,22 +501,6 @@ def _show_settings_error(widget, message):
     dialog.run()
     dialog.destroy()
 
-def _show_restart_required_popup(widget, detail=None):
-    dialog = Gtk.MessageDialog(
-        transient_for=widget.get_toplevel(),
-        flags=0,
-        message_type=Gtk.MessageType.INFO,
-        buttons=Gtk.ButtonsType.OK,
-        text="Restart required",
-    )
-    dialog.format_secondary_text(
-        detail if detail is not None else
-        "The Measurement System change will not take effect until you exit "
-        "and restart LinuxCNC."
-    )
-    dialog.run()
-    dialog.destroy()
-
 def _save_measurement_system(system):
     '''
     Persists the Measurement System choice ("Metric"/"Imperial") into
@@ -587,8 +571,8 @@ def _save_max_jog_speed(value):
 VELOCITY_SETTINGS = {
     "Default_Linear_Velocity":  ("default_linear_velocity",  0.250000),
     "Min_Linear_Velocity":      ("min_linear_velocity",      0.016670),
-    "Max_Angular_Velocity":     ("max_angular_velocity",     1.000000),
-    "Default_Angular_Velocity": ("default_angular_velocity", 12.000000),
+    "Max_Angular_Velocity":     ("max_angular_velocity",     10.000000),
+    "Default_Angular_Velocity": ("default_angular_velocity", 5.000000),
     "Min_Angular_Velocity":     ("min_angular_velocity",     1.666667),
 }
 
@@ -1500,7 +1484,6 @@ class HandlerClass:
 
         self._apply_measurement_system_labels(system)
         _save_measurement_system(system)
-        _show_restart_required_popup(widget)
 
     def Device_Names_Changed(self, buffer):
         # Wired to the Device Names GtkTextView's GtkTextBuffer
@@ -1517,13 +1500,107 @@ class HandlerClass:
         if self._applying_max_jog_speed:
             return
 
+        if not self._jog_speeds_ok(widget, "linear"):
+            return
         value = widget.get_value()
         _save_max_jog_speed(value)
-        _show_restart_required_popup(
+
+    # Each jog speed group's (min, default, max) spin buttons, with the
+    # REBset_v1.ini key and fallback each is loaded from - used to check
+    # min <= default <= max and to put a refused value back.
+    JOG_SPEED_GROUPS = {
+        "linear": (("Min_Linear_Velocity", "min_linear_velocity", VELOCITY_SETTINGS["Min_Linear_Velocity"][1]),
+                   ("Default_Linear_Velocity", "default_linear_velocity", VELOCITY_SETTINGS["Default_Linear_Velocity"][1]),
+                   ("Max_Jog_Speed", "max_jog_speed", 1.0)),
+        "angular": (("Min_Angular_Velocity", "min_angular_velocity", VELOCITY_SETTINGS["Min_Angular_Velocity"][1]),
+                    ("Default_Angular_Velocity", "default_angular_velocity", VELOCITY_SETTINGS["Default_Angular_Velocity"][1]),
+                    ("Max_Angular_Velocity", "max_angular_velocity", VELOCITY_SETTINGS["Max_Angular_Velocity"][1])),
+    }
+
+    def _jog_speeds_ok(self, widget, group):
+        '''
+        True if the group's jog speeds are still in order (Minimum <=
+        Default <= Maximum) after widget's change. Otherwise tells the
+        operator, puts widget back to its saved value, and returns False
+        so the caller doesn't save it.
+        '''
+        spins = [self.builder.get_object(wid) for wid, _, _ in self.JOG_SPEED_GROUPS[group]]
+        if any(spin is None for spin in spins):
+            return True
+        low, default, high = (spin.get_value() for spin in spins)
+        if low <= default <= high:
+            return True
+
+        name = "Linear Axes" if group == "linear" else "Rotary (Angular) Axis"
+        _show_settings_error(
             widget,
-            "The Max Jog Speed change will not take effect until you exit "
-            "and restart LinuxCNC."
+            "%s Jog Speed must be Minimum \u2264 Default \u2264 Maximum.\n\n"
+            "Minimum %.4f, Default %.4f, Maximum %.4f - the change was not saved.\n\n"
+            "Change the other values first if you need to move this one further."
+            % (name, low, default, high))
+
+        settings = reb_settings_io.load_settings()
+        for wid, key, fallback in self.JOG_SPEED_GROUPS[group]:
+            if self.builder.get_object(wid) is widget:
+                self._applying_velocity_settings = True
+                self._applying_max_jog_speed = True
+                try:
+                    widget.set_value(float(settings.get(key, fallback)))
+                finally:
+                    self._applying_velocity_settings = False
+                    self._applying_max_jog_speed = False
+        return False
+
+    def _tuning_values(self):
+        '''
+        The current Scale, Max Vel, Max Accel and PID values for every
+        axis - the values Save All Settings writes that are NOT saved
+        as soon as they change (Backlash is, so it's left out). Compared
+        with self._saved_tuning to spot unsaved changes on close.
+        '''
+        values = {}
+        for axis_id in CHANNEL_ROLES:
+            for field in ("_Set_Scale", "_Set_Max_Vel", "_Set_Max_Accel"):
+                widget = self.builder.get_object(axis_id + field)
+                if widget is not None:
+                    values[axis_id + field] = round(widget.get_value(), 6)
+            suffixes = ("_Pos", "_Vel") if axis_id in SPINDLE_IDS else ("",)
+            for suffix in suffixes:
+                for param in PID_PARAMS:
+                    widget = self.builder.get_object(axis_id + "_Set_" + param + suffix)
+                    if widget is not None:
+                        values[axis_id + "_Set_" + param + suffix] = round(widget.get_value(), 6)
+        return values
+
+    def confirm_close(self, window, event=None):
+        '''
+        delete-event handler for the main window: if any Scale, Max Vel,
+        Max Accel or PID value has changed since it was last saved, asks
+        whether to save first. Returns True (keep the window open) if
+        the operator cancels.
+        '''
+        if self._tuning_values() == self._saved_tuning:
+            return False
+        dialog = Gtk.MessageDialog(
+            transient_for=window,
+            flags=0,
+            message_type=Gtk.MessageType.WARNING,
+            buttons=Gtk.ButtonsType.NONE,
+            text="Save your changes before closing?",
         )
+        dialog.format_secondary_text(
+            "Some Scale, Max Vel, Max Accel or PID values have changed since they were "
+            "last saved. If you close without saving, those changes will be lost.")
+        dialog.add_button("Close Without Saving", Gtk.ResponseType.NO)
+        dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        dialog.add_button("Save and Close", Gtk.ResponseType.YES)
+        dialog.set_default_response(Gtk.ResponseType.YES)
+        response = dialog.run()
+        dialog.destroy()
+        if response == Gtk.ResponseType.YES:
+            self._write_rebset_snapshot()
+            return False
+        return response != Gtk.ResponseType.NO
 
     def Settings_Save(self, widget):
         if self.builder.get_object("X_Set_Scale") is None:
@@ -1577,6 +1654,7 @@ class HandlerClass:
                     axis_entry.setdefault("pid", {}).update(values)
 
         reb_settings_io.save_settings(settings)
+        self._saved_tuning = self._tuning_values()
         print("Saved live scale/backlash/max vel/max accel/PID values to " + SETTINGS_PATH)
 
     def Settings_Save_As(self, widget):
@@ -2473,6 +2551,10 @@ class HandlerClass:
         if viewport is not None:
             self._install_viewport_scroll_redirect(viewport)
 
+        # Baseline for confirm_close's unsaved-changes check - everything
+        # above has just loaded the saved values into the widgets.
+        self._saved_tuning = self._tuning_values()
+
 
 # ------------------------------------------------------------------
 # Generated per-channel handlers, for all 8 selectable letters
@@ -2927,20 +3009,19 @@ del _spindle_id, _loops, _suffix, _component, _param, _widget_id, _handler
 def _velocity_setting_changed(tag):
     '''
     Generic value-changed handler for one of VELOCITY_SETTINGS' spin
-    buttons: persists to REBset_v1.ini and warns that a restart is
-    needed, same as Max_Jog_Speed_Changed - these are read once by
-    LinuxCNC at process startup, not live HAL pins, so there's no
-    halcmd setp to also do here.
+    buttons: persists to REBset_v1.ini, same as Max_Jog_Speed_Changed -
+    these are read once by LinuxCNC at startup, and this program only
+    runs while LinuxCNC isn't running, so the next launch picks them up.
+    Refused (and put back) if it would break min <= default <= max.
     '''
     def handler(self, widget):
         if self._applying_velocity_settings:
             return
+        group = "angular" if "angular" in tag else "linear"
+        if not self._jog_speeds_ok(widget, group):
+            return
         value = widget.get_value()
         _save_velocity_setting(tag, value)
-        _show_restart_required_popup(
-            widget,
-            "This change will not take effect until you exit and restart LinuxCNC."
-        )
     return handler
 
 for _widget_id, (_tag, _default) in VELOCITY_SETTINGS.items():
@@ -2973,6 +3054,7 @@ def main():
     handler = HandlerClass(builder)
     builder.connect_signals(handler)
     window = builder.get_object("window1")
+    window.connect("delete-event", handler.confirm_close)
     window.connect("destroy", Gtk.main_quit)
     window.set_title("REB Settings")
     # window1/scrolledwindow1 no longer propagate their content's
