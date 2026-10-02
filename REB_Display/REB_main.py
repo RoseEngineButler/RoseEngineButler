@@ -320,6 +320,17 @@ THREAD_DEFAULTS = {
                  "Thread_First_Depth": 2.54, "Thread_Spring": 1},
 }
 
+# Main-panel values remembered between LinuxCNC sessions, in
+# REBset_v1.ini's "panel_state" (see _panel_state / _restore_panel_state).
+# Threading fields in inches/mm (or TPI vs mm pitch) aren't restored if
+# the Measurement System has changed since they were saved - see
+# THREAD_UNIT_FIELDS.
+THREAD_SAVED_SPINS = ("Thread_Starts", "Thread_TPI", "Thread_Length", "Thread_Angle",
+                      "Thread_Clearance", "Thread_First_Depth", "Thread_Spring")
+THREAD_SAVED_COMBOS = ("Thread_Hand", "Thread_Side", "Thread_Dir")
+THREAD_UNIT_FIELDS = ("Thread_TPI", "Thread_Length", "Thread_Clearance",
+                      "Thread_First_Depth", "Thread_Final_Depth")
+
 # Refuse a threading run with more passes per start than this - almost
 # certainly a mistyped First cut depth.
 THREAD_MAX_PASSES_PER_START = 200
@@ -1790,6 +1801,9 @@ class HandlerClass:
 
         self.Sp0_Feed = round(widget.get_value(), 1)
         print("self.Sp0_Feed = " + str(self.Sp0_Feed))
+        # Restoring the saved panel at startup - don't send an S word.
+        if getattr(self, "_restoring_panel", False):
+            return
 
         # The spinbutton's arrows auto-repeat while held, firing
         # value-changed on every tick. c.mdi()/c.wait_complete() below
@@ -2057,6 +2071,9 @@ class HandlerClass:
 
         self.Sp1_Pct = round(widget.get_value(), 2)
         print("self.Sp1_Pct = " + str(self.Sp1_Pct))
+        # Restoring the saved panel at startup - don't send an S word.
+        if getattr(self, "_restoring_panel", False):
+            return
 
         # Same freeze as Sp0_Set_Feed (see that handler's comment): the
         # spinbutton arrows auto-repeat while held, and dispatching the
@@ -2406,6 +2423,141 @@ class HandlerClass:
         # that actually changed - make sure Final depth and the
         # calculated fields are filled in regardless.
         self.Thread_Pitch_Changed(None)
+
+    def _panel_state(self):
+        '''
+        Snapshot of the main panel's operator-entered values - Indexing
+        (Feed Rate, Index Distance, Deg/Div per axis; spindle speed, Sp1 %,
+        Sp0/Sp1 index checkboxes), Sync Move (selected, distance,
+        direction per axis) and Threading (every field) - saved to
+        REBset_v1.ini's "panel_state" and put back at the next start
+        (_restore_panel_state). ENA states are deliberately not saved:
+        every axis starts disabled.
+        '''
+        b = self.builder.get_object
+        state = {"measurement_system": "Metric" if self._sync_metric else "Imperial", "axes": {}}
+        for axis in AXIS_SELECTION_LETTERS:
+            state["axes"][axis] = {
+                "feed": b(axis + "_Feed").get_value(),
+                "idx_dist": b(axis + "_Idx_Dist").get_value(),
+                "idx_degdiv": getattr(self, axis + "_Idx_DegDiv"),
+                "sync_use": b(axis + "_Sync_Use").get_active(),
+                "sync_dist": b(axis + "_Sync_Dist").get_value(),
+                "sync_dir": self._sync_dir.get(axis),
+            }
+        state["Sp0"] = {"feed": b("Sp0_Set_Feed").get_value(),
+                        "idx_dist": b("Sp0_Idx_Dist").get_value(),
+                        "idx_degdiv": self.Sp0_Idx_DegDiv,
+                        "idx_on": b("Sp0_Set_Idx_OnOff").get_active()}
+        state["Sp1"] = {"pct": b("Sp1_Set_Move_Pct").get_value(),
+                        "idx_on": b("Sp1_Set_Idx_OnOff").get_active()}
+        thread = {wid: b(wid).get_value() for wid in THREAD_SAVED_SPINS + ("Thread_Final_Depth",)}
+        thread.update({wid: b(wid).get_active_text() for wid in THREAD_SAVED_COMBOS})
+        state["threading"] = thread
+        return state
+
+    def _restore_panel_state(self):
+        '''
+        Puts back the values _panel_state saved last session. Run once
+        from GLib.idle_add, after the panel is up and its signals are
+        connected, so every widget is set the same way an operator would
+        set it - with _restoring_panel stopping Sp0_Set_Feed/
+        Sp1_Set_Move_Pct from sending S words, and the handler-held
+        copies (<axis>_Feed, Sp0_Idx_Deg, _sync_dir, ...) set explicitly
+        afterwards so they always match what's on screen. Inch/mm
+        values are skipped if the Measurement System has changed since
+        they were saved. Then starts the once-a-second autosave.
+        '''
+        saved = reb_settings_io.load_settings().get("panel_state", {})
+        same_units = saved.get("measurement_system") == ("Metric" if self._sync_metric else "Imperial")
+        b = self.builder.get_object
+        self._restoring_panel = True
+        try:
+            for axis, row in saved.get("axes", {}).items():
+                if axis not in AXIS_SELECTION_LETTERS:
+                    continue
+                linear = _axis_type_for_letter(axis) == "LINEAR"
+                if same_units or not linear:
+                    for wid, key in (("_Feed", "feed"), ("_Idx_Dist", "idx_dist"), ("_Sync_Dist", "sync_dist")):
+                        if key in row:
+                            b(axis + wid).set_value(row[key])
+                if "sync_use" in row:
+                    b(axis + "_Sync_Use").set_active(bool(row["sync_use"]))
+                degdiv = row.get("idx_degdiv", "Deg")
+                if not linear and degdiv in ("Deg", "Div"):
+                    b(axis + ("_Idx_Div" if degdiv == "Div" else "_Idx_Deg")).set_active(True)
+                    setattr(self, axis + "_Idx_DegDiv", degdiv)
+                direction = row.get("sync_dir")
+                if direction in SYNC_DIR_SIGN:
+                    self._sync_dir[axis] = direction
+                    for d in SYNC_DIR_SIGN:
+                        _set_depressed(b(axis + "_Sync_" + d), d == direction)
+                # What the Set_Feed/Set_Idx_Dist/Set_Idx_DegDiv handlers
+                # would hold for these on-screen values.
+                setattr(self, axis + "_Feed", round(b(axis + "_Feed").get_value(), 1))
+                dist = b(axis + "_Idx_Dist").get_value()
+                setattr(self, axis + "_Idx_Dist", dist)
+                if not linear:
+                    deg = 360 / dist if getattr(self, axis + "_Idx_DegDiv") == "Div" and dist else dist
+                    setattr(self, axis + "_Idx_Deg", round(deg, 1))
+
+            sp0 = saved.get("Sp0", {})
+            if "feed" in sp0:
+                b("Sp0_Set_Feed").set_value(sp0["feed"])
+            if "idx_dist" in sp0:
+                b("Sp0_Idx_Dist").set_value(sp0["idx_dist"])
+            if sp0.get("idx_degdiv") in ("Deg", "Div"):
+                b("Sp0_Set_Idx_bW_" + sp0["idx_degdiv"]).set_active(True)
+                self.Sp0_Idx_DegDiv = sp0["idx_degdiv"]
+            if "idx_on" in sp0:
+                self._set_checkbox_active("Sp0_Set_Idx_OnOff", bool(sp0["idx_on"]))
+                self.Sp0_Idx_Bool = bool(sp0["idx_on"])
+            sp1 = saved.get("Sp1", {})
+            if "pct" in sp1:
+                b("Sp1_Set_Move_Pct").set_value(sp1["pct"])
+            if "idx_on" in sp1:
+                self._set_checkbox_active("Sp1_Set_Idx_OnOff", bool(sp1["idx_on"]))
+                self.Sp1_Idx_Bool = bool(sp1["idx_on"])
+            self.Sp0_Feed = round(b("Sp0_Set_Feed").get_value(), 1)
+            self.Sp1_Pct = b("Sp1_Set_Move_Pct").get_value()
+            self.Sp0_Idx_Dist = round(b("Sp0_Idx_Dist").get_value(), 1)
+            self.Sp0_Idx_Deg = round(360 / self.Sp0_Idx_Dist, 1) \
+                if self.Sp0_Idx_DegDiv == "Div" and self.Sp0_Idx_Dist else self.Sp0_Idx_Dist
+
+            thread = saved.get("threading", {})
+            for wid in THREAD_SAVED_SPINS:
+                if wid in thread and (same_units or wid not in THREAD_UNIT_FIELDS):
+                    b(wid).set_value(thread[wid])
+            for wid in THREAD_SAVED_COMBOS:
+                combo = b(wid)
+                texts = [row[0] for row in combo.get_model()]
+                if thread.get(wid) in texts:
+                    combo.set_active(texts.index(thread[wid]))
+            # Final depth last: changing Starts/TPI/angle above resets it
+            # to the new maximum (Thread_Pitch_Changed).
+            if same_units and "Thread_Final_Depth" in thread:
+                b("Thread_Final_Depth").set_value(thread["Thread_Final_Depth"])
+            self.Thread_Recalc(None)
+        finally:
+            self._restoring_panel = False
+
+        self._last_saved_panel_state = self._panel_state()
+        GLib.timeout_add(1000, self._autosave_panel_state)
+        return False
+
+    def _autosave_panel_state(self):
+        '''
+        Once a second: saves _panel_state to REBset_v1.ini whenever it
+        differs from what was last saved (same approach as
+        _autosave_axis_comments).
+        '''
+        state = self._panel_state()
+        if state != self._last_saved_panel_state:
+            settings = reb_settings_io.load_settings()
+            settings["panel_state"] = state
+            reb_settings_io.save_settings(settings)
+            self._last_saved_panel_state = state
+        return True
 
     def _thread_value(self, wid):
         spin = self.builder.get_object(wid)
@@ -2881,6 +3033,14 @@ class HandlerClass:
             setattr(self, axis + "_Idx_Qty", 0)
             setattr(self, axis + "_Move_Dist", 0.0)
 
+        # Put back the main panel's values from last session (Indexing,
+        # Sync Move, Threading) once the panel is up, then keep them
+        # saved - see _restore_panel_state. Main panel only; queued after
+        # the Sp0/Sp1 checkbox idle callbacks above, so it runs after them.
+        self._restoring_panel = False
+        if self.builder.get_object("Sync_Run") is not None and self.builder.get_object("Thread_Run") is not None:
+            GLib.idle_add(self._restore_panel_state)
+
 # ------------------------------------------------------------------
 # Generated per-letter handlers, for all 8 axis letters
 # (AXIS_SELECTION_LETTERS).
@@ -3030,12 +3190,21 @@ def _axis_set_idx_degdiv(axis):
     def handler(self, widget):
         print("=================================================")
         print("FUNCTION " + axis + "_Set_Idx_DegDiv")
-        if getattr(self, axis + "_Idx_DegDiv") == "Deg":
-            setattr(self, axis + "_Idx_DegDiv", "Div")
-            setattr(self, axis + "_Idx_Deg", round(360 / getattr(self, axis + "_Idx_Dist"), 1))
+        # <axis>_Idx_Deg / <axis>_Idx_Div are a GTK radio pair sharing
+        # this "toggled" handler, so one click fires it twice (the button
+        # going active, then its sibling going inactive). It used to flip
+        # the mode on every call - two flips, net no change - so Div mode
+        # could never engage. Same fix as Sp0_Set_Idx_DegDiv: ignore the
+        # "going inactive" call and take the mode from the active button.
+        if not widget.get_active():
+            return
+        mode = "Div" if Gtk.Buildable.get_name(widget).endswith("_Idx_Div") else "Deg"
+        setattr(self, axis + "_Idx_DegDiv", mode)
+        dist = getattr(self, axis + "_Idx_Dist")
+        if mode == "Div":
+            setattr(self, axis + "_Idx_Deg", round(360 / dist, 1) if dist else 0.0)
         else:
-            setattr(self, axis + "_Idx_DegDiv", "Deg")
-            setattr(self, axis + "_Idx_Deg", round(getattr(self, axis + "_Idx_Dist"), 1))
+            setattr(self, axis + "_Idx_Deg", round(dist, 1))
         print(axis + "_Idx_Deg = " + str(getattr(self, axis + "_Idx_Deg")))
         print(axis + "_Idx_DegDiv = " + getattr(self, axis + "_Idx_DegDiv"))
     handler.__name__ = axis + "_Set_Idx_DegDiv"
