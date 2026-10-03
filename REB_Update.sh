@@ -138,6 +138,17 @@ if [ "$stashed" = true ]; then
 fi
 echo -e "${TITLE}Latest files pulled from GitHub                                        ${NOCOLOR}"
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
+echo -e "${TITLE}Add any new settings to this machine's settings file                  ${NOCOLOR}"
+# Adds to /home/reuben/Documents/REBset_v1.ini any setting the freshly
+# pulled REB_Setup/REBset_v1.ini has but this machine's file doesn't
+# (never changing existing values). Runs after the pull so it uses the
+# latest starting file. A problem here is reported but doesn't stop the
+# rest of the update.
+python3 /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/REB_Update_Settings.py
+if [ $? != 0 ]; then
+    echo -e "${KEYNOTE}WARNING: settings file could not be checked - see the message above.  ${NOCOLOR}"
+fi
+echo -e "${TITLE}#######################################################################${NOCOLOR}"
 echo -e "${TITLE}Update the package indexes                                             ${NOCOLOR}"
 sudo apt update
 if [ $? != 0 ]; then
