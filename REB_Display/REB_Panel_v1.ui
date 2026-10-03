@@ -843,7 +843,7 @@
                 <property name="can-focus">False</property>
                 <property name="halign">start</property>
                 <property name="hexpand">True</property>
-                <property name="label" translatable="yes">REB O/S 1.0 - alpha 02 October 2026</property>
+                <property name="label" translatable="yes">REB O/S 1.0 - alpha 03 October 2026</property>
                 <property name="justify">right</property>
                 <property name="width-chars">9</property>
                 <attributes>
@@ -2385,18 +2385,45 @@ W is parallel to Z</property>
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkLabel" id="Comments2">
+                  <object class="GtkBox" id="Settings_Note">
                     <property name="visible">True</property>
                     <property name="can-focus">False</property>
                     <property name="halign">start</property>
                     <property name="valign">start</property>
-                    <property name="margin-left">2</property>
                     <property name="margin-start">2</property>
                     <property name="margin-top">15</property>
-                    <property name="label" translatable="yes">COMMENTS
-After entering any comments, you must press ENTER to have them saved.</property>
-                    <property name="wrap">True</property>
-                    <property name="xalign">0.5</property>
+                    <property name="spacing">8</property>
+                    <child>
+                      <object class="GtkImage">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="valign">start</property>
+                        <property name="pixbuf">Images/REB_SettingsGear-Sm.png</property>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">0</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Settings_Note_Text">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="halign">start</property>
+                        <property name="valign">start</property>
+                        <property name="label" translatable="yes">SETTINGS
+To change how the system is set up - which axis uses each plug, scales, tuning, jog speeds, limit switches, E-stop button, or signal tower - exit Rose Engine Butler and use the Rose Engine Butler Settings program.</property>
+                        <property name="wrap">True</property>
+                      <property name="max-width-chars">54</property>
+                        <property name="xalign">0</property>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">1</property>
+                      </packing>
+                    </child>
                   </object>
                   <packing>
                     <property name="expand">False</property>
