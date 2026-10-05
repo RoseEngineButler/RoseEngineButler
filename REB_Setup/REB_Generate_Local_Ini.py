@@ -269,6 +269,11 @@ SIGNAL_TOWER_ACTIVE_LOW = True
 # How long the buzzer sounds each time the red light comes on.
 SIGNAL_TOWER_BUZZER_SECONDS = 3.0
 
+# Pulse width for tower-red-hold, the oneshot used as the red light's
+# following-error latch: long enough to never time out in practice
+# (about 31 years); it's cleared by turning the machine back on.
+SIGNAL_TOWER_LATCH_SECONDS = 1e9
+
 
 def _read_channel_assignments(settings):
     '''
@@ -359,15 +364,31 @@ def _signal_tower_hal(signal_tower, limit_nets, role_layout):
     '''
     Returns HAL text driving the optional signal tower's three relay
     outputs when signal_tower is True:
-      - green: on while the interpreter isn't idle - a G-code program
-        or an MDI command (Sync Move, Threading, ...) is executing.
-        Fed straight from halui.program.is-idle, with the GPIO's own
-        invert_output doing the inversion.
-      - red: on while any active joint has exceeded its following error
-        (joint.N.f-errored, which LinuxCNC holds until the machine is
-        turned back on) or any in-use limit jack is tripped (limit_nets,
-        from _limit_jack_hal) - both turn the machine off by themselves.
-        OR'd by a logic component.
+      - green: on while the system is doing something - the interpreter
+        isn't idle (a G-code program or MDI command: Sync Move,
+        Threading, axis indexing, ...), or an active spindle is running
+        (spindle.N-cw/-ccw - Run Operation, M3/M4, which finish as MDI
+        commands at once while the spindle keeps turning), or an active
+        spindle is indexing (its orient is enabled but not yet
+        is-oriented - covers both the M19 single-spindle path, which
+        leaves orient enabled afterwards to hold position, and the
+        Sp0+Sp1 path through Sp<n>-idx-active). OR'd by tower-green-or;
+        the NOTs are logic NANDs with both inputs on the same signal,
+        since not/and2 are already loaded elsewhere under fixed names.
+      - red: on after any active joint exceeds its following error, until
+        the machine is turned back on (F2), and while any in-use limit
+        jack is tripped (limit_nets, from _limit_jack_hal). LinuxCNC does
+        NOT hold joint.N.f-errored - it clears as the machine turns off,
+        within a servo cycle or so (found live 05 Oct 2026: red never
+        lit) - and a limit trip can be just as brief (the switch closes
+        again once the axis stops; found live the same day: the buzzer
+        sounded but red didn't stay lit). So following errors and limit
+        trips (OR'd by tower-fault-or) trigger tower-red-hold, a oneshot
+        with a practically endless pulse that acts as a latch, reset by
+        tower-on-edge's short pulse when machine-is-on rises (F2 - both
+        faults turn the machine off). tower-red-or then ORs the latch
+        with the live limit nets, so a switch still open after F2 keeps
+        red lit until the axis is moved off it.
       - buzzer: a SIGNAL_TOWER_BUZZER_SECONDS pulse from a oneshot each
         time red rises.
     With the tower off the pins are left as inputs, so nothing drives
@@ -384,40 +405,97 @@ def _signal_tower_hal(signal_tower, limit_nets, role_layout):
         lines.append("# (signal tower not connected)")
         return "\n".join(lines) + "\n"
 
-    # A GPIO output pin's level is .out XOR .invert_output. Each entry:
-    # (color, net, whether .out is true when the light/sounder is ON).
-    red_sources = ["joint." + str(j) + ".f-errored"
-                   for j in sorted(role_layout.joint_number.values())]
-    red_sources += sorted(limit_nets)
+    joints = sorted(role_layout.joint_number.values())
+    red_inputs = ["tower-red-held"] + sorted(limit_nets)
+    logic = [("tower-fault-or", "0x2%02x" % (len(joints) + len(limit_nets)))]
+    if len(red_inputs) > 1:
+        logic.append(("tower-red-or", "0x2%02x" % len(red_inputs)))
+
+    # Green: not idle, or any active spindle running or indexing. Each
+    # spindle's nets carry its LinuxCNC spindle number this launch
+    # (spindle.<n>-cw ...); its orient-done net keeps its role's name.
+    oriented_net = {"Sp0": "orient-done", "Sp1": "orient.1-done"}
+    green_inputs = ["tower-not-idle"]
+    spindle_lines = []
+    logic.append(("tower-not-idle-nand", "0x802"))
+    for role, n in sorted(role_layout.spindle_number.items(), key=lambda kv: kv[1]):
+        tag = "tower-sp%d" % n
+        logic.append((tag + "-not-oriented", "0x802"))
+        logic.append((tag + "-indexing", "0x102"))
+        spindle_lines += [
+            ("net " + oriented_net[role]).ljust(41) + "=> %s-not-oriented.in-00" % tag,
+            ("net " + oriented_net[role]).ljust(41) + "=> %s-not-oriented.in-01" % tag,
+            ("net %s-not-oriented" % tag).ljust(40) + "<=  %s-not-oriented.nand" % tag,
+            ("net %s-not-oriented" % tag).ljust(41) + "=> %s-indexing.in-00" % tag,
+            ("net spindle.%d-pos-mode-enable" % n).ljust(41) + "=> %s-indexing.in-01" % tag,
+            ("net %s-indexing" % tag).ljust(40) + "<=  %s-indexing.and" % tag,
+        ]
+        green_inputs += ["spindle.%d-cw" % n, "spindle.%d-ccw" % n, tag + "-indexing"]
+    if len(green_inputs) > 1:
+        logic.append(("tower-green-or", "0x2%02x" % len(green_inputs)))
 
     lines += [
-        "loadrt logic names=tower-red-or personality=0x2%02x" % len(red_sources),
-        "loadrt oneshot names=tower-buzz",
-        "addf tower-red-or".ljust(44) + "servo-thread",
-        "addf tower-buzz".ljust(44) + "servo-thread",
+        "loadrt logic names=%s personality=%s" % (",".join(n for n, _ in logic), ",".join(p for _, p in logic)),
+        "loadrt oneshot names=tower-buzz,tower-red-hold,tower-on-edge",
+    ]
+    for name in [n for n, _ in logic] + ["tower-red-hold", "tower-on-edge", "tower-buzz"]:
+        lines.append(("addf " + name).ljust(44) + "servo-thread")
+    lines += [
         "setp tower-buzz.width".ljust(44) + str(SIGNAL_TOWER_BUZZER_SECONDS),
+        "# Practically endless pulse = a latch, cleared by tower-red-reset.",
+        "setp tower-red-hold.width".ljust(44) + str(SIGNAL_TOWER_LATCH_SECONDS),
+        "setp tower-on-edge.width".ljust(44) + "0.05",
         "",
     ]
-    for i, source in enumerate(red_sources):
-        if source.startswith("joint."):
-            net = "tower-ferror-" + source.split(".")[1]
-            lines.append(("net " + net).ljust(40) + "<=  " + source)
-        else:
-            net = source
-        lines.append(("net " + net).ljust(41) + "=> tower-red-or.in-%02d" % i)
+    for i, j in enumerate(joints):
+        net = "net tower-ferror-%d" % j
+        lines.append(net.ljust(40) + "<=  joint.%d.f-errored" % j)
+        lines.append(net.ljust(41) + "=> tower-fault-or.in-%02d" % i)
+    for i, net in enumerate(sorted(limit_nets), start=len(joints)):
+        lines.append(("net " + net).ljust(41) + "=> tower-fault-or.in-%02d" % i)
+    lines += [
+        "net tower-fault".ljust(40) + "<=  tower-fault-or.or",
+        "net tower-fault".ljust(41) + "=> tower-red-hold.in",
+        "net machine-is-on".ljust(41) + "=> tower-on-edge.in",
+        "net tower-red-reset".ljust(40) + "<=  tower-on-edge.out",
+        "net tower-red-reset".ljust(41) + "=> tower-red-hold.reset",
+        "net tower-red-held".ljust(40) + "<=  tower-red-hold.out",
+    ]
     lines += [
         "",
         "net tower-green-idle".ljust(40) + "<=  halui.program.is-idle",
-        "net tower-green-idle".ljust(41) + "=> hm2_7i92.0.gpio." + SIGNAL_TOWER_OUTPUT["green"] + ".out",
-        "net tower-red".ljust(40) + "<=  tower-red-or.or",
-        "net tower-red".ljust(41) + "=> hm2_7i92.0.gpio." + SIGNAL_TOWER_OUTPUT["red"] + ".out",
-        "net tower-red".ljust(41) + "=> tower-buzz.in",
+        "net tower-green-idle".ljust(41) + "=> tower-not-idle-nand.in-00",
+        "net tower-green-idle".ljust(41) + "=> tower-not-idle-nand.in-01",
+        "net tower-not-idle".ljust(40) + "<=  tower-not-idle-nand.nand",
+    ] + spindle_lines
+    if len(green_inputs) > 1:
+        for i, net in enumerate(green_inputs):
+            lines.append(("net " + net).ljust(41) + "=> tower-green-or.in-%02d" % i)
+        lines.append("net tower-green".ljust(40) + "<=  tower-green-or.or")
+        green_net = "tower-green"
+    else:
+        green_net = "tower-not-idle"   # no spindles assigned
+    lines.append(("net " + green_net).ljust(41) + "=> hm2_7i92.0.gpio." + SIGNAL_TOWER_OUTPUT["green"] + ".out")
+    if len(red_inputs) > 1:
+        for i, net in enumerate(red_inputs):
+            lines.append(("net " + net).ljust(41) + "=> tower-red-or.in-%02d" % i)
+        red_source = "tower-red-or.or"
+    else:
+        red_source = None   # no limit jacks: the latch alone is red
+    lines.append("")
+    if red_source:
+        lines.append("net tower-red".ljust(40) + "<=  " + red_source)
+        red_net = "tower-red"
+    else:
+        red_net = "tower-red-held"
+    lines += [
+        ("net " + red_net).ljust(41) + "=> hm2_7i92.0.gpio." + SIGNAL_TOWER_OUTPUT["red"] + ".out",
+        ("net " + red_net).ljust(41) + "=> tower-buzz.in",
         "net tower-buzzer".ljust(40) + "<=  tower-buzz.out",
         "net tower-buzzer".ljust(41) + "=> hm2_7i92.0.gpio." + SIGNAL_TOWER_OUTPUT["buzzer"] + ".out",
         "",
     ]
-    # green's .out is is-idle, i.e. true when the light should be OFF.
-    out_true_means_on = {"green": False, "red": True, "buzzer": True}
+    out_true_means_on = {"green": True, "red": True, "buzzer": True}
     for color in ("green", "red", "buzzer"):
         pin = "hm2_7i92.0.gpio." + SIGNAL_TOWER_OUTPUT[color]
         # Active-low: ON must drive the pin low, so invert exactly when
