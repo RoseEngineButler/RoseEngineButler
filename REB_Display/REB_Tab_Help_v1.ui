@@ -80,7 +80,7 @@
     <property name="visible">True</property>
     <property name="can-focus">False</property>
     <property name="hexpand">True</property>
-    <property name="pixbuf">Images/Library.png</property>
+    <property name="pixbuf">Images/Librarysm.png</property>
   </object>
   <object class="GtkImage" id="OT_HandyBooksm">
     <property name="visible">True</property>
@@ -274,6 +274,7 @@
                     <property name="margin-bottom">12</property>
                     <property name="label" translatable="yes">Rose Engine Butler is implemented as a set of configurations for use on LinuxCNC, and is designed for use with stepper motors on a rose engine.</property>
                     <property name="wrap">True</property>
+                    <property name="max-width-chars">55</property>
                   </object>
                   <packing>
                     <property name="expand">True</property>
