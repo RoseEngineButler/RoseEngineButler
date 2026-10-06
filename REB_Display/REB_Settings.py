@@ -364,6 +364,22 @@ def _save_signal_tower(connected):
 def _read_persisted_signal_tower():
     return reb_settings_io.load_settings().get("signal_tower") is True
 
+# Where the main panel's attention beeps play (3 when a program, Sync
+# Move or Cut Thread finishes; 2 when a program stops at M0/M1) - see
+# REB_main.py's _load_sounds. The Done_Sound combo's ids are the
+# persisted values, REBset_v1.ini's "done_sound"; absent = "both".
+DONE_SOUND_CHOICES = ("off", "tower", "speaker", "both")
+
+def _save_done_sound(choice):
+    settings = reb_settings_io.load_settings()
+    settings["done_sound"] = choice
+    reb_settings_io.save_settings(settings)
+    print("Saved done sound: " + choice)
+
+def _read_persisted_done_sound():
+    choice = reb_settings_io.load_settings().get("done_sound", "both")
+    return choice if choice in DONE_SOUND_CHOICES else "both"
+
 # This session's channel -> role assignment, as persisted at the time
 # REB_Generate_Local_Ini.py generated REB.local.hal/REB.local.ini for
 # this LinuxCNC launch (see CLAUDE.md). Read once at module import: a
@@ -1343,6 +1359,27 @@ class HandlerClass:
         if self._applying_signal_tower:
             return
         _save_signal_tower(widget.get_active())
+
+    def _load_done_sound(self):
+        '''
+        Reads the persisted attention-sound choice (REBset_v1.ini's
+        "done_sound") into the Axis Selection page's Done_Sound combo.
+        '''
+        combo = self.builder.get_object("Done_Sound")
+        if combo is None:
+            return
+        self._applying_done_sound = True
+        combo.set_active_id(_read_persisted_done_sound())
+        self._applying_done_sound = False
+
+    def Done_Sound_Changed(self, widget):
+        '''
+        Persists the attention-sound choice. Takes effect the next time
+        LinuxCNC starts.
+        '''
+        if self._applying_done_sound or widget.get_active_id() is None:
+            return
+        _save_done_sound(widget.get_active_id())
 
     def _update_limit_jack_warnings(self):
         '''
@@ -2490,6 +2527,10 @@ class HandlerClass:
         # Signal_Tower_Connected checkbox.
         self._applying_signal_tower = False
 
+        # Same suppression as above, for _load_done_sound driving the
+        # Done_Sound combo.
+        self._applying_done_sound = False
+
         # Restore persisted axis scale values (REBset_v1.ini) into the
         # spin buttons and the real stepgen scale pins.
         self._load_scale_settings()
@@ -2534,6 +2575,7 @@ class HandlerClass:
         # Restore the persisted signal tower choice (REBset_v1.ini) into
         # the Axis Selection tab's Signal Tower checkbox.
         self._load_signal_tower()
+        self._load_done_sound()
 
         # Restore the persisted Max Jog Speed (REBset_v1.ini) into the
         # Max Jog Speed spin button.

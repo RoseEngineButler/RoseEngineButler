@@ -347,6 +347,24 @@ THREAD_KIND_DONE = 9
 # Threading tab's instructions come back.
 THREAD_RESULT_SECONDS = 20
 
+# Attention sounds (see _load_sounds). REBset_v1.ini's "done_sound"
+# picks where they play: "off", "tower" (the signal tower's buzzer, if
+# one is connected), "speaker" (the Pi's own audio - HDMI or USB) or
+# "both". Each pattern is that many short beeps, BEEP_SECONDS on then
+# BEEP_SECONDS off - deliberately unlike the tower's steady 3 s fault
+# siren. The .wav files in REB_Display/Sounds hold the same patterns.
+DONE_BEEPS = 3      # a program, Sync Move or Cut Thread finished
+PAUSE_BEEPS = 2     # a program stopped at M0/M1/M60, waiting for the operator
+BEEP_SECONDS = 0.2
+SOUND_FILES = {
+    DONE_BEEPS: os.path.join(os.path.dirname(os.path.abspath(__file__)), "Sounds", "REB_Done.wav"),
+    PAUSE_BEEPS: os.path.join(os.path.dirname(os.path.abspath(__file__)), "Sounds", "REB_Pause.wav"),
+}
+# Tried in order for the speaker; the first one installed is used.
+SOUND_PLAYERS = (["paplay"], ["pw-play"], ["aplay", "-q"])
+# How often a running program is checked for finishing or pausing.
+PROGRAM_POLL_MS = 250
+
 # A Return to Start move smaller than this (machine units) on every
 # axis counts as "already there".
 SYNC_POSITION_TOLERANCE = 0.0001
@@ -2149,6 +2167,7 @@ class HandlerClass:
         self._sync_dir = {axis: None for axis in AXIS_SELECTION_LETTERS}
         self._sync_start = None      # stat().position when Run Operation last started
         self._sync_feeds = {}        # letter -> feed rate used by that Run Operation
+        self._sync_target = {}       # letter -> where the current move should end
         self._sync_poll_id = None
 
         system = reb_settings_io.load_settings().get("measurement_system", "Imperial")
@@ -2226,7 +2245,7 @@ class HandlerClass:
             return False
         return True
 
-    def _sync_start_move(self, widget, deltas, feeds):
+    def _sync_start_move(self, widget, deltas, feeds, on_done=None):
         '''
         Sends deltas ({letter: signed incremental distance, in machine
         units}) as a single G1. Each letter's own time is
@@ -2240,7 +2259,10 @@ class HandlerClass:
         minutes = max(abs(d) / feeds[axis] for axis, d in deltas.items())
         words = " ".join("%s%.4f" % (axis, d) for axis, d in deltas.items())
         gcode = ("G21" if self._sync_metric else "G20") + " G91 G93 G1 " + words + " F%.8f" % (1.0 / minutes)
-        self._start_polled_mdi(widget, gcode)
+        # Where each axis should end up - see _sync_run_finished.
+        self._sync_target = {axis: s.position[STAT_POSITION_INDEX[axis]] + d
+                             for axis, d in deltas.items()}
+        self._start_polled_mdi(widget, gcode, on_done)
 
     def _start_polled_mdi(self, widget, gcode, on_done=None):
         '''
@@ -2333,7 +2355,22 @@ class HandlerClass:
 
         self._sync_start = tuple(s.position)
         self._sync_feeds = feeds
-        self._sync_start_move(widget, deltas, feeds)
+        self._sync_start_move(widget, deltas, feeds, self._sync_run_finished)
+
+    def _sync_run_finished(self):
+        '''
+        Run Operation's move is over. Beeps only if every axis actually
+        got where it was going - a move stopped from AXIS part way
+        (or by E-stop) stays silent.
+        '''
+        s.poll()
+        if s.task_state != linuxcnc.STATE_ON:
+            return
+        target = self._sync_target
+        for axis, end in target.items():
+            if abs(s.position[STAT_POSITION_INDEX[axis]] - end) >= SYNC_POSITION_TOLERANCE:
+                return
+        self._play_sound(DONE_BEEPS)
 
     def Sync_Return(self, widget):
         '''
@@ -2777,6 +2814,8 @@ class HandlerClass:
         self._thread_show_status(text)
         self._thread_result_id = GLib.timeout_add_seconds(
             THREAD_RESULT_SECONDS, self._thread_restore_instructions)
+        if (int(round(self._thread_last_code)) % 10000) // 1000 == THREAD_KIND_DONE:
+            self._play_sound(DONE_BEEPS)
 
     def Thread_Return(self, widget):
         '''
@@ -2806,6 +2845,153 @@ class HandlerClass:
         args = (deltas["X"], deltas["Z"], deltas["C"], 21 if self._thread_metric else 20)
         gcode = "o<reb_thread_return> call " + " ".join("[%.6f]" % a for a in args)
         self._start_polled_mdi(widget, gcode)
+
+
+#######################################################################
+# Attention sounds
+# Purpose:              3 short beeps when a G-code program, a Sync Move
+#                       Run Operation or a Cut Thread finishes normally;
+#                       2 when a program stops at M0/M1/M60 to wait for
+#                       the operator. Played on the signal tower's
+#                       buzzer and/or the Pi's speaker, per REBset_v1.ini's
+#                       "done_sound" (REB Settings, Axis Selection page;
+#                       read once at startup, like the tower itself).
+#                       Only the main panel component plays them; every
+#                       other component no-ops.
+# Updated:              ver 1.0, 06 October 2026, Claude
+#######################################################################
+    def _load_sounds(self):
+        if self.builder.get_object("Sync_Run") is None:
+            return
+        settings = reb_settings_io.load_settings()
+        choice = settings.get("done_sound", "both")
+        self._sound_tower = choice in ("tower", "both") and settings.get("signal_tower") is True
+        self._sound_speaker = choice in ("speaker", "both")
+        self._sound_player = None
+        if self._sound_speaker:
+            for player in SOUND_PLAYERS:
+                if shutil.which(player[0]):
+                    self._sound_player = player
+                    break
+            if self._sound_player is None:
+                print("Attention sounds: no audio player found (" +
+                      ", ".join(p[0] for p in SOUND_PLAYERS) + ") - speaker sounds off")
+        print("Attention sounds: tower " + ("on" if self._sound_tower else "off") +
+              ", speaker " + ("on" if self._sound_player else "off"))
+
+        # Pulsed in the beep pattern; REB_Generate_Local_Ini.py nets it
+        # (in REB_PostGUI_v1.local.hal) into the buzzer's OR gate
+        # alongside the fault siren, only when a tower is connected.
+        self.halcomp.newpin("tower-beep", hal.HAL_BIT, hal.HAL_OUT)
+        self._beep_steps_left = 0
+
+        # Program state seen at the last check - see _poll_program.
+        self._program_was_running = False
+        self._program_was_paused = False
+        self._program_end_line = None
+        GLib.timeout_add(PROGRAM_POLL_MS, self._poll_program)
+
+    def _play_sound(self, beeps):
+        if self.builder.get_object("Sync_Run") is None:
+            return
+        print("Attention sound: %d beeps" % beeps)
+        if self._sound_player is not None:
+            try:
+                subprocess.Popen(self._sound_player + [SOUND_FILES[beeps]],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except OSError as e:
+                print("Could not play " + SOUND_FILES[beeps] + ": " + str(e))
+        if self._sound_tower and self._beep_steps_left == 0:
+            # Each step flips the pin: on, off, on, off, ...
+            self._beep_steps_left = beeps * 2
+            self._tower_beep_step()
+            GLib.timeout_add(int(BEEP_SECONDS * 1000), self._tower_beep_step)
+
+    def _tower_beep_step(self):
+        if self._beep_steps_left <= 0:
+            self.halcomp["tower-beep"] = False
+            return False
+        self.halcomp["tower-beep"] = self._beep_steps_left % 2 == 0
+        self._beep_steps_left -= 1
+        return True
+
+    @staticmethod
+    def _gcode_words(line):
+        '''A G-code line with its (comments) and ;comment removed, upper case.'''
+        return re.sub(r"\([^)]*\)", " ", line.split(";")[0]).upper()
+
+    def _find_program_end_line(self, path):
+        '''
+        Line number (1-based) of the loaded program's last line that
+        moves an axis. A program counts as finished once motion has got
+        at least that far - see _poll_program. None if the file can't
+        be read.
+        '''
+        try:
+            with open(path, "r", errors="replace") as f:
+                lines = f.readlines()
+        except OSError:
+            return None
+        last = 0
+        for number, line in enumerate(lines, 1):
+            if re.search(r"(?<![A-Z])[XYZABCUVW]\s*[-+.\d\[#]", self._gcode_words(line)):
+                last = number
+        return last
+
+    def _line_is_operator_stop(self, path, number):
+        '''True when line `number` of the program is an M0/M1/M60.'''
+        try:
+            with open(path, "r", errors="replace") as f:
+                for i, line in enumerate(f, 1):
+                    if i == number:
+                        return bool(re.search(r"\bM0*(0|1|60)\b", self._gcode_words(line)))
+        except OSError:
+            pass
+        return False
+
+    def _poll_program(self):
+        '''
+        Watches a program run from a file (AUTO mode). LinuxCNC has no
+        "finished normally" flag - pressing Stop, E-stop, turning the
+        machine off and an error all end a run the same way as M2/M30 -
+        so a run counts as finished only if the machine is still on and
+        motion got at least as far as the program's last move
+        (_find_program_end_line). An abort part way leaves motion_line
+        short of that, so it stays silent. MDI commands (Sync Move,
+        Threading, indexing) are left to their own handlers.
+
+        Unverified on the machine as of 06 October 2026: what
+        motion_line reads right after a normal finish and right after
+        an abort - every run's end is printed below so that can be
+        checked from the console.
+        '''
+        s.poll()
+        auto = s.task_mode == linuxcnc.MODE_AUTO
+        running = auto and s.interp_state != linuxcnc.INTERP_IDLE
+        paused = running and s.interp_state == linuxcnc.INTERP_PAUSED
+
+        if running and not self._program_was_running:
+            self._program_end_line = self._find_program_end_line(s.file)
+
+        if paused and not self._program_was_paused:
+            if self._line_is_operator_stop(s.file, s.current_line) or \
+                    self._line_is_operator_stop(s.file, s.motion_line):
+                self._play_sound(PAUSE_BEEPS)
+
+        if self._program_was_running and not running:
+            finished = (s.task_state == linuxcnc.STATE_ON
+                        and self._program_end_line is not None
+                        and s.motion_line >= self._program_end_line)
+            print("Program run ended: motion_line=%d current_line=%d last move line=%s "
+                  "machine %s -> %s" % (s.motion_line, s.current_line, self._program_end_line,
+                                        "on" if s.task_state == linuxcnc.STATE_ON else "off",
+                                        "finished" if finished else "stopped/aborted"))
+            if finished:
+                self._play_sound(DONE_BEEPS)
+
+        self._program_was_running = running
+        self._program_was_paused = paused
+        return True
 
 
 #######################################################################
@@ -2954,6 +3140,9 @@ class HandlerClass:
 
         # Threading tab setup (if owned by this component).
         self._load_threading_tab()
+
+        # Program-done / pause beeps (main panel only) - see _load_sounds.
+        self._load_sounds()
 
 
 

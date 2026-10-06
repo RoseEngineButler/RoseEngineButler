@@ -2048,6 +2048,44 @@ Choose Not used for any jack with nothing plugged into it.</property>
                                   </packing>
                                 </child>
                                 <child>
+                                  <object class="GtkFrame">
+                                    <property name="visible">True</property>
+                                    <property name="can-focus">False</property>
+                                    <property name="label-xalign">0</property>
+                                    <child>
+                                      <object class="GtkComboBoxText" id="Done_Sound">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="tooltip-text" translatable="yes">Where to play the attention beeps: 3 short beeps when a G-code program, a Sync Move or a Cut Thread finishes, and 2 when a program stops at M0 or M1 to wait for you. Tower buzzer uses the signal tower (only if one is connected); Speaker uses the Pi's own sound (HDMI monitor or USB speaker). The tower's 3-second siren for faults is not affected. Takes effect the next time LinuxCNC starts.</property>
+                                        <property name="halign">center</property>
+                                        <property name="valign">center</property>
+                                        <items>
+                                          <item id="off" translatable="yes">Off</item>
+                                          <item id="tower" translatable="yes">Tower buzzer</item>
+                                          <item id="speaker" translatable="yes">Speaker</item>
+                                          <item id="both" translatable="yes">Both</item>
+                                        </items>
+                                        <signal name="changed" handler="Done_Sound_Changed" swapped="no"/>
+                                      </object>
+                                    </child>
+                                    <child type="label">
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="label" translatable="yes">Done / Pause Beeps</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                          <attribute name="weight" value="bold"/>
+                                        </attributes>
+                                      </object>
+                                    </child>
+                                  </object>
+                                  <packing>
+                                    <property name="left-attach">2</property>
+                                    <property name="top-attach">5</property>
+                                  </packing>
+                                </child>
+                                <child>
                                   <object class="GtkLabel">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
