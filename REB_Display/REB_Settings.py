@@ -3140,6 +3140,7 @@ def main():
     window.connect("delete-event", handler.confirm_close)
     window.connect("destroy", Gtk.main_quit)
     window.set_title("REB Settings")
+    _add_file_menu(builder, handler, window)
     # window1/scrolledwindow1 no longer propagate their content's
     # natural size upward (see scrolledwindow1's propagate-natural-
     # width/height in REB_Settings_v1.ui - needed so content actually
@@ -3152,6 +3153,54 @@ def main():
     window.maximize()
     window.show_all()
     Gtk.main()
+
+def _add_file_menu(builder, handler, window):
+    '''
+    Puts a File menu across the top of the window (asked for by Chuck,
+    07 October 2026) with the same four actions as the four buttons on
+    the Axis Selection page, which stay as they are, plus the
+    usual keyboard shortcuts. Each item runs that button's own handler with
+    the button as its widget, so dialogs open over the main window
+    rather than over the menu's popup.
+    '''
+    accel_group = Gtk.AccelGroup()
+    window.add_accel_group(accel_group)
+    file_menu = Gtk.Menu()
+    file_menu.set_accel_group(accel_group)
+    for label, button_id, method, accel in (
+        ("_Save All Settings", "Settings_Save", handler.Settings_Save, "<Control>s"),
+        ("Save All Settings _As...", "Settings_Save_As", handler.Settings_Save_As, "<Shift><Control>s"),
+        ("Save Subset of Settings As...", "Export_Settings", handler.Export_Settings, None),
+        ("_Load Settings from File...", "Settings_Load", handler.Settings_Load, "<Control>o"),
+        (None, None, None, None),
+        ("_Quit", None, lambda widget: window.close(), "<Control>q"),
+    ):
+        if label is None:
+            file_menu.append(Gtk.SeparatorMenuItem())
+            continue
+        item = Gtk.MenuItem.new_with_mnemonic(label)
+        button = builder.get_object(button_id) if button_id else None
+        item.connect("activate", lambda _item, m=method, b=button: _run_menu_action(window, m, b))
+        if accel:
+            key, mods = Gtk.accelerator_parse(accel)
+            item.add_accelerator("activate", accel_group, key, mods, Gtk.AccelFlags.VISIBLE)
+        file_menu.append(item)
+    file_item = Gtk.MenuItem.new_with_mnemonic("_File")
+    file_item.set_submenu(file_menu)
+    menu_bar = Gtk.MenuBar()
+    menu_bar.append(file_item)
+    outer_box = builder.get_object("Settings_Outer_Box")
+    outer_box.pack_start(menu_bar, False, False, 0)
+    outer_box.reorder_child(menu_bar, 0)
+
+def _run_menu_action(window, method, button):
+    # A shortcut key leaves focus in a spin button that's still being
+    # typed in, whose new value isn't committed until focus leaves it
+    # (clicking a button does that); commit it first so it's saved.
+    focus = window.get_focus()
+    if isinstance(focus, Gtk.SpinButton):
+        focus.update()
+    method(button)
 
 if __name__ == "__main__":
     main()
