@@ -353,12 +353,18 @@ THREAD_RESULT_SECONDS = 20
 # "both". Each pattern is that many short beeps, BEEP_SECONDS on then
 # BEEP_SECONDS off - deliberately unlike the tower's steady 3 s fault
 # siren. The .wav files in REB_Display/Sounds hold the same patterns.
+# The fault siren has its own setting, "fault_sound" (same choices):
+# the tower sounds it straight from HAL, and REB_Generate_Local_Ini.py
+# nets the same 3 s pulse to the fault-siren pin for the speaker, which
+# plays REB_Fault.wav (a 3 s two-tone siren).
 DONE_BEEPS = 3      # a program, Sync Move or Cut Thread finished
 PAUSE_BEEPS = 2     # a program stopped at M0/M1/M60, waiting for the operator
+FAULT_SIREN = "fault"
 BEEP_SECONDS = 0.2
 SOUND_FILES = {
     DONE_BEEPS: os.path.join(os.path.dirname(os.path.abspath(__file__)), "Sounds", "REB_Done.wav"),
     PAUSE_BEEPS: os.path.join(os.path.dirname(os.path.abspath(__file__)), "Sounds", "REB_Pause.wav"),
+    FAULT_SIREN: os.path.join(os.path.dirname(os.path.abspath(__file__)), "Sounds", "REB_Fault.wav"),
 }
 # Tried in order for the speaker; the first one installed is used.
 SOUND_PLAYERS = (["paplay"], ["pw-play"], ["aplay", "-q"])
@@ -2856,9 +2862,11 @@ class HandlerClass:
 #                       buzzer and/or the Pi's speaker, per REBset_v1.ini's
 #                       "done_sound" (REB Settings, Axis Selection page;
 #                       read once at startup, like the tower itself).
+#                       Also plays the fault siren on the speaker, per
+#                       "fault_sound" (the tower's own siren is all HAL).
 #                       Only the main panel component plays them; every
 #                       other component no-ops.
-# Updated:              ver 1.0, 06 October 2026, Claude
+# Updated:              ver 1.0, 07 October 2026, Claude
 #######################################################################
     def _load_sounds(self):
         if self.builder.get_object("Sync_Run") is None:
@@ -2867,8 +2875,9 @@ class HandlerClass:
         choice = settings.get("done_sound", "both")
         self._sound_tower = choice in ("tower", "both") and settings.get("signal_tower") is True
         self._sound_speaker = choice in ("speaker", "both")
+        fault_speaker = settings.get("fault_sound", "both") in ("speaker", "both")
         self._sound_player = None
-        if self._sound_speaker:
+        if self._sound_speaker or fault_speaker:
             for player in SOUND_PLAYERS:
                 if shutil.which(player[0]):
                     self._sound_player = player
@@ -2877,7 +2886,16 @@ class HandlerClass:
                 print("Attention sounds: no audio player found (" +
                       ", ".join(p[0] for p in SOUND_PLAYERS) + ") - speaker sounds off")
         print("Attention sounds: tower " + ("on" if self._sound_tower else "off") +
-              ", speaker " + ("on" if self._sound_player else "off"))
+              ", speaker " + ("on" if self._sound_player and self._sound_speaker else "off") +
+              "; fault siren on speaker " + ("on" if self._sound_player and fault_speaker else "off"))
+
+        # Fault siren for the speaker: netted (in REB_PostGUI_v1.local.hal)
+        # to the tower-siren pulse only when fault_sound includes the
+        # speaker. The pulse lasts 3 s, so polling can't miss it.
+        self.halcomp.newpin("fault-siren", hal.HAL_BIT, hal.HAL_IN)
+        self._fault_siren_was_on = False
+        if fault_speaker and self._sound_player is not None:
+            GLib.timeout_add(PROGRAM_POLL_MS, self._poll_fault_siren)
 
         # Pulsed in the beep pattern; REB_Generate_Local_Ini.py nets it
         # (in REB_PostGUI_v1.local.hal) into the buzzer's OR gate
@@ -2895,17 +2913,30 @@ class HandlerClass:
         if self.builder.get_object("Sync_Run") is None:
             return
         print("Attention sound: %d beeps" % beeps)
-        if self._sound_player is not None:
-            try:
-                subprocess.Popen(self._sound_player + [SOUND_FILES[beeps]],
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except OSError as e:
-                print("Could not play " + SOUND_FILES[beeps] + ": " + str(e))
+        if self._sound_speaker:
+            self._play_on_speaker(SOUND_FILES[beeps])
         if self._sound_tower and self._beep_steps_left == 0:
             # Each step flips the pin: on, off, on, off, ...
             self._beep_steps_left = beeps * 2
             self._tower_beep_step()
             GLib.timeout_add(int(BEEP_SECONDS * 1000), self._tower_beep_step)
+
+    def _play_on_speaker(self, path):
+        if self._sound_player is None:
+            return
+        try:
+            subprocess.Popen(self._sound_player + [path],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError as e:
+            print("Could not play " + path + ": " + str(e))
+
+    def _poll_fault_siren(self):
+        on = self.halcomp["fault-siren"]
+        if on and not self._fault_siren_was_on:
+            print("Fault siren")
+            self._play_on_speaker(SOUND_FILES[FAULT_SIREN])
+        self._fault_siren_was_on = on
+        return True
 
     def _tower_beep_step(self):
         if self._beep_steps_left <= 0:

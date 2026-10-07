@@ -360,10 +360,26 @@ def _read_signal_tower(settings):
     return settings.get("signal_tower") is True
 
 
-def _signal_tower_hal(signal_tower, limit_nets, role_layout):
+# Where the fault siren sounds - REBset_v1.ini's "fault_sound"
+# (REB_Settings.py's _save_fault_sound; absent = "both"), the same
+# choices as "done_sound": the tower's buzzer and/or the Pi's speaker
+# (REB_main.py's _load_sounds plays REB_Fault.wav when the
+# gladevcp.fault-siren pin rises).
+FAULT_SOUND_CHOICES = ("off", "tower", "speaker", "both")
+
+def _read_fault_sound(settings):
+    choice = settings.get("fault_sound", "both")
+    return choice if choice in FAULT_SOUND_CHOICES else "both"
+
+
+def _signal_tower_hal(signal_tower, limit_nets, role_layout, fault_sound="both"):
     '''
     Returns HAL text driving the optional signal tower's three relay
-    outputs when signal_tower is True:
+    outputs when signal_tower is True, and the fault siren's fault
+    detection when the tower is connected or fault_sound sends the
+    siren to the speaker (with no tower, only the fault logic -
+    tower-fault-or, the tower-red-hold latch, tower-buzz - is set up,
+    keeping its tower-* names, and no output pins are touched):
       - green: on while the system is doing something - the interpreter
         isn't idle (a G-code program or MDI command: Sync Move,
         Threading, axis indexing, ...), or an active spindle is running
@@ -390,7 +406,9 @@ def _signal_tower_hal(signal_tower, limit_nets, role_layout):
         with the live limit nets, so a switch still open after F2 keeps
         red lit until the axis is moved off it.
       - buzzer: a SIGNAL_TOWER_BUZZER_SECONDS pulse from a oneshot each
-        time red rises.
+        time red rises (net tower-siren), when fault_sound includes the
+        tower. _fault_siren_postgui_hal nets the same pulse to the
+        main panel for the speaker.
     With the tower off the pins are left as inputs, so nothing drives
     the relays. Pin levels follow SIGNAL_TOWER_ACTIVE_LOW.
     '''
@@ -401,9 +419,13 @@ def _signal_tower_hal(signal_tower, limit_nets, role_layout):
         "# REBset_v1.ini's signal_tower (REB Settings, Axis Selection page).",
         "# ********************************************************************",
     ]
-    if not signal_tower:
-        lines.append("# (signal tower not connected)")
+    siren_to_speaker = fault_sound in ("speaker", "both")
+    if not signal_tower and not siren_to_speaker:
+        lines.append("# (signal tower not connected, fault siren not on the speaker)")
         return "\n".join(lines) + "\n"
+    if not signal_tower:
+        lines.append("# (signal tower not connected - fault siren detection only,")
+        lines.append("# for the speaker)")
 
     joints = sorted(role_layout.joint_number.values())
     red_inputs = ["tower-red-held"] + sorted(limit_nets)
@@ -417,26 +439,27 @@ def _signal_tower_hal(signal_tower, limit_nets, role_layout):
     oriented_net = {"Sp0": "orient-done", "Sp1": "orient.1-done"}
     green_inputs = ["tower-not-idle"]
     spindle_lines = []
-    logic.append(("tower-not-idle-nand", "0x802"))
-    for role, n in sorted(role_layout.spindle_number.items(), key=lambda kv: kv[1]):
-        tag = "tower-sp%d" % n
-        logic.append((tag + "-not-oriented", "0x802"))
-        logic.append((tag + "-indexing", "0x102"))
-        spindle_lines += [
-            ("net " + oriented_net[role]).ljust(41) + "=> %s-not-oriented.in-00" % tag,
-            ("net " + oriented_net[role]).ljust(41) + "=> %s-not-oriented.in-01" % tag,
-            ("net %s-not-oriented" % tag).ljust(40) + "<=  %s-not-oriented.nand" % tag,
-            ("net %s-not-oriented" % tag).ljust(41) + "=> %s-indexing.in-00" % tag,
-            ("net spindle.%d-pos-mode-enable" % n).ljust(41) + "=> %s-indexing.in-01" % tag,
-            ("net %s-indexing" % tag).ljust(40) + "<=  %s-indexing.and" % tag,
-        ]
-        green_inputs += ["spindle.%d-cw" % n, "spindle.%d-ccw" % n, tag + "-indexing"]
-    if len(green_inputs) > 1:
-        logic.append(("tower-green-or", "0x2%02x" % len(green_inputs)))
-    # Buzzer: the fault siren OR'd with REB_main.py's attention beeps
-    # (gladevcp.tower-beep, netted to in-01 by _tower_beep_postgui_hal,
-    # since that pin only exists once the GUI is up).
-    logic.append(("tower-buzzer-or", "0x202"))
+    if signal_tower:
+        logic.append(("tower-not-idle-nand", "0x802"))
+        for role, n in sorted(role_layout.spindle_number.items(), key=lambda kv: kv[1]):
+            tag = "tower-sp%d" % n
+            logic.append((tag + "-not-oriented", "0x802"))
+            logic.append((tag + "-indexing", "0x102"))
+            spindle_lines += [
+                ("net " + oriented_net[role]).ljust(41) + "=> %s-not-oriented.in-00" % tag,
+                ("net " + oriented_net[role]).ljust(41) + "=> %s-not-oriented.in-01" % tag,
+                ("net %s-not-oriented" % tag).ljust(40) + "<=  %s-not-oriented.nand" % tag,
+                ("net %s-not-oriented" % tag).ljust(41) + "=> %s-indexing.in-00" % tag,
+                ("net spindle.%d-pos-mode-enable" % n).ljust(41) + "=> %s-indexing.in-01" % tag,
+                ("net %s-indexing" % tag).ljust(40) + "<=  %s-indexing.and" % tag,
+            ]
+            green_inputs += ["spindle.%d-cw" % n, "spindle.%d-ccw" % n, tag + "-indexing"]
+        if len(green_inputs) > 1:
+            logic.append(("tower-green-or", "0x2%02x" % len(green_inputs)))
+        # Buzzer: the fault siren OR'd with REB_main.py's attention beeps
+        # (gladevcp.tower-beep, netted to in-01 by _tower_beep_postgui_hal,
+        # since that pin only exists once the GUI is up).
+        logic.append(("tower-buzzer-or", "0x202"))
 
     lines += [
         "loadrt logic names=%s personality=%s" % (",".join(n for n, _ in logic), ",".join(p for _, p in logic)),
@@ -465,21 +488,22 @@ def _signal_tower_hal(signal_tower, limit_nets, role_layout):
         "net tower-red-reset".ljust(41) + "=> tower-red-hold.reset",
         "net tower-red-held".ljust(40) + "<=  tower-red-hold.out",
     ]
-    lines += [
-        "",
-        "net tower-green-idle".ljust(40) + "<=  halui.program.is-idle",
-        "net tower-green-idle".ljust(41) + "=> tower-not-idle-nand.in-00",
-        "net tower-green-idle".ljust(41) + "=> tower-not-idle-nand.in-01",
-        "net tower-not-idle".ljust(40) + "<=  tower-not-idle-nand.nand",
-    ] + spindle_lines
-    if len(green_inputs) > 1:
-        for i, net in enumerate(green_inputs):
-            lines.append(("net " + net).ljust(41) + "=> tower-green-or.in-%02d" % i)
-        lines.append("net tower-green".ljust(40) + "<=  tower-green-or.or")
-        green_net = "tower-green"
-    else:
-        green_net = "tower-not-idle"   # no spindles assigned
-    lines.append(("net " + green_net).ljust(41) + "=> hm2_7i92.0.gpio." + SIGNAL_TOWER_OUTPUT["green"] + ".out")
+    if signal_tower:
+        lines += [
+            "",
+            "net tower-green-idle".ljust(40) + "<=  halui.program.is-idle",
+            "net tower-green-idle".ljust(41) + "=> tower-not-idle-nand.in-00",
+            "net tower-green-idle".ljust(41) + "=> tower-not-idle-nand.in-01",
+            "net tower-not-idle".ljust(40) + "<=  tower-not-idle-nand.nand",
+        ] + spindle_lines
+        if len(green_inputs) > 1:
+            for i, net in enumerate(green_inputs):
+                lines.append(("net " + net).ljust(41) + "=> tower-green-or.in-%02d" % i)
+            lines.append("net tower-green".ljust(40) + "<=  tower-green-or.or")
+            green_net = "tower-green"
+        else:
+            green_net = "tower-not-idle"   # no spindles assigned
+        lines.append(("net " + green_net).ljust(41) + "=> hm2_7i92.0.gpio." + SIGNAL_TOWER_OUTPUT["green"] + ".out")
     if len(red_inputs) > 1:
         for i, net in enumerate(red_inputs):
             lines.append(("net " + net).ljust(41) + "=> tower-red-or.in-%02d" % i)
@@ -493,10 +517,15 @@ def _signal_tower_hal(signal_tower, limit_nets, role_layout):
     else:
         red_net = "tower-red-held"
     lines += [
-        ("net " + red_net).ljust(41) + "=> hm2_7i92.0.gpio." + SIGNAL_TOWER_OUTPUT["red"] + ".out",
         ("net " + red_net).ljust(41) + "=> tower-buzz.in",
         "net tower-siren".ljust(40) + "<=  tower-buzz.out",
-        "net tower-siren".ljust(41) + "=> tower-buzzer-or.in-00",
+    ]
+    if not signal_tower:
+        return "\n".join(lines) + "\n"
+    lines.append(("net " + red_net).ljust(41) + "=> hm2_7i92.0.gpio." + SIGNAL_TOWER_OUTPUT["red"] + ".out")
+    if fault_sound in ("tower", "both"):
+        lines.append("net tower-siren".ljust(41) + "=> tower-buzzer-or.in-00")
+    lines += [
         "net tower-buzzer".ljust(40) + "<=  tower-buzzer-or.or",
         "net tower-buzzer".ljust(41) + "=> hm2_7i92.0.gpio." + SIGNAL_TOWER_OUTPUT["buzzer"] + ".out",
         "",
@@ -512,25 +541,37 @@ def _signal_tower_hal(signal_tower, limit_nets, role_layout):
     return "\n".join(lines) + "\n"
 
 
-def _tower_beep_postgui_hal(signal_tower):
+def _tower_beep_postgui_hal(signal_tower, fault_sound="both"):
     '''
     Returns HAL text, appended to REB_PostGUI_v1.local.hal, netting the
     main panel's attention-beep pin (REB_main.py's _load_sounds) into
-    the buzzer's OR gate - post-GUI because gladevcp's pins don't exist
-    until the panel has loaded. Empty with the tower off, since
-    tower-buzzer-or then doesn't exist.
+    the buzzer's OR gate, and the fault siren's pulse (tower-siren, from
+    _signal_tower_hal) to the main panel's gladevcp.fault-siren when
+    fault_sound sends it to the speaker - post-GUI because gladevcp's
+    pins don't exist until the panel has loaded. The beep net is left
+    out with the tower off, since tower-buzzer-or then doesn't exist.
     '''
-    if not signal_tower:
-        return ""
-    return "\n".join([
-        "",
-        "# ********************************************************************",
-        "# Signal tower attention beeps - generated by REB_Generate_Local_Ini.py",
-        "# (REBset_v1.ini's signal_tower is true).",
-        "# ********************************************************************",
-        "net tower-beep".ljust(40) + "<=  gladevcp.tower-beep",
-        "net tower-beep".ljust(41) + "=> tower-buzzer-or.in-01",
-    ]) + "\n"
+    lines = []
+    if signal_tower:
+        lines += [
+            "",
+            "# ********************************************************************",
+            "# Signal tower attention beeps - generated by REB_Generate_Local_Ini.py",
+            "# (REBset_v1.ini's signal_tower is true).",
+            "# ********************************************************************",
+            "net tower-beep".ljust(40) + "<=  gladevcp.tower-beep",
+            "net tower-beep".ljust(41) + "=> tower-buzzer-or.in-01",
+        ]
+    if fault_sound in ("speaker", "both"):
+        lines += [
+            "",
+            "# ********************************************************************",
+            "# Fault siren on the speaker - generated by REB_Generate_Local_Ini.py",
+            "# (REBset_v1.ini's fault_sound is speaker or both).",
+            "# ********************************************************************",
+            "net tower-siren".ljust(41) + "=> gladevcp.fault-siren",
+        ]
+    return "\n".join(lines) + "\n" if lines else ""
 
 
 def _limit_jack_hal(limit_jacks, role_layout):
@@ -1011,7 +1052,7 @@ def _retarget_spindle_block(block_text, spindle_id, channel_id, spindle_num, pro
 
 
 def generate_local_hal_files(role_layout, limit_jacks=None, estop_button=False,
-                             signal_tower=False):
+                             signal_tower=False, fault_sound="both"):
     '''
     Regenerates REB.local.hal from the tracked REB.hal: for each of the
     8 currently-active roles, retargets its own isolated
@@ -1085,13 +1126,13 @@ def generate_local_hal_files(role_layout, limit_jacks=None, estop_button=False,
     # present, so that banner still ends the file.
     limit_text, limit_summary, limit_nets = _limit_jack_hal(limit_jacks or {}, role_layout)
     limit_text += _estop_button_hal(estop_button)
-    limit_text += _signal_tower_hal(signal_tower, limit_nets, role_layout)
+    limit_text += _signal_tower_hal(signal_tower, limit_nets, role_layout, fault_sound)
     end_banner = hal_text.rfind("\n# *********************** NOTHING FOLLOWS")
     if end_banner == -1:
         hal_text += limit_text
     else:
         hal_text = hal_text[:end_banner] + limit_text + hal_text[end_banner:]
-    postgui_text += _tower_beep_postgui_hal(signal_tower)
+    postgui_text += _tower_beep_postgui_hal(signal_tower, fault_sound)
 
     if problems:
         print("REFUSING to write REB.local.hal - generation problem(s):")
@@ -1112,10 +1153,12 @@ def generate_local_hal_files(role_layout, limit_jacks=None, estop_button=False,
     print("Limit jacks: " + (", ".join(limit_summary) or "none in use"))
     print("E-stop button: " + ("connected" if estop_button else "not connected"))
     print("Signal tower: " + ("connected" if signal_tower else "not connected"))
+    print("Fault siren: " + fault_sound)
     if role_layout.inactive_roles:
         print("Not currently assigned to any channel: " + ", ".join(role_layout.inactive_roles))
     print("Wrote " + LOCAL_HAL_PATH + " and " + LOCAL_POSTGUI_HAL_PATH +
-          (" (copy plus tower beep net)" if signal_tower else " (unchanged copy)"))
+          (" (copy plus tower/siren nets)" if signal_tower or fault_sound in ("speaker", "both")
+           else " (unchanged copy)"))
     return True
 
 
@@ -1166,7 +1209,8 @@ def main():
     # .local.hal left over from a different assignment) anyway.
     if not generate_local_hal_files(role_layout, _read_limit_jacks(settings),
                                     _read_estop_button(settings),
-                                    _read_signal_tower(settings)):
+                                    _read_signal_tower(settings),
+                                    _read_fault_sound(settings)):
         sys.exit(1)
 
     text, hal_files_result = _overlay_hal_files(text)
