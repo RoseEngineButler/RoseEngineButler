@@ -956,6 +956,80 @@ def _overlay_backlash(text, settings, role_layout):
     return text, applied
 
 
+def _set_in_section(text, header, key, value_text):
+    '''
+    Sets key = value_text on its first line inside the [section] that
+    starts with header (e.g. "[AXIS_C]"). Returns (text, True if set).
+    '''
+    start = text.find("\n" + header + "\n")
+    if start < 0:
+        return text, False
+    end = text.find("\n[", start + 1)
+    if end < 0:
+        end = len(text)
+    section, n = re.subn(
+        r'(?m)^(' + key + r'\s*= )\S+',
+        lambda m: m.group(1) + value_text,
+        text[start:end],
+        count=1,
+    )
+    if not n:
+        return text, False
+    return text[:start] + section + text[end:], True
+
+
+def _overlay_axis_limits(text, settings, role_layout):
+    '''
+    Writes each active axis letter's Max Speed / Max Acceleration (REB
+    Settings - REBset_v1.ini axes.<letter>.max_speed/max_acceleration)
+    into its [AXIS_<letter>] and [JOINT_n] MAX_VELOCITY/MAX_ACCELERATION,
+    the trajectory planner's limits. Read once by LinuxCNC at startup,
+    like BACKLASH (see _overlay_backlash) - so must also run after
+    _overlay_role_assignment. Returns (text, list applied).
+    '''
+    axes = settings.get("axes", {})
+    applied = []
+    for letter, joint_num in role_layout.joint_number.items():
+        entry = axes.get(letter, {})
+        try:
+            speed = float(entry["max_speed"])
+            accel = float(entry["max_acceleration"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        for header in ("[AXIS_" + letter + "]", "[JOINT_" + str(joint_num) + "]"):
+            text, _ = _set_in_section(text, header, "MAX_VELOCITY", "%.6f" % speed)
+            text, _ = _set_in_section(text, header, "MAX_ACCELERATION", "%.6f" % accel)
+        applied.append("%s=%g/%g" % (letter, speed, accel))
+    return text, applied
+
+
+def _overlay_traj_caps(text, settings, role_layout):
+    '''
+    [TRAJ]MAX_LINEAR_VELOCITY / MAX_ANGULAR_VELOCITY cap every move in a
+    program. Before 08 October 2026 they were simply the jog settings
+    (Max Jog Speed / Max Angular Velocity), so a jog choice also held
+    back programs. Now each is the higher of its jog setting and the
+    fastest active axis of that kind's Max Speed, so the axes' own Max
+    Speed is what limits programs. Must run after the jog overlays,
+    which write these same keys. Returns (text, (linear, angular)).
+    '''
+    axes = settings.get("axes", {})
+    linear = float(settings.get("max_jog_speed", 0))
+    angular = float(settings.get("max_angular_velocity", 0))
+    for letter in role_layout.joint_number:
+        try:
+            speed = float(axes.get(letter, {})["max_speed"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if letter in ("A", "B", "C"):   # angular - the rest are linear
+            angular = max(angular, speed)
+        else:
+            linear = max(linear, speed)
+    text, _ = _set_in_section(text, "[TRAJ]", "MAX_LINEAR_VELOCITY", "%.6f" % linear)
+    text, _ = _set_in_section(text, "[TRAJ]", "MAX_ANGULAR_VELOCITY", "%.6f" % angular)
+    return text, (linear, angular)
+
+
 # ----------------------------------------------------------------------
 # REB.hal regeneration. REB_PostGUI_v1.hal needs no per-launch
 # substitution at all (see this file's own header) and is simply copied
@@ -1241,6 +1315,13 @@ def main():
         if result:
             value_text, n = result
             print("Overlaid " + ini_key + " = " + value_text + " (" + str(n) + " line(s))")
+
+    text, limits_applied = _overlay_axis_limits(text, settings, role_layout)
+    print("Overlaid MAX_VELOCITY/MAX_ACCELERATION: " + (", ".join(limits_applied) or "none"))
+
+    text, (traj_linear, traj_angular) = _overlay_traj_caps(text, settings, role_layout)
+    print("Overlaid [TRAJ] MAX_LINEAR_VELOCITY = %g, MAX_ANGULAR_VELOCITY = %g"
+          % (traj_linear, traj_angular))
 
     text, units_result = _overlay_measurement_system(text, settings)
     if units_result:

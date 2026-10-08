@@ -145,7 +145,49 @@ PID_PARAMS = ("P", "I", "D", "FF0", "FF1", "FF2")
 # start from.
 _DEFAULT_PID = {"P": 5, "I": 1, "D": 1.2, "FF0": 0, "FF1": 1, "FF2": 0}
 _DEFAULT_SPINDLE_PID_POS = {"P": 2, "I": 1, "D": 1.2, "FF0": 0, "FF1": 0, "FF2": 0}
-_DEFAULT_SPINDLE_PID_VEL = {"P": 35.1, "I": 20, "D": 1.2, "FF0": 1, "FF1": 0, "FF2": 0}
+# (Spindles' old velocity-loop "pid_vel" gains were dropped 08 October
+# 2026 - that loop's output never reached the stepgen. A machine's file
+# may still carry the key; nothing reads it.)
+
+# How the advanced limits are worked out from an axis's Max Speed / Max
+# Acceleration (the trajectory planner's limits, [AXIS_*]/[JOINT_n]
+# MAX_VELOCITY/MAX_ACCELERATION), and the least margin each must keep
+# above them. REB Settings shows these as each row's note and warns
+# when a value drops below its minimum; REB_Update_Settings.py uses them
+# to fill in a machine's first Max Speed / Max Acceleration.
+STEPGEN_VEL_FACTOR = 1.25      # stepgen max_vel = 1.25 x max_speed
+STEPGEN_VEL_MIN = 1.0          # ... and never below max_speed
+STEPGEN_ACCEL_FACTOR = 2.0     # stepgen max_accel = 2 x max_acceleration
+STEPGEN_ACCEL_MIN = 1.5        # ... and never below 1.5 x max_acceleration
+PID_OUTPUT_FACTOR = 1.1        # pid max output = 1.1 x max_speed
+PID_OUTPUT_MIN = 1.0           # ... and never below max_speed
+
+# Step pulse time (ns) every channel uses - REB.ini's STEPLEN +
+# STEPSPACE (2500 + 2500 for the DM542T). 1e9 / this is the most steps
+# per second the 7i92 can send, so a Max Speed above
+# that / |scale| can't actually be reached.
+STEP_TIME_NS = 5000
+
+# Fastest any linear axis may be set to move: 1 inch/sec (Rich, 08
+# October 2026), in machine units - 25.4 mm/sec when the Measurement
+# System is Metric.
+LINEAR_MAX_SPEED_CAP_INCH = 1.0
+
+
+def linear_speed_cap(measurement_system):
+    return LINEAR_MAX_SPEED_CAP_INCH * (25.4 if measurement_system == "Metric" else 1.0)
+
+
+def step_rate_speed_ceiling(scale):
+    '''Fastest speed (units/sec) the step timing allows at this scale,
+    or None for a zero scale.'''
+    try:
+        scale = abs(float(scale))
+    except (TypeError, ValueError):
+        return None
+    if scale == 0:
+        return None
+    return 1e9 / STEP_TIME_NS / scale
 
 # REB.ini's own shipped [TRAJ]/[DISPLAY] starting values - mirrors
 # REB_main.py's VELOCITY_SETTINGS defaults exactly.
@@ -158,23 +200,128 @@ VELOCITY_DEFAULTS = {
 }
 
 
-# REB.ini's own shipped [JOINT_n]/[SPINDLE_n] STEPGEN_MAXVEL/
-# STEPGEN_MAXACCEL starting values, by axis category - what a brand-new
-# axis entry's "max_vel"/"max_accel" should start from. These are the
-# stepgen hardware limits (live hm2_7i92.0.stepgen.NN.maxvel/maxaccel
-# HAL params - see AXIS_STEPGEN in REB_main.py), not the [JOINT_n]/
-# [AXIS_*] MAX_VELOCITY/MAX_ACCELERATION ini keys - those are a
-# deliberately unreachable trajectory-planner ceiling that never binds
-# (see CLAUDE.md), so this Settings-tab feature exposes the stepgen
-# limit instead, matching REB_Generate_Local_Ini.py's docstring, which
-# already calls STEPGEN_MAXVEL/STEPGEN_MAXACCEL "physical-channel
-# tuning values the operator retunes via the Settings tab".
-_DEFAULT_LINEAR_MAX_VEL = 0.4
-_DEFAULT_LINEAR_MAX_ACCEL = 30.0
-_DEFAULT_ROTARY_MAX_VEL = 100.0
-_DEFAULT_ROTARY_MAX_ACCEL = 20.0
+# A spindle's stepgen limits (its Max Vel / Max Accel in REB Settings -
+# spindles have no planner limits of their own). An axis's stepgen
+# max_vel/max_accel are worked out from its Max Speed / Max
+# Acceleration instead - see default_limits.
 _DEFAULT_SPINDLE_MAX_VEL = 3.0
 _DEFAULT_SPINDLE_MAX_ACCEL = 1.0
+
+# Planner limits ("max_speed"/"max_acceleration") per letter - REB.ini's
+# shipped [AXIS_*] values, except linear Max Speed, which REB.ini sets
+# far above what the stepgen allows (10 in/s) and is the stepgen's own
+# default here instead. C is set up for rosette programs of many tiny
+# moves (see REB.ini's [AXIS_C]).
+_DEFAULT_MAX_SPEED = {"C": 30.0}
+_DEFAULT_MAX_ACCELERATION = {"C": 320.0}
+_DEFAULT_LINEAR_MAX_SPEED = 0.3
+_DEFAULT_LINEAR_MAX_ACCELERATION = 20.0
+_DEFAULT_ROTARY_MAX_SPEED = 10.0
+_DEFAULT_ROTARY_MAX_ACCELERATION = 10.0
+# Spindle indexing (M19) position loop's output cap - REB.ini's
+# [SPINDLE_n]MAX_OUTPUT_POS.
+_DEFAULT_INDEX_MAX_OUTPUT = 1.0
+
+
+def default_limits(axis_id):
+    '''
+    An axis's calculated starting limits: {"max_speed", "max_acceleration",
+    "max_vel", "max_accel", "pid_max_output"} - or, for a spindle,
+    {"max_vel", "max_accel", "index_max_output"}. Also what REB Settings'
+    Restore Defaults puts back.
+    '''
+    if axis_id in SPINDLE_IDS:
+        return {"max_vel": _DEFAULT_SPINDLE_MAX_VEL,
+                "max_accel": _DEFAULT_SPINDLE_MAX_ACCEL,
+                "index_max_output": _DEFAULT_INDEX_MAX_OUTPUT}
+    angular = _axis_type_for_letter(axis_id) == "ANGULAR"
+    speed = _DEFAULT_MAX_SPEED.get(
+        axis_id, _DEFAULT_ROTARY_MAX_SPEED if angular else _DEFAULT_LINEAR_MAX_SPEED)
+    accel = _DEFAULT_MAX_ACCELERATION.get(
+        axis_id, _DEFAULT_ROTARY_MAX_ACCELERATION if angular else _DEFAULT_LINEAR_MAX_ACCELERATION)
+    return {"max_speed": speed,
+            "max_acceleration": accel,
+            "max_vel": round(speed * STEPGEN_VEL_FACTOR, 6),
+            "max_accel": round(accel * STEPGEN_ACCEL_FACTOR, 6),
+            "pid_max_output": round(speed * PID_OUTPUT_FACTOR, 6)}
+
+
+def default_pid(axis_id):
+    '''An axis's standard PID gains (a spindle's indexing loop's for Sp0/Sp1).'''
+    return dict(_DEFAULT_SPINDLE_PID_POS if axis_id in SPINDLE_IDS else _DEFAULT_PID)
+
+
+LIMIT_KEYS = ("max_speed", "max_acceleration", "pid_max_output", "index_max_output")
+
+
+def fill_missing_limits(axis_id, entry, planner=None, measurement_system="Imperial"):
+    '''
+    Fills in a machine's missing Max Speed / Max Acceleration / PID Max
+    Output (axes) or Indexing Max Output (spindles) without changing how
+    fast the axis can actually move. Returns a list of what was set.
+
+    Before 08 October 2026 these lived in REB.ini, where linear Max
+    Speed was 10 in/s but the stepgen's own max_vel (often 0.167 in/s)
+    was what really limited the axis - so Max Speed starts at the lower
+    of the two.
+
+    planner=None (just reading a file): Max Acceleration is also held to
+    what the saved stepgen max_accel allows, so nothing is asked of the
+    stepgen that it can't do. planner=(MAX_VELOCITY, MAX_ACCELERATION)
+    from REB.ini (REB_Update_Settings.py): Max Acceleration is REB.ini's,
+    and the stepgen max_vel/max_accel are raised if they're now too low
+    - the one place existing values change.
+    '''
+    changes = []
+    if axis_id in SPINDLE_IDS:
+        if "index_max_output" not in entry:
+            # REB.ini's MAX_OUTPUT_POS, but no more than the spindle's own
+            # Max Vel - the stepgen held it to that anyway.
+            try:
+                stepgen_vel = float(entry.get("max_vel", _DEFAULT_SPINDLE_MAX_VEL))
+            except (TypeError, ValueError):
+                stepgen_vel = _DEFAULT_SPINDLE_MAX_VEL
+            entry["index_max_output"] = round(min(_DEFAULT_INDEX_MAX_OUTPUT, stepgen_vel), 6)
+            changes.append("index_max_output = %g" % entry["index_max_output"])
+        return changes
+
+    defaults = default_limits(axis_id)
+    speed_default, accel_default = planner if planner else (defaults["max_speed"], defaults["max_acceleration"])
+    try:
+        stepgen_vel = float(entry.get("max_vel", defaults["max_vel"]))
+        stepgen_accel = float(entry.get("max_accel", defaults["max_accel"]))
+    except (TypeError, ValueError):
+        stepgen_vel, stepgen_accel = defaults["max_vel"], defaults["max_accel"]
+
+    if "max_speed" not in entry:
+        speed = min(speed_default, stepgen_vel)
+        if _axis_type_for_letter(axis_id) == "LINEAR":
+            speed = min(speed, linear_speed_cap(measurement_system))
+        entry["max_speed"] = round(speed, 6)
+        changes.append("max_speed = %g" % entry["max_speed"])
+        if planner:
+            wanted = entry["max_speed"] * STEPGEN_VEL_FACTOR
+            ceiling = step_rate_speed_ceiling(entry.get("scale"))
+            if ceiling is not None:
+                wanted = min(wanted, ceiling)
+            if wanted > stepgen_vel:
+                entry["max_vel"] = round(wanted, 6)
+                changes.append("max_vel %g -> %g" % (stepgen_vel, entry["max_vel"]))
+
+    if "max_acceleration" not in entry:
+        if planner:
+            entry["max_acceleration"] = accel_default
+            if stepgen_accel < accel_default * STEPGEN_ACCEL_MIN:
+                entry["max_accel"] = round(accel_default * STEPGEN_ACCEL_FACTOR, 6)
+                changes.append("max_accel %g -> %g" % (stepgen_accel, entry["max_accel"]))
+        else:
+            entry["max_acceleration"] = round(min(accel_default, stepgen_accel / STEPGEN_ACCEL_MIN), 6)
+        changes.append("max_acceleration = %g" % entry["max_acceleration"])
+
+    if "pid_max_output" not in entry:
+        entry["pid_max_output"] = round(entry["max_speed"] * PID_OUTPUT_FACTOR, 6)
+        changes.append("pid_max_output = %g" % entry["pid_max_output"])
+    return changes
 
 
 # The axis letter -> Type rule. TYPE was briefly an independent,
@@ -194,23 +341,15 @@ def _axis_type_for_letter(letter):
 
 def _default_axis_entry(axis_id):
     if axis_id in SPINDLE_IDS:
-        return {
-            "scale": 1,
-            "backlash": 0.0,
-            "max_vel": _DEFAULT_SPINDLE_MAX_VEL,
-            "max_accel": _DEFAULT_SPINDLE_MAX_ACCEL,
-            "pid_pos": dict(_DEFAULT_SPINDLE_PID_POS),
-            "pid_vel": dict(_DEFAULT_SPINDLE_PID_VEL),
-        }
-    angular = _axis_type_for_letter(axis_id) == "ANGULAR"
-    return {
-        "scale": 1,
-        "backlash": 0.0,
-        "max_vel": _DEFAULT_ROTARY_MAX_VEL if angular else _DEFAULT_LINEAR_MAX_VEL,
-        "max_accel": _DEFAULT_ROTARY_MAX_ACCEL if angular else _DEFAULT_LINEAR_MAX_ACCEL,
-        "usercomment": "",
-        "pid": dict(_DEFAULT_PID),
-    }
+        entry = {"scale": 1, "backlash": 0.0}
+        entry.update(default_limits(axis_id))
+        entry["pid_pos"] = default_pid(axis_id)
+        return entry
+    entry = {"scale": 1, "backlash": 0.0}
+    entry.update(default_limits(axis_id))
+    entry["usercomment"] = ""
+    entry["pid"] = default_pid(axis_id)
+    return entry
 
 
 def default_settings():
@@ -271,7 +410,16 @@ def _merge_defaults(loaded):
         if key == "axes" and isinstance(value, dict):
             for axis_id, axis_value in value.items():
                 if axis_id in merged["axes"] and isinstance(axis_value, dict):
-                    merged["axes"][axis_id].update(axis_value)
+                    entry = merged["axes"][axis_id]
+                    # A saved axis without the 08 October 2026 limits
+                    # gets them worked out from its own stepgen values,
+                    # not the shipped defaults - see fill_missing_limits.
+                    for limit_key in LIMIT_KEYS:
+                        if limit_key not in axis_value:
+                            entry.pop(limit_key, None)
+                    entry.update(axis_value)
+                    fill_missing_limits(axis_id, entry, measurement_system=loaded.get(
+                        "measurement_system", "Imperial"))
                 else:
                     merged["axes"][axis_id] = axis_value
         else:

@@ -140,9 +140,12 @@ class RoleLayout(object):
 
 _ROLE_LAYOUT = RoleLayout(_read_channel_assignments())
 
+# Each spindle's indexing (M19) position loop. (Their velocity loops,
+# pid.s0/pid.s1, were removed 08 October 2026 - their output never
+# reached the stepgen.)
 PID_SPINDLE_LOOPS = {
-    "Sp0": {"Pos": "pid.p0", "Vel": "pid.s0"},
-    "Sp1": {"Pos": "pid.p1", "Vel": "pid.s1"},
+    "Sp0": {"Pos": "pid.p0"},
+    "Sp1": {"Pos": "pid.p1"},
 }
 PID_PARAM_PIN = {
     "P":   "Pgain",
@@ -175,6 +178,10 @@ def set_stepgen_max(stepgen_ch, param, value):
 
 def set_pid_gain(hal_component, param, value):
     _setp(hal_component + "." + PID_PARAM_PIN[param], value)
+
+
+def set_pid_max_output(hal_component, value):
+    _setp(hal_component + ".maxoutput", value)
 
 
 def main():
@@ -243,6 +250,24 @@ def main():
                 sys.exit(1)
         print("Restored " + axis_id + " " + block_tag + " PID gains = " + str(pid_block))
 
+    def restore_max_output(axis_id, key, hal_component):
+        # An axis's PID Max Output / a spindle's Indexing Max Output
+        # (REB Settings' advanced rows). REB.hal sets each from REB.ini
+        # first; this replaces it with the machine's own value.
+        axis_entry = axes.get(axis_id)
+        if axis_entry is None or key not in axis_entry:
+            print("No stored " + key + " found for axis " + axis_id)
+            return
+        value = float(axis_entry[key])
+        try:
+            set_pid_max_output(hal_component, value)
+            print("Restored " + axis_id + " " + key + " = " + str(value))
+        except subprocess.CalledProcessError as e:
+            print("Error restoring " + key + " for axis " + axis_id + ": " + e.stderr)
+        except FileNotFoundError:
+            print("halcmd not found - is the LinuxCNC environment sourced?")
+            sys.exit(1)
+
     for role in CHANNEL_ROLES:
         channel_id = _ROLE_LAYOUT.channel_of.get(role)
         if channel_id is None:
@@ -256,10 +281,11 @@ def main():
 
         if role in AXIS_SELECTION_LETTERS:
             restore_pid(role, "pid", "pid." + role.lower())
+            restore_max_output(role, "pid_max_output", "pid." + role.lower())
         else:
-            for suffix, hal_component in PID_SPINDLE_LOOPS[role].items():
-                block_tag = "pid_pos" if suffix == "Pos" else "pid_vel"
-                restore_pid(role, block_tag, hal_component)
+            hal_component = PID_SPINDLE_LOOPS[role]["Pos"]
+            restore_pid(role, "pid_pos", hal_component)
+            restore_max_output(role, "index_max_output", hal_component)
 
 
 if __name__ == "__main__":

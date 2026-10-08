@@ -135,7 +135,7 @@ loadrt estop_latch
 # like every other role's pid component, even on a launch where A/C
 # aren't currently assigned to any channel (harmless idle, no net wired
 # to them in that case - see the AXIS_A/AXIS_C blocks below).
-loadrt pid names=pid.x,pid.z,pid.b,pid.a,pid.c,pid.u,pid.v,pid.w,pid.s0,pid.s1,pid.p0,pid.p1
+loadrt pid names=pid.x,pid.z,pid.b,pid.a,pid.c,pid.u,pid.v,pid.w,pid.p0,pid.p1
 
 addf hm2_7i92.0.read                        servo-thread
 addf hm2_7i92.0.write                       servo-thread
@@ -718,7 +718,6 @@ net spindle.0-ccw                       <=  spindle.0.reverse
 
 # See also the REB_PostGui.hal
 net spindle.0-enable                     => hm2_7i92.0.outm.00.out-06
-net spindle.0-enable                     => pid.s0.enable
 
 net spindle.0-index-enable              <=> spindle.0.index-enable
 net spindle.0-index-enable               => pid.p0.index-enable
@@ -749,9 +748,6 @@ net spindle.0-position-fb               => orient.0.position
 net spindle.0-position-fb               => pid.p0.feedback
 net spindle.0-position-fb               => spindle.0.revs
 
-net spindle.0-vel-cmd-rpm               <=  spindle.0.speed-out
-net spindle.0-vel-cmd-rpm                => pid.s0.command
-
 net spindle.0-vel-cmd-rps               <=  spindle.0.speed-out-rps
 net spindle.0-vel-cmd-rps                => mux2.0.in0
 
@@ -775,8 +771,6 @@ setp hm2_7i92.0.stepgen.06.control-type     1
 setp hm2_7i92.0.stepgen.06.maxaccel         [SPINDLE_0]STEPGEN_MAXACCEL
 setp hm2_7i92.0.stepgen.06.maxvel           [SPINDLE_0]STEPGEN_MAXVEL
 
-setp pid.s0.error-previous-target           true
-
 setp pid.p0.bias                            [SPINDLE_0]BIAS_POS
 setp orient.0.tolerance                     [SPINDLE_0]ORIENT_TOLERANCE
 # Hardwired shortest-path (see man orient) - both the M19 path (which has
@@ -786,10 +780,6 @@ setp orient.0.tolerance                     [SPINDLE_0]ORIENT_TOLERANCE
 setp orient.0.mode                          0
 setp pid.p0.maxoutput                       [SPINDLE_0]MAX_OUTPUT_POS
 setp pid.p0.maxerrorI                       [SPINDLE_0]MAX_ERROR_I_POS
-
-setp pid.s0.bias                            [SPINDLE_0]BIAS_VEL
-setp pid.s0.deadband                        [SPINDLE_0]DEADBAND
-setp pid.s0.maxoutput                       [SPINDLE_0]MAX_OUTPUT_VEL
 
 # ********************************************************************
 #  Set signal values
@@ -817,7 +807,6 @@ sets spindle.0-at-speed                     true
 # ********************************************************************
 
 # ROLE_BLOCK_START: Sp1
-addf pid.s1.do-pid-calcs                    servo-thread
 addf orient.1                               servo-thread
 addf pid.p1.do-pid-calcs                    servo-thread
 addf mux2.1                                 servo-thread
@@ -854,10 +843,8 @@ net spindle.1-ccw                       <=  spindle.1.reverse
 
 # See also the REB_PostGui.hal
 net spindle.1-enable                     => hm2_7i92.0.outm.00.out-07
-net spindle.1-enable                     => pid.s1.enable
 
 net spindle.1-index-enable              <=> spindle.1.index-enable
-net spindle.1-index-enable               => pid.s1.index-enable
 net spindle.1-index-enable               => pid.p1.index-enable
 
 net spindle.1-output-pos                <=  pid.p1.output
@@ -893,13 +880,9 @@ net spindle.1-vel-cmd-final               => hm2_7i92.0.stepgen.07.velocity-cmd
 
 net spindle.1-vel-fb-rps                <=  hm2_7i92.0.stepgen.07.velocity-fb
 
-net spindle.1-vel-cmd-rpm               <=  spindle.1.speed-out
-
 net spindle.1-vel-cmd-rps               <=  spindle.1.speed-out-rps
 
 net spindle.1-vel-fb-rps                 => spindle.1.speed-in
-
-net spindle.1-vel-cmd-rpm                => pid.s1.command
 
 # ********************************************************************
 #  Set pin values
@@ -912,19 +895,12 @@ setp hm2_7i92.0.stepgen.07.control-type     1
 setp hm2_7i92.0.stepgen.07.maxaccel         [SPINDLE_1]STEPGEN_MAXACCEL
 setp hm2_7i92.0.stepgen.07.maxvel           [SPINDLE_1]STEPGEN_MAXVEL
 
-setp pid.s1.error-previous-target           true
-
 setp pid.p1.bias                            [SPINDLE_1]BIAS_POS
 setp orient.1.tolerance                     [SPINDLE_1]ORIENT_TOLERANCE
 # See the matching Sp0 setp above - hardwired shortest-path.
 setp orient.1.mode                          0
 setp pid.p1.maxoutput                       [SPINDLE_1]MAX_OUTPUT_POS
 setp pid.p1.maxerrorI                       [SPINDLE_1]MAX_ERROR_I_POS
-
-setp pid.s1.bias                            [SPINDLE_1]BIAS_VEL
-
-setp pid.s1.deadband                        [SPINDLE_1]DEADBAND
-setp pid.s1.maxoutput                       [SPINDLE_1]MAX_OUTPUT_VEL
 
 # ********************************************************************
 #  Set signal values
@@ -968,7 +944,7 @@ net machine-is-on                           halui.machine.is-on
 #  Added 4 September 2026 by Claude
 # ********************************************************************
 # hm2_7i92.0.stepgen.*.position-scale/maxvel/maxaccel, pid.*.Pgain/
-# Igain/Dgain/FF0/FF1/FF2, and joint.*.backlash are all live HAL
+# Igain/Dgain/FF0/FF1/FF2/maxoutput, and joint.*.backlash are all live HAL
 # PARAMETERS with no connection to REB.ini/REB.local.ini at all - each
 # one resets to that component's own hard default (0 or 1, not this
 # machine's real values) every time hm2_7i92/pid/motion are freshly

@@ -81,6 +81,7 @@ import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Gdk', '3.0')
 from gi.repository import Gdk
+from gi.repository import GLib
 from gi.repository import Gtk
 
 @contextlib.contextmanager
@@ -425,14 +426,39 @@ _ROLE_CHANNEL_OF = {role: channel_id for channel_id, role in _CHANNEL_ASSIGNMENT
 _ACTIVE_LETTERS_AT_STARTUP = [l for l in JOINT_NUMBER_CANONICAL_ORDER if l in _ROLE_CHANNEL_OF]
 JOINT_NUMBER = {letter: i for i, letter in enumerate(_ACTIVE_LETTERS_AT_STARTUP)}
 
-# Spindle id -> {"Pos": position-loop component, "Vel": velocity-loop
-# component}. The suffix ("Pos"/"Vel") matches the Settings widget id
-# suffix (e.g. Sp0_Set_P_Pos, Sp0_Set_P_Vel) and the REBset_v1.ini block
-# tag ("pid_pos"/"pid_vel").
+# Spindle id -> {"Pos": its indexing (M19) position-loop component}. The
+# suffix matches the Settings widget id suffix (e.g. Sp0_Set_P_Pos) and
+# the REBset_v1.ini block tag "pid_pos". (The velocity loops, pid.s0/
+# pid.s1 and their "_Vel" widgets, were removed 08 October 2026 - their
+# output never reached the stepgen.)
 PID_SPINDLE_LOOPS = {
-    "Sp0": {"Pos": "pid.p0", "Vel": "pid.s0"},
-    "Sp1": {"Pos": "pid.p1", "Vel": "pid.s1"},
+    "Sp0": {"Pos": "pid.p0"},
+    "Sp1": {"Pos": "pid.p1"},
 }
+
+# The speed limits that moved out of REB.ini on 08 October 2026: widget
+# id suffix -> REBset_v1.ini axes.<id> key. Max Speed / Max Acceleration
+# are the motion planner's limits (written into REB.local.ini by
+# REB_Generate_Local_Ini.py); PID/Indexing Max Output cap the position
+# loop's output (set by REB_Settings_Restore.py). Like Scale and the PID
+# gains, they're saved by Save All Settings, and none has a live HAL
+# write - this program never runs alongside LinuxCNC.
+LIMIT_FIELDS = {
+    "_Set_Max_Speed": "max_speed",
+    "_Set_Max_Acceleration": "max_acceleration",
+    "_Set_PID_Max_Output": "pid_max_output",
+    "_Set_Index_Max_Output": "index_max_output",
+}
+
+# The three tuning groups' "Advanced settings" expanders, and the grid
+# group each axis belongs to (its Limits_Warning label's prefix).
+ADVANCED_EXPANDERS = ("LinearAxes_Advanced", "RotaryAxes_Advanced", "Spindle_Advanced")
+
+
+def _limit_group(axis_id):
+    if axis_id in SPINDLE_IDS:
+        return "Spindle"
+    return "RotaryAxes" if _axis_type_for_letter(axis_id) == "ANGULAR" else "LinearAxes"
 
 # Settings widget field name -> HAL pid component pin name.
 PID_PARAM_PIN = {
@@ -1035,6 +1061,180 @@ class HandlerClass:
             if widget is not None:
                 widget.set_value(value)
 
+    def _load_limit_settings(self):
+        '''
+        Reads each axis's Max Speed / Max Acceleration / PID Max Output
+        (and each spindle's Indexing Max Output) from REBset_v1.ini into
+        their spin buttons. No live push - see LIMIT_FIELDS.
+        '''
+        axes = reb_settings_io.load_settings().get("axes", {})
+        self._applying_limits = True
+        try:
+            for axis_id in CHANNEL_ROLES:
+                entry = axes.get(axis_id, {})
+                for suffix, key in LIMIT_FIELDS.items():
+                    widget = self.builder.get_object(axis_id + suffix)
+                    if widget is None or key not in entry:
+                        continue
+                    try:
+                        widget.set_value(float(entry[key]))
+                    except (TypeError, ValueError):
+                        print("Skipping " + axis_id + " " + key + " - not a number")
+        finally:
+            self._applying_limits = False
+        self._remember_limit_values()
+        self._update_limit_warnings()
+
+    def _remember_limit_values(self):
+        # Each axis's Max Speed / Max Acceleration as last seen, so a
+        # change can tell whether the advanced values below it were
+        # still at their worked-out value (see Tuning_Limit_Changed).
+        self._last_limits = {}
+        for axis_id in AXIS_SELECTION_LETTERS:
+            for suffix in ("_Set_Max_Speed", "_Set_Max_Acceleration"):
+                widget = self.builder.get_object(axis_id + suffix)
+                if widget is not None:
+                    self._last_limits[axis_id + suffix] = widget.get_value()
+
+    def _spin_value(self, widget_id):
+        widget = self.builder.get_object(widget_id)
+        return widget.get_value() if widget is not None else None
+
+    def Tuning_Limit_Changed(self, widget):
+        '''
+        value-changed handler for every Max Speed, Max Acceleration, PID
+        Max Output and Indexing Max Output spin button. A Max Speed or
+        Max Acceleration change carries through to the advanced values
+        worked out from it (Stepgen Max Vel / PID Max Output, or Stepgen
+        Max Accel) - but only those still at their worked-out value, so
+        a value the operator set by hand is left alone (the warnings
+        line then says if it no longer fits).
+        '''
+        if self._applying_limits:
+            return
+        name = Gtk.Buildable.get_name(widget)
+        axis_id = name.split("_Set_")[0]
+        old = self._last_limits.get(name)
+        new = widget.get_value()
+        if old is not None and name.endswith("_Set_Max_Speed"):
+            follow = ((axis_id + "_Set_Max_Vel", reb_settings_io.STEPGEN_VEL_FACTOR),
+                      (axis_id + "_Set_PID_Max_Output", reb_settings_io.PID_OUTPUT_FACTOR))
+        elif old is not None and name.endswith("_Set_Max_Acceleration"):
+            follow = ((axis_id + "_Set_Max_Accel", reb_settings_io.STEPGEN_ACCEL_FACTOR),)
+        else:
+            follow = ()
+        for dependent_id, factor in follow:
+            dependent = self.builder.get_object(dependent_id)
+            if dependent is None:
+                continue
+            step = 10 ** -dependent.get_digits()
+            if abs(dependent.get_value() - old * factor) <= step:
+                dependent.set_value(new * factor)
+        if name in self._last_limits:
+            self._last_limits[name] = new
+        self._update_limit_warnings()
+
+    def _limit_problems(self, axis_id):
+        '''One-line descriptions of whatever is wrong with this axis's limits.'''
+        problems = []
+        scale = self._spin_value(axis_id + "_Set_Scale")
+        stepgen_vel = self._spin_value(axis_id + "_Set_Max_Vel")
+        stepgen_accel = self._spin_value(axis_id + "_Set_Max_Accel")
+        if axis_id in SPINDLE_IDS:
+            top, index_out = stepgen_vel, self._spin_value(axis_id + "_Set_Index_Max_Output")
+            if index_out is not None and stepgen_vel is not None and index_out > stepgen_vel:
+                problems.append("Indexing Max Output is above Max Vel")
+        else:
+            top = self._spin_value(axis_id + "_Set_Max_Speed")
+            accel = self._spin_value(axis_id + "_Set_Max_Acceleration")
+            pid_out = self._spin_value(axis_id + "_Set_PID_Max_Output")
+            if None in (top, accel, stepgen_vel, stepgen_accel, pid_out):
+                return problems
+            if stepgen_vel < top * reb_settings_io.STEPGEN_VEL_MIN:
+                problems.append("Stepgen Max Vel is below Max Speed")
+            if stepgen_accel < accel * reb_settings_io.STEPGEN_ACCEL_MIN:
+                problems.append("Stepgen Max Accel is below 1.5 x Max Acceleration")
+            if pid_out < top * reb_settings_io.PID_OUTPUT_MIN:
+                problems.append("PID Max Output is below Max Speed")
+        ceiling = reb_settings_io.step_rate_speed_ceiling(scale)
+        if ceiling is not None and top is not None and top > ceiling:
+            problems.append("%s is more than the step timing allows at this Scale (%.4g)"
+                            % ("Max Vel" if axis_id in SPINDLE_IDS else "Max Speed", ceiling))
+        return problems
+
+    def _update_limit_warnings(self):
+        '''
+        Fills each tuning group's Limits_Warning line (just under
+        Backlash, so it shows with Advanced settings closed) with every
+        axis whose limits are out of order, e.g. "C: Stepgen Max Accel is
+        below 1.5 x Max Acceleration". Empty when all is well. A warning
+        only - nothing is changed or refused.
+        '''
+        lines = {"LinearAxes": [], "RotaryAxes": [], "Spindle": []}
+        for axis_id in CHANNEL_ROLES:
+            for problem in self._limit_problems(axis_id):
+                lines[_limit_group(axis_id)].append(axis_id + ": " + problem)
+        for group, problems in lines.items():
+            label = self.builder.get_object(group + "_Limits_Warning")
+            if label is None:
+                continue
+            if problems:
+                label.set_markup('<span foreground="#c06000" weight="bold">'
+                                 + GLib.markup_escape_text("\n".join(problems)) + '</span>')
+            else:
+                label.set_text("")
+
+    def Advanced_Toggled(self, expander, param=None):
+        '''
+        Shows or hides the grid rows below an "Advanced settings"
+        expander - every child of its GtkGrid placed below it. Hidden
+        rows take no space, so the page closes up around them.
+        '''
+        grid = expander.get_parent()
+        row = grid.child_get_property(expander, "top-attach")
+        shown = expander.get_expanded()
+        for child in grid.get_children():
+            if grid.child_get_property(child, "top-attach") > row:
+                child.set_visible(shown)
+
+    def apply_advanced_visibility(self):
+        # Called after window.show_all(), which would otherwise show the
+        # advanced rows of a closed expander.
+        for expander_id in ADVANCED_EXPANDERS:
+            expander = self.builder.get_object(expander_id)
+            if expander is not None:
+                self.Advanced_Toggled(expander)
+
+    def Restore_Defaults(self, button):
+        '''
+        An axis's Restore Defaults button: puts its advanced values back -
+        Stepgen Max Vel / Max Accel and PID Max Output worked out from its
+        own Max Speed / Max Acceleration, and the standard PID gains (for
+        a spindle, its indexing loop's gains and Indexing Max Output).
+        Max Speed, Max Acceleration and Scale are left as they are.
+        Saved with Save All Settings, like any other change here.
+        '''
+        axis_id = Gtk.Buildable.get_name(button).split("_Restore_Defaults")[0]
+        values = {}
+        if axis_id in SPINDLE_IDS:
+            values["_Set_Index_Max_Output"] = reb_settings_io.default_limits(axis_id)["index_max_output"]
+            pid_suffix = "_Pos"
+        else:
+            speed = self._spin_value(axis_id + "_Set_Max_Speed")
+            accel = self._spin_value(axis_id + "_Set_Max_Acceleration")
+            values["_Set_Max_Vel"] = speed * reb_settings_io.STEPGEN_VEL_FACTOR
+            values["_Set_Max_Accel"] = accel * reb_settings_io.STEPGEN_ACCEL_FACTOR
+            values["_Set_PID_Max_Output"] = speed * reb_settings_io.PID_OUTPUT_FACTOR
+            pid_suffix = ""
+        for param, value in reb_settings_io.default_pid(axis_id).items():
+            values["_Set_" + param + pid_suffix] = value
+        for suffix, value in values.items():
+            widget = self.builder.get_object(axis_id + suffix)
+            if widget is not None:
+                widget.set_value(value)
+        self._update_limit_warnings()
+        print("Restored " + axis_id + " advanced settings to defaults")
+
     def _apply_measurement_system_labels(self, system):
         '''
         Sets the Scale/Max Vel/Max Accel unit-of-measure labels for the
@@ -1074,6 +1274,24 @@ class HandlerClass:
         accel_label = self.builder.get_object("LinearAxes_Max_Accel_UOM")
         if accel_label is not None:
             accel_label.set_text(accel_uom)
+
+        for label_id, uom in (("LinearAxes_Max_Speed_UOM", vel_uom),
+                              ("LinearAxes_Max_Acceleration_UOM", accel_uom),
+                              ("LinearAxes_PID_Max_Output_UOM", vel_uom)):
+            label = self.builder.get_object(label_id)
+            if label is not None:
+                label.set_text(uom)
+
+        # Linear axes are capped at 1 in/sec (25.4 mm/sec) - the Max
+        # Speed boxes' own upper limit (PID Max Output's allows 2x that).
+        cap = reb_settings_io.linear_speed_cap(system)
+        for letter in AXIS_SELECTION_LETTERS:
+            if _axis_type_for_letter(letter) != "LINEAR":
+                continue
+            for suffix, upper in (("_Set_Max_Speed", cap), ("_Set_PID_Max_Output", 2 * cap)):
+                widget = self.builder.get_object(letter + suffix)
+                if widget is not None:
+                    widget.get_adjustment().set_upper(upper)
 
     def _load_measurement_system(self):
         '''
@@ -1633,11 +1851,11 @@ class HandlerClass:
         '''
         values = {}
         for axis_id in CHANNEL_ROLES:
-            for field in ("_Set_Scale", "_Set_Max_Vel", "_Set_Max_Accel"):
+            for field in ("_Set_Scale", "_Set_Max_Vel", "_Set_Max_Accel") + tuple(LIMIT_FIELDS):
                 widget = self.builder.get_object(axis_id + field)
                 if widget is not None:
                     values[axis_id + field] = round(widget.get_value(), 6)
-            suffixes = ("_Pos", "_Vel") if axis_id in SPINDLE_IDS else ("",)
+            suffixes = ("_Pos",) if axis_id in SPINDLE_IDS else ("",)
             for suffix in suffixes:
                 for param in PID_PARAMS:
                     widget = self.builder.get_object(axis_id + "_Set_" + param + suffix)
@@ -1662,7 +1880,7 @@ class HandlerClass:
             text="Save your changes before closing?",
         )
         dialog.format_secondary_text(
-            "Some Scale, Max Vel, Max Accel or PID values have changed since they were "
+            "Some Scale, speed, acceleration or PID values have changed since they were "
             "last saved. If you close without saving, those changes will be lost.")
         dialog.add_button("Close Without Saving", Gtk.ResponseType.NO)
         dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
@@ -1714,8 +1932,13 @@ class HandlerClass:
             if max_accel_widget is not None:
                 axis_entry["max_accel"] = max_accel_widget.get_value()
 
+            for suffix, key in LIMIT_FIELDS.items():
+                limit_widget = self.builder.get_object(axis_id + suffix)
+                if limit_widget is not None:
+                    axis_entry[key] = limit_widget.get_value()
+
             if axis_id in SPINDLE_IDS:
-                for suffix, block_tag in (("Pos", "pid_pos"), ("Vel", "pid_vel")):
+                for suffix, block_tag in (("Pos", "pid_pos"),):
                     values = self._read_pid_gains(
                         lambda param, axis_id=axis_id, suffix=suffix: axis_id + "_Set_" + param + "_" + suffix
                     )
@@ -1917,9 +2140,14 @@ class HandlerClass:
                 get_axis_entry(axis_id)["max_accel"] = max_accel_spin.get_value()
                 exported.append(axis_id + " Max Accel")
 
+            for suffix, key in LIMIT_FIELDS.items():
+                limit_spin = self.builder.get_object(axis_id + suffix)
+                if limit_spin is not None:
+                    get_axis_entry(axis_id)[key] = limit_spin.get_value()
+
             if axis_id in SPINDLE_IDS:
-                for suffix in ("Pos", "Vel"):
-                    block_tag = "pid_pos" if suffix == "Pos" else "pid_vel"
+                for suffix in ("Pos",):
+                    block_tag = "pid_pos"
                     self._export_pid_block(
                         get_axis_entry(axis_id), block_tag,
                         lambda param, axis_id=axis_id, suffix=suffix: axis_id + "_Set_" + param + "_" + suffix
@@ -2183,6 +2411,9 @@ class HandlerClass:
         '''
         imported = []
         comment_imported = False
+        # Apply the file's own stepgen/PID values as they are, rather
+        # than recalculating them as its Max Speed/Acceleration go in.
+        self._applying_limits = True
         for axis_id, axis_entry in data.get("axes", {}).items():
             if axis_id not in CHANNEL_ROLES:
                 continue
@@ -2241,6 +2472,16 @@ class HandlerClass:
                         spin.set_value(max_accel)  # fires <Axis>_Set_Max_Accel: halcmd setp
                         imported.append(axis_id + " Max Accel")
 
+            for suffix, key in LIMIT_FIELDS.items():
+                spin = self.builder.get_object(axis_id + suffix)
+                if key not in axis_entry or spin is None:
+                    continue
+                try:
+                    spin.set_value(float(axis_entry[key]))
+                    imported.append(axis_id + " " + key.replace("_", " ").title())
+                except (TypeError, ValueError):
+                    print("Skipping " + axis_id + " " + key + " - not a number: " + str(axis_entry[key]))
+
             # Comment (device name): only COMMENT_AXES have a live
             # comment field to apply it to (Sp0/Sp1 don't - the main
             # panel has no spindle comment entries), so a file's comment
@@ -2258,8 +2499,8 @@ class HandlerClass:
 
             pid_applied = False
             if axis_id in SPINDLE_IDS:
-                for suffix in ("Pos", "Vel"):
-                    block_tag = "pid_pos" if suffix == "Pos" else "pid_vel"
+                for suffix in ("Pos",):
+                    block_tag = "pid_pos"
                     if self._import_pid_block(
                         axis_entry, block_tag,
                         lambda param, axis_id=axis_id, suffix=suffix: axis_id + "_Set_" + param + "_" + suffix
@@ -2271,6 +2512,10 @@ class HandlerClass:
                 )
             if pid_applied:
                 imported.append(axis_id + " PID")
+
+        self._applying_limits = False
+        self._remember_limit_values()
+        self._update_limit_warnings()
 
         measurement_system = data.get("measurement_system")
         if measurement_system in ("Metric", "Imperial"):
@@ -2593,6 +2838,20 @@ class HandlerClass:
         # the Measurement_System combo box and the Linear Axes table's
         # unit-of-measure labels.
         self._load_measurement_system()
+
+        # Restore each axis's Max Speed / Max Acceleration / PID Max
+        # Output and each spindle's Indexing Max Output (REBset_v1.ini).
+        # After _load_measurement_system, which sets the linear Max Speed
+        # boxes' upper limit for the units in use.
+        self._applying_limits = False
+        self._last_limits = {}
+        self._load_limit_settings()
+        # Any value the warnings line checks - keep it current.
+        for axis_id in CHANNEL_ROLES:
+            for suffix in ("_Set_Scale", "_Set_Max_Vel", "_Set_Max_Accel"):
+                widget = self.builder.get_object(axis_id + suffix)
+                if widget is not None:
+                    widget.connect("value-changed", lambda _w: self._update_limit_warnings())
 
         # Restore the persisted device-name list (REBset_v1.ini) into
         # the Other page's Device Names text box.
@@ -3152,6 +3411,7 @@ def main():
     # size to imply a window size.
     window.maximize()
     window.show_all()
+    handler.apply_advanced_visibility()
     Gtk.main()
 
 def _add_file_menu(builder, handler, window):

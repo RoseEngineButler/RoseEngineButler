@@ -119,9 +119,11 @@ class RoleLayout(object):
 
 _ROLE_LAYOUT = RoleLayout(_read_channel_assignments())
 
+# Each spindle's indexing (M19) position loop - see
+# REB_Settings_Restore.py.
 PID_SPINDLE_LOOPS = {
-    "Sp0": {"Pos": "pid.p0", "Vel": "pid.s0"},
-    "Sp1": {"Pos": "pid.p1", "Vel": "pid.s1"},
+    "Sp0": {"Pos": "pid.p0"},
+    "Sp1": {"Pos": "pid.p1"},
 }
 PID_PARAM_PIN = {
     "P":   "Pgain",
@@ -161,6 +163,16 @@ def get_pid_gain(hal_component, param):
     hal_pin = hal_component + "." + PID_PARAM_PIN[param]
     result = subprocess.run(
         ["halcmd", "getp", hal_pin],
+        check=True,
+        capture_output=True,
+        text=True
+    )
+    return float(result.stdout.strip())
+
+
+def get_pid_max_output(hal_component):
+    result = subprocess.run(
+        ["halcmd", "getp", hal_component + ".maxoutput"],
         check=True,
         capture_output=True,
         text=True
@@ -217,7 +229,7 @@ def main():
                 print("Saved " + role + " PID gains = " + str(values))
         else:
             for suffix, hal_component in PID_SPINDLE_LOOPS[role].items():
-                block_tag = "pid_pos" if suffix == "Pos" else "pid_vel"
+                block_tag = "pid_pos"
                 values = {}
                 try:
                     for param in PID_PARAMS:
@@ -231,6 +243,21 @@ def main():
                     sys.exit(1)
                 axes.setdefault(role, {}).setdefault(block_tag, {}).update(values)
                 print("Saved " + role + " " + suffix + " PID gains = " + str(values))
+
+        if role in AXIS_SELECTION_LETTERS:
+            key, hal_component = "pid_max_output", "pid." + role.lower()
+        else:
+            key, hal_component = "index_max_output", PID_SPINDLE_LOOPS[role]["Pos"]
+        try:
+            value = get_pid_max_output(hal_component)
+        except subprocess.CalledProcessError as e:
+            print("Error reading " + key + " for axis " + role + ": " + e.stderr)
+        except FileNotFoundError:
+            print("halcmd not found - is the LinuxCNC environment sourced?")
+            sys.exit(1)
+        else:
+            axes.setdefault(role, {})[key] = value
+            print("Saved " + role + " " + key + " = " + str(value))
 
     try:
         reb_settings_io.save_settings(settings)

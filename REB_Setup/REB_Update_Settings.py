@@ -27,13 +27,18 @@
 #   setting the programs use, with its starting value - keep it up to #
 #   date whenever a new setting is added.                             #
 #                                                                     #
-#   Also raises any axis's saved stepgen Max Accel that is too low    #
-#   for REB.ini's MAX_ACCELERATION (see raise_stepgen_accel) - the    #
-#   one case where an existing value is changed.                      #
+#   Also gives each axis its own Max Speed / Max Acceleration / PID   #
+#   Max Output (and each spindle its Indexing Max Output) the first   #
+#   time, worked out from REB.ini and the machine's own stepgen       #
+#   values (see fill_speed_limits) - raising a stepgen Max Vel / Max  #
+#   Accel only if it's now too low, the one case where an existing    #
+#   value is changed.                                                 #
 #                                                                     #
 # Version                                                             #
 #   1.0 - 03 October 2026                                             #
 #   1.1 - 07 October 2026 - raise too-low stepgen Max Accel           #
+#   1.2 - 08 October 2026 - fill in each axis's speed limits, which   #
+#         moved from REB.ini to REB Settings (replaces 1.1's rule)    #
 #                                                                     #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.             #
 #                                                                     #
@@ -88,65 +93,57 @@ def add_missing(user, seed, path=""):
 # (REB.ini's MAX_ACCELERATION) or the stepgen can't keep up and the axis
 # trips a following error on its first quick move. REB.ini keeps a
 # 1.5-2x margin; below 1.5x counts as too low.
-STEPGEN_ACCEL_MIN_MARGIN = 1.5
 AXIS_LETTERS = ("X", "Z", "B", "A", "C", "U", "V", "W")
 
 
-def read_axis_accels(path=REB_INI_PATH):
+def read_axis_planner(path=REB_INI_PATH):
     '''
-    Returns {letter: (MAX_ACCELERATION, STEPGEN_MAXACCEL)} from REB.ini:
-    MAX_ACCELERATION from [AXIS_<letter>], STEPGEN_MAXACCEL from the
-    [JOINT_n] section that follows it (REB.ini always puts an axis's
-    joint section straight after its axis section).
+    Returns {letter: (MAX_VELOCITY, MAX_ACCELERATION)} from each
+    [AXIS_<letter>] section of REB.ini - the starting point for an axis
+    that has no Max Speed / Max Acceleration of its own yet.
     '''
     found = {}
     letter = None
-    in_joint = False
     with open(path, "r") as f:
         for line in f:
             line = line.strip()
             if line.startswith("["):
-                if line.startswith("[AXIS_") and line[6:-1] in AXIS_LETTERS:
-                    letter, in_joint = line[6:-1], False
-                    found[letter] = [None, None]
-                elif line.startswith("[JOINT_") and letter is not None and not in_joint:
-                    in_joint = True
-                else:
-                    letter = None
+                letter = line[6:-1] if line.startswith("[AXIS_") and line[6:-1] in AXIS_LETTERS else None
+                if letter:
+                    found[letter] = {}
                 continue
             if letter is None or "=" not in line or line.startswith("#"):
                 continue
             key, value = (part.strip() for part in line.split("=", 1))
-            try:
-                number = float(value)
-            except ValueError:
-                continue
-            if key == "MAX_ACCELERATION" and not in_joint and found[letter][0] is None:
-                found[letter][0] = number
-            elif key == "STEPGEN_MAXACCEL" and in_joint and found[letter][1] is None:
-                found[letter][1] = number
-    return {k: tuple(v) for k, v in found.items() if None not in v}
+            if key in ("MAX_VELOCITY", "MAX_ACCELERATION") and key not in found[letter]:
+                try:
+                    found[letter][key] = float(value)
+                except ValueError:
+                    pass
+    return {k: (v["MAX_VELOCITY"], v["MAX_ACCELERATION"])
+            for k, v in found.items() if len(v) == 2}
 
 
-def raise_stepgen_accel(user, accels):
+def fill_speed_limits(user, planner):
     '''
-    Raises each axis's saved stepgen max_accel that is below
-    STEPGEN_ACCEL_MIN_MARGIN x REB.ini's MAX_ACCELERATION to REB.ini's
-    own STEPGEN_MAXACCEL (or to the minimum, if that's higher). Returns
-    a list of what was changed. Values already high enough - including
-    ones tuned above REB.ini's - are left alone.
+    Gives every axis that doesn't have one yet its Max Speed, Max
+    Acceleration and PID Max Output, and every spindle its Indexing Max
+    Output (reb_settings_io.fill_missing_limits). Must run before
+    add_missing, so these come from this machine's own values rather
+    than the starting file's. Returns a list of what was set or raised.
     '''
     changed = []
-    for letter, (planner, stepgen) in sorted(accels.items()):
-        entry = user.get("axes", {}).get(letter)
-        if not isinstance(entry, dict) or not isinstance(entry.get("max_accel"), (int, float)):
+    system = user.get("measurement_system", "Imperial")
+    for axis_id, entry in sorted(user.get("axes", {}).items()):
+        if not isinstance(entry, dict):
             continue
-        minimum = planner * STEPGEN_ACCEL_MIN_MARGIN
-        if entry["max_accel"] < minimum:
-            new = max(stepgen, minimum)
-            changed.append("%s Max Accel %g -> %g (REB.ini plans %s at up to %g)"
-                           % (letter, entry["max_accel"], new, letter, planner))
-            entry["max_accel"] = new
+        if axis_id in reb_settings_io.SPINDLE_IDS:
+            notes = reb_settings_io.fill_missing_limits(axis_id, entry)
+        elif axis_id in planner:
+            notes = reb_settings_io.fill_missing_limits(axis_id, entry, planner[axis_id], system)
+        else:
+            continue
+        changed += [axis_id + " " + note for note in notes]
     return changed
 
 
@@ -185,12 +182,12 @@ def main():
         print("ERROR: " + SETTINGS_PATH + " is not a settings file - left unchanged.")
         return 1
 
-    added = add_missing(user, seed)
     try:
-        raised = raise_stepgen_accel(user, read_axis_accels())
+        raised = fill_speed_limits(user, read_axis_planner())
     except OSError as e:
-        print("WARNING: could not read " + REB_INI_PATH + " (" + str(e) + ") - Max Accel not checked.")
+        print("WARNING: could not read " + REB_INI_PATH + " (" + str(e) + ") - speed limits not filled in.")
         raised = []
+    added = add_missing(user, seed)
     if not added and not raised:
         print("Settings file is up to date - nothing to add.")
         return 0
@@ -203,7 +200,7 @@ def main():
         for where in added:
             print("    " + where)
     if raised:
-        print("Raised %d stepgen Max Accel value(s) to suit REB.ini:" % len(raised))
+        print("Set up %d speed limit value(s) (now in REB Settings):" % len(raised))
         for what in raised:
             print("    " + what)
     print("Previous settings file saved as " + backup)
