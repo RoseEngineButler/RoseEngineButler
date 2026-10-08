@@ -74,8 +74,8 @@ import subprocess
 import shutil
 import re
 import json
-import webbrowser
 import contextlib
+import webbrowser
 import linuxcnc
 import gi
 gi.require_version('Gtk', '3.0')
@@ -364,6 +364,48 @@ def _save_signal_tower(connected):
 
 def _read_persisted_signal_tower():
     return reb_settings_io.load_settings().get("signal_tower") is True
+
+# The signal tower relay board's polarity - Signal_Tower_Active_Low
+# under the Connected checkbox, persisted as REBset_v1.ini's
+# "signal_tower_active_low" (absent = true, the usual board, which
+# switches a relay on when its input is pulled low).
+# REB_Generate_Local_Ini.py inverts the three output pins to suit.
+def _save_signal_tower_active_low(active_low):
+    settings = reb_settings_io.load_settings()
+    settings["signal_tower_active_low"] = bool(active_low)
+    reb_settings_io.save_settings(settings)
+    print("Saved signal tower relays: " + ("active-low" if active_low else "active-high"))
+
+def _read_persisted_signal_tower_active_low():
+    return reb_settings_io.load_settings().get("signal_tower_active_low", True) is not False
+
+# Whether the limit jacks take normally-closed or normally-open
+# switches - the Limit_Switch_NC / Limit_Switch_NO radios, persisted as
+# REBset_v1.ini's "limit_switch_type" ("NC" or "NO"; absent = "NC").
+# One choice for all jacks. REB_Generate_Local_Ini.py reads the jacks'
+# GPIO .in for NC and .in_not for NO. The E-stop button is always NC.
+LIMIT_SWITCH_TYPES = ("NC", "NO")
+
+# User Manual pages opened by the buttons beside the Axis Selection
+# page's Limit Switches and E-Stop Button notes (Open_Manual_Link),
+# keyed by button id.
+MANUAL_URL = "https://roseenginebutler.com/UserManual/index.php?n=Main."
+MANUAL_LINKS = {
+    "Limit_Switch_Cabling_Link": MANUAL_URL + "LimitSwitchCabling",
+    "Limit_Switch_How_Link":     MANUAL_URL + "AxisSelection#LimitSwitches",
+    "Estop_Cabling_Link":        MANUAL_URL + "E-StopCabling",
+    "Estop_How_Link":            MANUAL_URL + "AxisSelection#EStopButton",
+}
+
+def _save_limit_switch_type(switch_type):
+    settings = reb_settings_io.load_settings()
+    settings["limit_switch_type"] = switch_type
+    reb_settings_io.save_settings(settings)
+    print("Saved limit switch type: " + switch_type)
+
+def _read_persisted_limit_switch_type():
+    switch_type = reb_settings_io.load_settings().get("limit_switch_type", "NC")
+    return switch_type if switch_type in LIMIT_SWITCH_TYPES else "NC"
 
 # Where the main panel's attention beeps play (3 when a program, Sync
 # Move or Cut Thread finishes; 2 when a program stops at M0/M1) - see
@@ -1188,11 +1230,16 @@ class HandlerClass:
         '''
         Shows or hides the grid rows below an "Advanced settings"
         expander - every child of its GtkGrid placed below it. Hidden
-        rows take no space, so the page closes up around them.
+        rows take no space, so the page closes up around them. Also
+        switches its label's hint between "click to show" and "click to
+        hide" (set_text keeps the .ui file's blue/bold attributes).
         '''
         grid = expander.get_parent()
         row = grid.child_get_property(expander, "top-attach")
         shown = expander.get_expanded()
+        label = expander.get_label_widget()
+        if label is not None:
+            label.set_text("Advanced settings (click to " + ("hide" if shown else "show") + ")")
         for child in grid.get_children():
             if grid.child_get_property(child, "top-attach") > row:
                 child.set_visible(shown)
@@ -1582,16 +1629,55 @@ class HandlerClass:
             return
         self._applying_signal_tower = True
         check.set_active(_read_persisted_signal_tower())
+        active_low = self.builder.get_object("Signal_Tower_Active_Low")
+        if active_low is not None:
+            active_low.set_active(_read_persisted_signal_tower_active_low())
+            active_low.set_sensitive(check.get_active())
         self._applying_signal_tower = False
 
     def Signal_Tower_Toggled(self, widget):
         '''
         Persists the signal tower checkbox. Takes effect at the next
-        LinuxCNC launch (REB_Generate_Local_Ini.py).
+        LinuxCNC launch (REB_Generate_Local_Ini.py). The relay polarity
+        checkbox only matters with a tower, so it's greyed out without one.
         '''
+        active_low = self.builder.get_object("Signal_Tower_Active_Low")
+        if active_low is not None:
+            active_low.set_sensitive(widget.get_active())
         if self._applying_signal_tower:
             return
         _save_signal_tower(widget.get_active())
+
+    def Signal_Tower_Active_Low_Toggled(self, widget):
+        '''
+        Persists the signal tower relay polarity. Takes effect at the
+        next LinuxCNC launch.
+        '''
+        if self._applying_signal_tower:
+            return
+        _save_signal_tower_active_low(widget.get_active())
+
+    def _load_limit_switch_type(self):
+        '''
+        Reads the persisted limit switch type (REBset_v1.ini's
+        "limit_switch_type") into the Limit_Switch_NC / _NO radios.
+        '''
+        radio = self.builder.get_object("Limit_Switch_" + _read_persisted_limit_switch_type())
+        if radio is None:
+            return
+        self._applying_limit_switch_type = True
+        radio.set_active(True)
+        self._applying_limit_switch_type = False
+
+    def Limit_Switch_Type_Toggled(self, widget):
+        '''
+        Persists the limit switch type. Each click fires "toggled" on
+        both radios; only the one becoming active saves. Takes effect at
+        the next LinuxCNC launch.
+        '''
+        if self._applying_limit_switch_type or not widget.get_active():
+            return
+        _save_limit_switch_type(Gtk.Buildable.get_name(widget).split("_")[-1])
 
     def _load_done_sound(self):
         '''
@@ -1743,27 +1829,13 @@ class HandlerClass:
         # nothing persists it.
         pass
 
-    def Open_User_Manual(self, widget):
-        # Opens the Rose Engine Butler User Manual's Axis Configuration
-        # File page in the default web browser.
-        url = "https://roseenginebutler.com/UserManual/index.php?n=Main.AxisConfigurationFile"
-        webbrowser.open(url)
-        print("Opening website " + url)
-
-    def OpenPidTuningReference(self, widget):
-        # Opens LinuxCNC's own documentation for the pid HAL component
-        # (the control loop these P/I/D/FF values tune) in a browser.
-        url = "https://linuxcnc.org/docs/html/man/man9/pid.9.html"
-        webbrowser.open(url)
-        print("Opening website " + url)
-
-    def OpenPidControllerWikipedia(self, widget):
-        # Opens Wikipedia's PID controller article - general background
-        # on P/I/D/FF terms, separate from LinuxCNC's own pid-component
-        # reference above.
-        url = "https://en.wikipedia.org/wiki/PID_controller"
-        webbrowser.open(url)
-        print("Opening website " + url)
+    def Open_Manual_Link(self, widget):
+        # One of the User Manual buttons beside the Axis Selection
+        # page's notes - opens its MANUAL_LINKS page in the browser.
+        url = MANUAL_LINKS.get(Gtk.Buildable.get_name(widget))
+        if url:
+            webbrowser.open(url)
+            print("Opening website " + url)
 
     def Measurement_System_Changed(self, widget):
         if self._applying_measurement_system:
@@ -2808,6 +2880,10 @@ class HandlerClass:
         # Signal_Tower_Connected checkbox.
         self._applying_signal_tower = False
 
+        # Same suppression as above, for _load_limit_switch_type driving
+        # the Limit_Switch_NC / _NO radios.
+        self._applying_limit_switch_type = False
+
         # Same suppression as above, for _load_done_sound driving the
         # Done_Sound combo.
         self._applying_done_sound = False
@@ -2874,6 +2950,7 @@ class HandlerClass:
         # Restore the persisted signal tower choice (REBset_v1.ini) into
         # the Axis Selection tab's Signal Tower checkbox.
         self._load_signal_tower()
+        self._load_limit_switch_type()
         self._load_done_sound()
         self._load_fault_sound()
 
