@@ -387,14 +387,17 @@ def _read_persisted_signal_tower_active_low():
 LIMIT_SWITCH_TYPES = ("NC", "NO")
 
 # User Manual pages opened by the buttons beside the Axis Selection
-# page's Limit Switches and E-Stop Button notes (Open_Manual_Link),
-# keyed by button id.
+# page's Limit Switches and E-Stop Button notes and the tuning page's
+# three Scale notes (Open_Manual_Link), keyed by button id.
 MANUAL_URL = "https://roseenginebutler.com/UserManual/index.php?n=Main."
 MANUAL_LINKS = {
     "Limit_Switch_Cabling_Link": MANUAL_URL + "LimitSwitchCabling",
     "Limit_Switch_How_Link":     MANUAL_URL + "AxisSelection#LimitSwitches",
     "Estop_Cabling_Link":        MANUAL_URL + "E-StopCabling",
     "Estop_How_Link":            MANUAL_URL + "AxisSelection#EStopButton",
+    "Linear_Scale_Link":         MANUAL_URL + "ScaleSettingsForADevice",
+    "Rotary_Scale_Link":         MANUAL_URL + "ScaleSettingsForADevice",
+    "Spindle_Scale_Link":        MANUAL_URL + "ScaleSettingsForADevice",
 }
 
 def _save_limit_switch_type(switch_type):

@@ -3209,21 +3209,49 @@ The button plugs into the E-stop (GX-16) plug. Check Connected only when a butto
                                   </packing>
                                 </child>
                                 <child>
-                                  <object class="GtkLabel">
+                                  <object class="GtkBox" id="Linear_Scale_Note_Row">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
-                                    <property name="halign">start</property>
-                                    <property name="valign">center</property>
-                                    <property name="margin-start">12</property>
-                                    <property name="xalign">0</property>
-                                    <property name="wrap">True</property>
-                                    <property name="max-width-chars">80</property>
-                                    <property name="label" translatable="yes">Motor steps for one inch (or mm) of travel.</property>
-                                    <property name="justify">left</property>
-                                    <attributes>
-                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
-                                      <attribute name="foreground" value="#404040404040"/>
-                                    </attributes>
+                                    <property name="spacing">12</property>
+                                    <child>
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">start</property>
+                                        <property name="valign">center</property>
+                                        <property name="margin-start">12</property>
+                                        <property name="xalign">0</property>
+                                        <property name="wrap">True</property>
+                                        <property name="max-width-chars">80</property>
+                                        <property name="label" translatable="yes">Motor steps for one inch (or mm) of travel.</property>
+                                        <property name="justify">left</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                          <attribute name="foreground" value="#404040404040"/>
+                                        </attributes>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">True</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">0</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkButton" id="Linear_Scale_Link">
+                                        <property name="label" translatable="yes">How to Set Scale</property>
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">True</property>
+                                        <property name="receives-default">True</property>
+                                        <property name="tooltip-text" translatable="yes">Opens the User Manual page on working out the Scale setting for a device.</property>
+                                        <property name="valign">center</property>
+                                        <signal name="clicked" handler="Open_Manual_Link" swapped="no"/>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">1</property>
+                                      </packing>
+                                    </child>
                                   </object>
                                   <packing>
                                     <property name="left-attach">7</property>
@@ -5703,21 +5731,49 @@ The button plugs into the E-stop (GX-16) plug. Check Connected only when a butto
                                   </packing>
                                 </child>
                                 <child>
-                                  <object class="GtkLabel">
+                                  <object class="GtkBox" id="Rotary_Scale_Note_Row">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
-                                    <property name="halign">start</property>
-                                    <property name="valign">center</property>
-                                    <property name="margin-start">12</property>
-                                    <property name="xalign">0</property>
-                                    <property name="wrap">True</property>
-                                    <property name="max-width-chars">80</property>
-                                    <property name="label" translatable="yes">Motor steps for one degree of travel.</property>
-                                    <property name="justify">left</property>
-                                    <attributes>
-                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
-                                      <attribute name="foreground" value="#404040404040"/>
-                                    </attributes>
+                                    <property name="spacing">12</property>
+                                    <child>
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">start</property>
+                                        <property name="valign">center</property>
+                                        <property name="margin-start">12</property>
+                                        <property name="xalign">0</property>
+                                        <property name="wrap">True</property>
+                                        <property name="max-width-chars">80</property>
+                                        <property name="label" translatable="yes">Motor steps for one degree of travel.</property>
+                                        <property name="justify">left</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                          <attribute name="foreground" value="#404040404040"/>
+                                        </attributes>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">True</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">0</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkButton" id="Rotary_Scale_Link">
+                                        <property name="label" translatable="yes">How to Set Scale</property>
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">True</property>
+                                        <property name="receives-default">True</property>
+                                        <property name="tooltip-text" translatable="yes">Opens the User Manual page on working out the Scale setting for a device.</property>
+                                        <property name="valign">center</property>
+                                        <signal name="clicked" handler="Open_Manual_Link" swapped="no"/>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">1</property>
+                                      </packing>
+                                    </child>
                                   </object>
                                   <packing>
                                     <property name="left-attach">5</property>
@@ -7500,21 +7556,49 @@ The button plugs into the E-stop (GX-16) plug. Check Connected only when a butto
                                   </packing>
                                 </child>
                                 <child>
-                                  <object class="GtkLabel">
+                                  <object class="GtkBox" id="Spindle_Scale_Note_Row">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
-                                    <property name="halign">start</property>
-                                    <property name="valign">center</property>
-                                    <property name="margin-start">12</property>
-                                    <property name="xalign">0</property>
-                                    <property name="wrap">True</property>
-                                    <property name="max-width-chars">80</property>
-                                    <property name="label" translatable="yes">Motor steps for one revolution of the respective spindle.</property>
-                                    <property name="justify">left</property>
-                                    <attributes>
-                                      <attribute name="font-desc" value="DejaVu Serif 10"/>
-                                      <attribute name="foreground" value="#404040404040"/>
-                                    </attributes>
+                                    <property name="spacing">12</property>
+                                    <child>
+                                      <object class="GtkLabel">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="halign">start</property>
+                                        <property name="valign">center</property>
+                                        <property name="margin-start">12</property>
+                                        <property name="xalign">0</property>
+                                        <property name="wrap">True</property>
+                                        <property name="max-width-chars">80</property>
+                                        <property name="label" translatable="yes">Motor steps for one revolution of the respective spindle.</property>
+                                        <property name="justify">left</property>
+                                        <attributes>
+                                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                          <attribute name="foreground" value="#404040404040"/>
+                                        </attributes>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">True</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">0</property>
+                                      </packing>
+                                    </child>
+                                    <child>
+                                      <object class="GtkButton" id="Spindle_Scale_Link">
+                                        <property name="label" translatable="yes">How to Set Scale</property>
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">True</property>
+                                        <property name="receives-default">True</property>
+                                        <property name="tooltip-text" translatable="yes">Opens the User Manual page on working out the Scale setting for a device.</property>
+                                        <property name="valign">center</property>
+                                        <signal name="clicked" handler="Open_Manual_Link" swapped="no"/>
+                                      </object>
+                                      <packing>
+                                        <property name="expand">False</property>
+                                        <property name="fill">True</property>
+                                        <property name="position">1</property>
+                                      </packing>
+                                    </child>
                                   </object>
                                   <packing>
                                     <property name="left-attach">4</property>
