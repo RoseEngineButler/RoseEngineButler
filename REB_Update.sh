@@ -40,6 +40,9 @@
 #             Dropped sudo from the git commands so pull/stash run as
 #             reuben (whose key is registered with GitHub) instead of
 #             root (which has no key and would fail publickey auth).
+#   1.4 - 08 October 2026 - Refreshes the EtherLab package source's
+#             signing key before "apt update" (see below): its copy
+#             expired 20 September 2026, which made apt update warn.
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #
@@ -147,6 +150,39 @@ echo -e "${TITLE}Add any new settings to this machine's settings file           
 python3 /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/REB_Update_Settings.py
 if [ $? != 0 ]; then
     echo -e "${KEYNOTE}WARNING: settings file could not be checked - see the message above.  ${NOCOLOR}"
+fi
+echo -e "${TITLE}#######################################################################${NOCOLOR}"
+echo -e "${TITLE}Refresh the EtherLab package signing key                               ${NOCOLOR}"
+# The EtherLab (EtherCAT) package source that LinuxCNC's setup adds is
+# signed by an openSUSE key that is re-issued with a later expiry date
+# from time to time; once this machine's copy expires, apt update warns
+# "Signing key ... is bad ... Expired". Fetch the current copy from the
+# source's own Release.key and install it - only if it is still
+# EtherLab's key (same fingerprint). Skipped when the source isn't set
+# up; a failure here only warns, since nothing REB uses comes from it.
+ETHERLAB_FPR="5D6B2B6E61B29B37F7A5E407A94819A7CB97A204"
+ETHERLAB_SOURCES="/etc/apt/sources.list.d/ethercat.sources"
+if [ -f "$ETHERLAB_SOURCES" ]; then
+    etherlab_url=$(sed -n 's/^URIs:[[:space:]]*//p' "$ETHERLAB_SOURCES" | head -1)
+    etherlab_keyring=$(sed -n 's/^Signed-By:[[:space:]]*//p' "$ETHERLAB_SOURCES" | head -1)
+    etherlab_tmp=$(mktemp)
+    if [ -n "$etherlab_url" ] && [ -n "$etherlab_keyring" ] \
+       && curl -fsSL "${etherlab_url%/}/Release.key" | gpg --dearmor > "$etherlab_tmp" 2>/dev/null \
+       && gpg --show-keys --with-colons "$etherlab_tmp" 2>/dev/null | grep -q "^fpr:*${ETHERLAB_FPR}:"; then
+        if cmp -s "$etherlab_tmp" "$etherlab_keyring"; then
+            echo -e "${TITLE}EtherLab signing key is already current                                ${NOCOLOR}"
+        elif sudo install -m 644 -o root -g root "$etherlab_tmp" "$etherlab_keyring"; then
+            echo -e "${TITLE}EtherLab signing key refreshed                                         ${NOCOLOR}"
+        else
+            echo -e "${KEYNOTE}WARNING: could not install the EtherLab signing key.                 ${NOCOLOR}"
+        fi
+    else
+        echo -e "${KEYNOTE}WARNING: could not fetch the EtherLab signing key - apt update may   ${NOCOLOR}"
+        echo -e "${KEYNOTE}warn about it, but the REB update carries on.                        ${NOCOLOR}"
+    fi
+    rm -f "$etherlab_tmp"
+else
+    echo -e "${TITLE}No EtherLab package source on this machine - nothing to refresh        ${NOCOLOR}"
 fi
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
 echo -e "${TITLE}Update the package indexes                                             ${NOCOLOR}"
