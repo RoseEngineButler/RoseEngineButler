@@ -1633,6 +1633,19 @@ class HandlerClass:
             return
         _save_signal_tower(widget.get_active())
 
+    # MOCK-UP ONLY (11 October 2026, not to be committed): the two-box
+    # layout's "Expansion Box - Connected" checkbox greys / ungreys the
+    # expansion side on both pages. Nothing is saved.
+    def Expansion_Box_Toggled(self, widget):
+        on = widget.get_active()
+        for wid in ("Channel_06_Axis", "Channel_07_Axis", "Channel_08_Axis", "Channel_09_Axis",
+                    "Limit_Jack_4_Axis", "Limit_Jack_5_Axis", "Limit_Jack_6_Axis"):
+            w = self.builder.get_object(wid)
+            while w is not None and not isinstance(w, Gtk.Frame):
+                w = w.get_parent()
+            if w is not None:
+                w.set_sensitive(on)
+
     def _load_limit_switch_type(self):
         '''
         Reads the persisted limit switch type (REBset_v1.ini's
