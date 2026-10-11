@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A LinuxCNC configuration (not a compiled software project) for the "Rose Engine Butler" — a control system for ornamental turning lathes (rose engines), built by Colvin Tools / Brainwave Embedded. It uses a Raspberry Pi 5 + Mesa 7i92 (`hm2_eth`) FPGA card driving 8 stepper joints via StepperOnline DM542T drives. Details: https://RoseEngineButler.com.
 
+**Tracker:** `docs/REB_Tracker.md` is the one list of what's untested on a machine, what's open, and what was recently settled (since 11 October 2026). Read it at the start of REB work; when you build something that hasn't run on hardware yet, find a problem, or agree a follow-up, add it there (dated), and move items to its Done table when they're settled. Per-machine Claude memory isn't shared between Rich's Pi and Mac, so anything that matters goes in the tracker.
+
 There is no build/compile/test step. "Testing" a change means loading the config in LinuxCNC (`linuxcnc REB.ini`) on the actual machine (or a sim) and observing axis/spindle behavior — most of this is real-time motion control tuning, not something that can be verified by static inspection alone.
 
 ## Repo vs. local machine state — read this before editing
