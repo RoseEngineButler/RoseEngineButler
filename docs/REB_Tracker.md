@@ -113,6 +113,17 @@ Points to settle in the design:
   Cheaper and easier on timing, but long signal cables pick up noise and
   it uses up the card's spare pins; the two-card design is more modular.
 
+Screen layout - mock-up approved by Rich, 11 October 2026: REB Settings'
+Axis Selection page shows **Base Box** (00 / 02 / 04 over 01 / 03 / 05)
+stacked above **Expansion Box** (06 / 08 over 07 / 09) with an "Expansion
+Box - Connected" checkbox, each box with its own Top / Bottom rows; the
+Inputs, Outputs and Sounds page shows Limit Jacks 1-3 under Base Box over
+Limit Jacks 4-6 under Expansion Box, the expansion side greyed out until
+connected. Pictures: `docs/mockups/two_box_axis_selection.png` and
+`docs/mockups/two_box_inputs_outputs_sounds.png`. The mock-up itself is
+on the `two-box-mockup` branch (display only - channels 08/09 and jacks
+4-6 do nothing; don't merge it): start the real screens from it.
+
 Software work once the design is fixed (not started):
 
 1. Channels 00-09 across two cards (`hm2_7i92.0` for 00-05,
