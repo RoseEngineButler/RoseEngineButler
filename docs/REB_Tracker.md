@@ -33,6 +33,8 @@ Built and committed, but not yet seen working on real hardware.
 | EtherLab key refresh in `REB_Update.sh` | 08 October 2026 | Tested on its own (current key, stale key, server unreachable), not yet as part of a full update run. |
 | Back Up to USB | 06 October 2026 | Insert a stick, run a backup, then check the dated `REB_Backup/` folder and `backup_log.txt` on another computer, and that the stick ejects with "Safe to remove". Also add the MenuLibre menu and desktop entries - Command `/home/reuben/linuxcnc/configs/RoseEngineButler/REB_Backup.sh`, Icon `REB_Setup/Images/REB_Backup.png`. |
 | REB.ini / REB.hal cleanup | 06 October 2026 | LinuxCNC starts with no HAL errors, an axis jogs and moves, and an Sp0 M19 index works. Probably already exercised by the 08 October spindle and speed-limit testing - tick it off if so. |
+| Index counters on the Indexing tab | 11 October 2026 | Each axis row and the spindle row show a count left of Distance: +1 per Fwd index, -1 per Rev (it can go negative). Resets to 0 at startup, on a distance or deg/div change, and on a double-click of the number. Check the count follows the on-screen Rev/Fwd columns, the spindle count works with Sp0, Sp1 and both, and the Distance column didn't get wider. Rich may switch the reset to a single click after trying it. |
+| Notes in REBset_v1.ini | 11 October 2026 | After an update (run twice on Chuck's and Roy's machines), `~/Documents/REBset_v1.ini` starts with the "Rose Engine Butler settings" notes and ends with the copyright, and the other settings/export files there have their notes too (not the `.bak-` backups); LinuxCNC and REB Settings still start, and Load Settings reads both a "Save All Settings As..." copy and a Save Subset export. |
 | File menu in REB Settings | 07 October 2026 | Ctrl+S / Shift+Ctrl+S / Ctrl+O / Ctrl+Q do the same as the buttons, including a half-typed value being saved. |
 
 ## Open items and follow-ups
@@ -53,12 +55,87 @@ Built and committed, but not yet seen working on real hardware.
 | Old spindle `pid_vel` blocks in settings files | 08 October 2026 | Machines' REBset_v1.ini still hold an inert `pid_vel` block from the removed spindle velocity PID. Harmless; could be removed by `REB_Update_Settings.py` some day. |
 | Leftover repo copy on the Mac | 06 October 2026 | `~/Documents/GitHub/RoseEngineButler` is a stale duplicate (with one unpushed commit, now also in the real repo). Safe to delete; the working copy is iCloud Drive > Shared iCloud > Rich > GitHub > RoseEngineButler. |
 
+## Planning
+
+Ideas and designs not yet being built. Nothing here has code yet.
+
+### Two-box hardware: base box + expansion box (since 11 October 2026)
+
+Rich and Chuck's plan to split the hardware into two chassis: a **base
+box** with the Raspberry Pi, an Ethernet switch, one Mesa 7i92TH and 6
+DM542T channels, and an optional **expansion box** with a second 7i92TH
+and 4 more channels - 10 in all, one for each of the 10 roles (8 axis
+letters and 2 spindles). The two cards talk to the Pi through the switch.
+
+Decided so far:
+
+- **Development boxes:** the current 8-channel boxes are development
+  units. They'll be replaced, or simply treated as a base box with
+  channels 00-05 and their other two plugs ignored - so only one
+  software design is needed.
+- **Base box I/O stays:** limit jacks 1-3, the E-stop button and the
+  signal tower stay in the base box. The expansion box may add **limit
+  jacks 4-6**, read from the second card.
+- **Channel labels:** base box 00 / 02 / 04 on the top row and 01 / 03 /
+  05 on the bottom. Expansion box either 00-03 again or **06 / 08 over
+  07 / 09** - Claude recommends 06-09, so every channel number names one
+  plug on the whole machine (in the settings file, on the Axis Selection
+  page and when talking to a customer), continuing the base box's
+  even-top / odd-bottom pattern. Also recommended: wire each plug to the
+  step generator with the same number, so labels and software agree
+  (today's boxes don't - "Position 1" is Channel 02).
+- **No fixed roles:** any role on any channel, as now.
+
+Open questions:
+
+- **Mesa (Rich has asked their tech contact):** is two 7i92s through an
+  unmanaged switch at a 1 ms servo period on a Pi 5 a setup they've seen
+  work; any switch they recommend; and firmware - a 6-channel base card
+  and a 4-channel expansion card with the inputs/outputs wanted (custom
+  pin files like today's `PIN_REB_34`, or something stock).
+- **Bench test:** if Mesa agrees, borrow a card from a development box:
+  two cards, the switch and a few drives, run for a long time watching
+  for `hm2_eth` read errors and following errors. Order another card
+  after.
+
+Points to settle in the design:
+
+- The second card needs its own IP address (today's card uses the
+  jumper default, 192.168.1.121), set once with `mesaflash` before the
+  box ships.
+- Keep the switch private - nothing else (router, internet, file
+  sharing) on that network, or the 1 ms timing suffers. The Pi's
+  internet stays on Wi-Fi.
+- Either card's watchdog (it stops that card's steps if it loses
+  contact) should count as an E-stop fault, so a pulled cable can't leave
+  half the machine running.
+- Alternative considered: one 7i92 with new firmware running all ten
+  channels, with step/direction signals cabled to the expansion box.
+  Cheaper and easier on timing, but long signal cables pick up noise and
+  it uses up the card's spare pins; the two-card design is more modular.
+
+Software work once the design is fixed (not started):
+
+1. Channels 00-09 across two cards (`hm2_7i92.0` for 00-05,
+   `hm2_7i92.1` for 06-09). The channel table is repeated in
+   `REB_Settings.py`, `REB_main.py`, `REB_Scale_Persist.py` and
+   `REB_Generate_Local_Ini.py`; the generator builds the HAL from it.
+2. An "Expansion box connected" setting (like Signal Tower's): off = one
+   card and 6 channels, on = both cards and 10.
+3. REB Settings' Axis Selection page laid out as the two boxes, with the
+   expansion group greyed out when it isn't connected.
+4. Limit jacks 4-6 on the second card, shown only with the expansion box.
+5. Either card losing contact = E-stop.
+6. The update step converting existing settings files' channel IDs.
+7. New firmware/pin files for both cards.
+
 ## Done
 
 Most recent first.
 
 | Item | Settled | How |
 |---|---|---|
+| Startup splash drawing and fallback | 11 October 2026 | Verified by Rich: with X and Z assigned the preview shows "REB" over "ROSE ENGINE BUTLER", right way up, no error; X only, Z only, and neither all fall back to the empty splash; pressing Run with it loaded and the axes enabled moves nothing. |
 | Items from the Mac session's list | 11 October 2026 | Copied into this file. |
 | Sp0 / Sp1 running | 08 October 2026 | Verified by Rich on the prototype. |
 | EtherLab "signing key is bad / expired" from apt update | 08 October 2026 | Key refreshed on the Pi; `REB_Update.sh` now refreshes it automatically (06549a8). |
