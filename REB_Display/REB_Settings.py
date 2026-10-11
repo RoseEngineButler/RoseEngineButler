@@ -365,20 +365,6 @@ def _save_signal_tower(connected):
 def _read_persisted_signal_tower():
     return reb_settings_io.load_settings().get("signal_tower") is True
 
-# The signal tower relay board's polarity - Signal_Tower_Active_Low
-# under the Connected checkbox, persisted as REBset_v1.ini's
-# "signal_tower_active_low" (absent = true, the usual board, which
-# switches a relay on when its input is pulled low).
-# REB_Generate_Local_Ini.py inverts the three output pins to suit.
-def _save_signal_tower_active_low(active_low):
-    settings = reb_settings_io.load_settings()
-    settings["signal_tower_active_low"] = bool(active_low)
-    reb_settings_io.save_settings(settings)
-    print("Saved signal tower relays: " + ("active-low" if active_low else "active-high"))
-
-def _read_persisted_signal_tower_active_low():
-    return reb_settings_io.load_settings().get("signal_tower_active_low", True) is not False
-
 # Whether the limit jacks take normally-closed or normally-open
 # switches - the Limit_Switch_NC / Limit_Switch_NO radios, persisted as
 # REBset_v1.ini's "limit_switch_type" ("NC" or "NO"; absent = "NC").
@@ -387,14 +373,18 @@ def _read_persisted_signal_tower_active_low():
 LIMIT_SWITCH_TYPES = ("NC", "NO")
 
 # User Manual pages opened by the buttons beside the Axis Selection
-# page's Limit Switches and E-Stop Button notes and the tuning page's
-# three Scale notes (Open_Manual_Link), keyed by button id.
+# page's Limit Switches, E-Stop Button and Signal Tower and Sounds notes
+# and the tuning page's three Scale notes (Open_Manual_Link), keyed by
+# button id.
 MANUAL_URL = "https://roseenginebutler.com/UserManual/index.php?n=Main."
 MANUAL_LINKS = {
     "Limit_Switch_Cabling_Link": MANUAL_URL + "LimitSwitchCabling",
     "Limit_Switch_How_Link":     MANUAL_URL + "AxisSelection#LimitSwitches",
     "Estop_Cabling_Link":        MANUAL_URL + "E-StopCabling",
     "Estop_How_Link":            MANUAL_URL + "AxisSelection#EStopButton",
+    "Tower_Cabling_Link":        MANUAL_URL + "SignalTowerCabling",
+    "Tower_How_Link":            MANUAL_URL + "SignalTower",
+    "Sounds_How_Link":           MANUAL_URL + "Sounds",
     "Linear_Scale_Link":         MANUAL_URL + "ScaleSettingsForADevice",
     "Rotary_Scale_Link":         MANUAL_URL + "ScaleSettingsForADevice",
     "Spindle_Scale_Link":        MANUAL_URL + "ScaleSettingsForADevice",
@@ -1632,33 +1622,16 @@ class HandlerClass:
             return
         self._applying_signal_tower = True
         check.set_active(_read_persisted_signal_tower())
-        active_low = self.builder.get_object("Signal_Tower_Active_Low")
-        if active_low is not None:
-            active_low.set_active(_read_persisted_signal_tower_active_low())
-            active_low.set_sensitive(check.get_active())
         self._applying_signal_tower = False
 
     def Signal_Tower_Toggled(self, widget):
         '''
         Persists the signal tower checkbox. Takes effect at the next
-        LinuxCNC launch (REB_Generate_Local_Ini.py). The relay polarity
-        checkbox only matters with a tower, so it's greyed out without one.
+        LinuxCNC launch (REB_Generate_Local_Ini.py).
         '''
-        active_low = self.builder.get_object("Signal_Tower_Active_Low")
-        if active_low is not None:
-            active_low.set_sensitive(widget.get_active())
         if self._applying_signal_tower:
             return
         _save_signal_tower(widget.get_active())
-
-    def Signal_Tower_Active_Low_Toggled(self, widget):
-        '''
-        Persists the signal tower relay polarity. Takes effect at the
-        next LinuxCNC launch.
-        '''
-        if self._applying_signal_tower:
-            return
-        _save_signal_tower_active_low(widget.get_active())
 
     def _load_limit_switch_type(self):
         '''

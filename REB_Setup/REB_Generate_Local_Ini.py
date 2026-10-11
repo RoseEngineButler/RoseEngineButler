@@ -262,12 +262,13 @@ SIGNAL_TOWER_OUTPUT = {
     "buzzer": "027",
 }
 
-# Default for relay boards that switch ON when their input is pulled LOW
-# (REBset_v1.ini's "signal_tower_active_low", REB Settings' "Relays
-# switch on when low" checkbox, absent = this). The 7i92's pull-ups hold
-# every pin high whenever LinuxCNC isn't driving it (power-up, after
-# exit), so active-low relays stay off then; an active-high board would
-# light/sound everything at every boot.
+# The Rose Engine Butler standard: the signal tower's relays switch ON
+# when their input is pulled LOW. They're on the REB circuit board, and a
+# home-built system must follow the same standard - there's no setting
+# for it (a REB Settings checkbox existed 08-11 October 2026). The 7i92's
+# pull-ups hold every pin high whenever LinuxCNC isn't driving it
+# (power-up, after exit), so active-low relays stay off then; an
+# active-high board would light/sound everything at every boot.
 SIGNAL_TOWER_ACTIVE_LOW = True
 
 # How long the buzzer sounds each time the red light comes on.
@@ -356,15 +357,6 @@ def _read_estop_button(settings):
     return settings.get("estop_button") is True
 
 
-def _read_signal_tower_active_low(settings):
-    '''
-    The signal tower relay board's polarity (REB_Settings.py's
-    _save_signal_tower_active_low). Absent means SIGNAL_TOWER_ACTIVE_LOW.
-    '''
-    value = settings.get("signal_tower_active_low", SIGNAL_TOWER_ACTIVE_LOW)
-    return value if isinstance(value, bool) else SIGNAL_TOWER_ACTIVE_LOW
-
-
 def _read_limit_switch_type(settings):
     '''
     "NC" or "NO" for every limit jack (REB_Settings.py's
@@ -394,8 +386,7 @@ def _read_fault_sound(settings):
     return choice if choice in FAULT_SOUND_CHOICES else "both"
 
 
-def _signal_tower_hal(signal_tower, limit_nets, role_layout, fault_sound="both",
-                      active_low=SIGNAL_TOWER_ACTIVE_LOW):
+def _signal_tower_hal(signal_tower, limit_nets, role_layout, fault_sound="both"):
     '''
     Returns HAL text driving the optional signal tower's three relay
     outputs when signal_tower is True, and the fault siren's fault
@@ -433,7 +424,7 @@ def _signal_tower_hal(signal_tower, limit_nets, role_layout, fault_sound="both",
         tower. _fault_siren_postgui_hal nets the same pulse to the
         main panel for the speaker.
     With the tower off the pins are left as inputs, so nothing drives
-    the relays. Pin levels follow active_low (the relay board's polarity).
+    the relays. Pin levels follow SIGNAL_TOWER_ACTIVE_LOW.
     '''
     lines = [
         "",
@@ -558,7 +549,7 @@ def _signal_tower_hal(signal_tower, limit_nets, role_layout, fault_sound="both",
         pin = "hm2_7i92.0.gpio." + SIGNAL_TOWER_OUTPUT[color]
         # Active-low: ON must drive the pin low, so invert exactly when
         # .out is true for ON. Active-high: the opposite.
-        invert = out_true_means_on[color] == active_low
+        invert = out_true_means_on[color] == SIGNAL_TOWER_ACTIVE_LOW
         lines.append(("setp " + pin + ".is_output").ljust(44) + "1")
         lines.append(("setp " + pin + ".invert_output").ljust(44) + ("1" if invert else "0"))
     return "\n".join(lines) + "\n"
@@ -1156,7 +1147,6 @@ def _retarget_spindle_block(block_text, spindle_id, channel_id, spindle_num, pro
 
 def generate_local_hal_files(role_layout, limit_jacks=None, estop_button=False,
                              signal_tower=False, fault_sound="both",
-                             signal_tower_active_low=SIGNAL_TOWER_ACTIVE_LOW,
                              limit_switch_type="NC"):
     '''
     Regenerates REB.local.hal from the tracked REB.hal: for each of the
@@ -1231,8 +1221,7 @@ def generate_local_hal_files(role_layout, limit_jacks=None, estop_button=False,
     # present, so that banner still ends the file.
     limit_text, limit_summary, limit_nets = _limit_jack_hal(limit_jacks or {}, role_layout, limit_switch_type)
     limit_text += _estop_button_hal(estop_button)
-    limit_text += _signal_tower_hal(signal_tower, limit_nets, role_layout, fault_sound,
-                                    signal_tower_active_low)
+    limit_text += _signal_tower_hal(signal_tower, limit_nets, role_layout, fault_sound)
     end_banner = hal_text.rfind("\n# *********************** NOTHING FOLLOWS")
     if end_banner == -1:
         hal_text += limit_text
@@ -1258,9 +1247,7 @@ def generate_local_hal_files(role_layout, limit_jacks=None, estop_button=False,
     print("Regenerated REB.local.hal: " + ", ".join(retargeted))
     print("Limit jacks: " + (", ".join(limit_summary) or "none in use"))
     print("E-stop button: " + ("connected" if estop_button else "not connected"))
-    print("Signal tower: " + (("connected, relays switch on when "
-                                + ("low" if signal_tower_active_low else "high"))
-                               if signal_tower else "not connected"))
+    print("Signal tower: " + ("connected" if signal_tower else "not connected"))
     print("Fault siren: " + fault_sound)
     if role_layout.inactive_roles:
         print("Not currently assigned to any channel: " + ", ".join(role_layout.inactive_roles))
@@ -1447,7 +1434,6 @@ def main():
                                     _read_estop_button(settings),
                                     _read_signal_tower(settings),
                                     _read_fault_sound(settings),
-                                    _read_signal_tower_active_low(settings),
                                     _read_limit_switch_type(settings)):
         sys.exit(1)
 

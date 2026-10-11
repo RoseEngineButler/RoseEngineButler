@@ -24,7 +24,6 @@ Built and committed, but not yet seen working on real hardware.
 |---|---|---|
 | E-stop button | 28 September 2026 | Pressing it (and unplugging it) latches E-stop; release then F1 resets. Needs "Connected" ticked in REB Settings. |
 | NO limit switches | 08 October 2026 | With Limit Switch Type set to Normally open, a tripped NO switch stops the axis (reads the jack's GPIO `.in_not`). NC is already verified - see Done. |
-| Active-high signal tower relays | 08 October 2026 | With "Relays switch on when low" unticked, the lights and buzzer follow the right states on an active-high relay board. Active-low (the default) is already verified. |
 | Fault siren on the speaker | 07 October 2026 | A following error or limit trip plays `REB_Fault.wav` on the monitor speaker, with and without a signal tower. Also that Fault Siren = Off / Speaker silences the tower buzzer for faults. |
 | Done / Pause beeps | 06 October 2026 | 3 beeps when a program finishes normally, 2 at M0/M1/M60, none on an abort. The finish detection (`stat.motion_line` vs the program's last move) is a guess - the console prints each run's end values to check it. |
 | Speed limits in REB Settings | 08 October 2026 | Max Speed / Max Acceleration / PID Max Output from REB Settings reach LinuxCNC; `REB_Update.sh` fills them in correctly on an existing machine. On the tuning page: each group shows four rows, a warnings line and a closed "Advanced settings" twistie with a note beside every row, nothing cut off; no warnings on a normal machine; changing C's Max Speed carries Stepgen Max Vel and PID Max Output along; linear Max Speed stops at 1.0 in/s; Restore Defaults resets an axis's advanced values. The window itself was never opened before commit (no GTK on the Mac). |
@@ -52,7 +51,7 @@ Built and committed, but not yet seen working on real hardware.
 | User Manual: tuning page | 08 October 2026 | Update for the new Max Speed / Max Acceleration rows, the Advanced settings twisties, the row notes and Restore Defaults, once the screen has been seen on the Pi. |
 | Restore from USB | 06 October 2026 | Idea, not started: a matching program to copy a dated backup back onto the Pi. Check how it should fit with the existing `REB_Display/REB_Settings_Restore.py` first. |
 | REB.ini: possibly redundant keys | 06 October 2026 | Left in during the cleanup because how AXIS uses them wasn't certain: `[FILTER]` (opens .png/.gif/.jpg and .py files through image-to-gcode - remove if never used), `[DISPLAY]MIN_VELOCITY` and the un-numbered `MAX_SPINDLE_OVERRIDE`/`MIN_SPINDLE_OVERRIDE`. |
-| Old spindle `pid_vel` blocks in settings files | 08 October 2026 | Machines' REBset_v1.ini still hold an inert `pid_vel` block from the removed spindle velocity PID. Harmless; could be removed by `REB_Update_Settings.py` some day. |
+| Old keys in settings files | 08 October 2026 | Machines' REBset_v1.ini may still hold an inert `pid_vel` block from the removed spindle velocity PID, and (since 11 October 2026) a `signal_tower_active_low` value from the removed relay-polarity checkbox. Nothing reads either; harmless. Could be removed by `REB_Update_Settings.py` some day. |
 | Leftover repo copy on the Mac | 06 October 2026 | `~/Documents/GitHub/RoseEngineButler` is a stale duplicate (with one unpushed commit, now also in the real repo). Safe to delete; the working copy is iCloud Drive > Shared iCloud > Rich > GitHub > RoseEngineButler. |
 
 ## Planning
@@ -135,6 +134,7 @@ Most recent first.
 
 | Item | Settled | How |
 |---|---|---|
+| Signal tower relay polarity setting | 11 October 2026 | Dropped: the relays are on Chuck's REB circuit board, and home-built systems must follow the same active-low standard. The "Relays switch on when low" checkbox is gone; `SIGNAL_TOWER_ACTIVE_LOW` is fixed. |
 | Startup splash drawing and fallback | 11 October 2026 | Verified by Rich: with X and Z assigned the preview shows "REB" over "ROSE ENGINE BUTLER", right way up, no error; X only, Z only, and neither all fall back to the empty splash; pressing Run with it loaded and the axes enabled moves nothing. |
 | Items from the Mac session's list | 11 October 2026 | Copied into this file. |
 | Sp0 / Sp1 running | 08 October 2026 | Verified by Rich on the prototype. |
