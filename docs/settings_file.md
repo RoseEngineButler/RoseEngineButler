@@ -1,5 +1,15 @@
 # Named Settings Files (.settings.ini) — Design Plan
 
+> **Comment lines around the JSON (11 October 2026):** `REBset_v1.ini`,
+> its "Save All Settings As..." copies and the seed `REB_Setup/REBset_v1.ini`
+> now start with a `#` comment block saying what the file is and that it
+> shouldn't be edited by hand, and end with the copyright/licence lines
+> (`SETTINGS_HEADER`/`SETTINGS_FOOTER` in `reb_settings_io.py`). Every
+> reader drops `#` lines before parsing (`parse_settings_text`), and
+> `save_settings` always writes them back. Export (Save Subset) files get
+> their own wording (`EXPORT_HEADER`). `REB_Update_Settings.py` adds the
+> notes to older settings and export files in `~/Documents` (not backups).
+
 > **REBset_v1.ini and .REBset_v1.ini exports moved from XML to JSON (22
 > August 2026):** `REBset_v1.ini` was XML manipulated entirely by
 > hand-rolled regex substitution (no real parser anywhere in the read/

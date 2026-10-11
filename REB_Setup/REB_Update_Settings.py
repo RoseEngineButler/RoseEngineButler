@@ -147,12 +147,64 @@ def fill_speed_limits(user, planner):
     return changed
 
 
+def add_notes_to_other_files(main_path):
+    '''
+    Gives every other Rose Engine Butler settings or export file in the
+    settings folder (~/Documents) the explanatory notes - "Save All
+    Settings As..." copies and "Save Subset" exports saved before the
+    notes existed. Only *.ini files that read as a settings/export file
+    (a JSON object with "axes") are touched, and only if the notes are
+    missing; the settings themselves are written back unchanged, checked
+    before the file is replaced. Backups (*.ini.bak-...) don't end in
+    .ini, so they're left alone. A REBset file that can't be read is
+    reported and left as it is.
+    '''
+    folder = os.path.dirname(main_path)
+    try:
+        names = sorted(os.listdir(folder))
+    except OSError:
+        return
+    for name in names:
+        path = os.path.join(folder, name)
+        if not name.endswith(".ini") or os.path.abspath(path) == os.path.abspath(main_path):
+            continue
+        try:
+            with open(path, "r") as f:
+                raw = f.read()
+            data = reb_settings_io.parse_settings_text(raw)
+        except (OSError, ValueError, UnicodeDecodeError) as e:
+            if "REBset" in name:
+                print("NOTE: " + name + " could not be read (" + str(e).split(":")[0]
+                      + ") - left as it is.")
+            continue
+        if not isinstance(data, dict) or "axes" not in data:
+            continue
+        new = reb_settings_io.settings_text(data)
+        if new == raw or reb_settings_io.SETTINGS_HEADER in raw or reb_settings_io.EXPORT_HEADER in raw:
+            continue
+        tmp_path = path + ".tmp"
+        try:
+            with open(tmp_path, "w") as f:
+                f.write(new)
+            with open(tmp_path, "r") as f:
+                if reb_settings_io.parse_settings_text(f.read()) != data:
+                    raise ValueError("settings changed on rewrite")
+            os.replace(tmp_path, path)
+            print("Added the explanatory notes to " + name)
+        except (OSError, ValueError) as e:
+            print("NOTE: could not add notes to " + name + " (" + str(e) + ") - left as it is.")
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+
+
 def main():
     print("Checking " + SETTINGS_PATH + " for new settings")
 
     try:
         with open(SEED_PATH, "r") as f:
-            seed = json.load(f)
+            seed = reb_settings_io.parse_settings_text(f.read())
     except (OSError, ValueError) as e:
         print("ERROR: could not read " + SEED_PATH + ": " + str(e))
         return 1
@@ -172,7 +224,7 @@ def main():
         with open(SETTINGS_PATH, "r") as f:
             raw = f.read()
     try:
-        user = json.loads(raw)
+        user = reb_settings_io.parse_settings_text(raw)
     except ValueError as e:
         # Never replace a file we can't read - it may hold the only copy
         # of this machine's calibration.
@@ -188,7 +240,11 @@ def main():
         print("WARNING: could not read " + REB_INI_PATH + " (" + str(e) + ") - speed limits not filled in.")
         raised = []
     added = add_missing(user, seed)
-    if not added and not raised:
+    # A file from before the explanatory notes (08 October 2026 and
+    # earlier) gets them now, rather than at the next program save.
+    needs_notes = reb_settings_io.SETTINGS_HEADER not in raw
+    add_notes_to_other_files(SETTINGS_PATH)
+    if not added and not raised and not needs_notes:
         print("Settings file is up to date - nothing to add.")
         return 0
 
@@ -203,6 +259,8 @@ def main():
         print("Set up %d speed limit value(s) (now in REB Settings):" % len(raised))
         for what in raised:
             print("    " + what)
+    if needs_notes:
+        print("Added the notes explaining what the settings file is.")
     print("Previous settings file saved as " + backup)
     return 0
 

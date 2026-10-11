@@ -34,7 +34,7 @@ Invoked from REB.hal, after hm2_7i92/pid/motion are all loaded:
     loadusr -w python3 REB_Display/REB_Settings_Restore.py
 
 ------------------------------------------------------------------
-Any-role/any-channel generalization (13 September 2026, Rich)
+Any-role/any-channel generalization (13 September 2026)
 ------------------------------------------------------------------
 Any of 10 roles (8 axis letters or 2 spindles) can now be assigned to
 any of the 8 physical channels - see CLAUDE.md and REB_Setup/

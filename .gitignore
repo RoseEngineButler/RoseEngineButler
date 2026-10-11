@@ -13,6 +13,7 @@ __pycache__/
 /REB.local.ini
 /REB.local.hal
 /REB_Display/REB_PostGUI_v1.local.hal
+/REB_Display/REB_Splash.local.ngc
 /sim.var
 /sim.var.bak
 /halshow.preferences

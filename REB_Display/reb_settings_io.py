@@ -48,7 +48,7 @@
 #   Brainwave Embedded.
 #
 # Version
-#   1.0 - 22 August 2026, Claude
+#   1.0 - 22 August 2026
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #
@@ -427,6 +427,78 @@ def _merge_defaults(loaded):
     return merged
 
 
+# The comment lines written around the JSON in REBset_v1.ini (and its
+# "Save All Settings As..." copies and the seed file) so someone who
+# opens the file knows what it is: what it holds and not to edit it by
+# hand at the top, the legal notice at the end. JSON itself has no
+# comments, so every reader goes through parse_settings_text, which
+# drops lines starting with "#" first - safe, since no line of the JSON
+# json.dump writes ever starts with "#". save_settings always writes
+# them back, so they can't go missing or out of date. Export (Save
+# Subset) files - anything without a full channel_assignments - get
+# EXPORT_HEADER instead, worded for a file meant to be loaded elsewhere.
+SETTINGS_HEADER = """#######################################################################
+# Rose Engine Butler settings                                         #
+#######################################################################
+#                                                                     #
+# This file holds this machine's settings for the Rose Engine Butler: #
+# which axis is on each plug, each axis's scale, speed and tuning,    #
+# limit switches, jog speeds, and the values remembered on the main   #
+# panel.                                                              #
+#                                                                     #
+# The Rose Engine Butler's programs read and write this file. To      #
+# change a setting, use the Rose Engine Butler Settings program.      #
+# Editing this file by hand is not recommended and is not supported:  #
+# a mistake can stop the Rose Engine Butler from starting, and the    #
+# programs may overwrite hand edits.                                  #
+#                                                                     #
+#######################################################################
+"""
+EXPORT_HEADER = """#######################################################################
+# Rose Engine Butler settings export                                  #
+#######################################################################
+#                                                                     #
+# This file holds some Rose Engine Butler settings - for example one  #
+# device's scale and tuning - saved with "Save Subset of Settings     #
+# As..." in the Rose Engine Butler Settings program. To use them, open#
+# that program and choose "Load Settings from File", on this machine  #
+# or another one.                                                     #
+#                                                                     #
+# Editing this file by hand is not recommended and is not supported:  #
+# a mistake can stop the settings from loading.                       #
+#                                                                     #
+#######################################################################
+"""
+SETTINGS_FOOTER = """#######################################################################
+# Copyright (c) 2026 Colvin Tools and Brainwave Embedded.             #
+# The MIT/X Consortium License applies - see LICENSE.                 #
+#######################################################################
+"""
+
+
+def strip_comments(text):
+    '''Drops the "#" comment lines around a settings file's JSON.'''
+    return "\n".join(line for line in text.split("\n") if not line.lstrip().startswith("#"))
+
+
+def parse_settings_text(text):
+    '''
+    Parses the text of a settings (or export) file: the JSON with any
+    "#" comment lines dropped. Raises ValueError like json.loads.
+    '''
+    return json.loads(strip_comments(text))
+
+
+def settings_text(data):
+    '''
+    The full text of a settings file: header, JSON, footer. A whole
+    settings file (one with channel_assignments) gets SETTINGS_HEADER;
+    an export (Save Subset) file gets EXPORT_HEADER.
+    '''
+    header = SETTINGS_HEADER if "channel_assignments" in data else EXPORT_HEADER
+    return header + json.dumps(data, indent=2) + "\n" + SETTINGS_FOOTER
+
+
 def save_settings(data, path=SETTINGS_PATH):
     '''
     Writes data as JSON to path, atomically: write to a temp file in the
@@ -434,12 +506,11 @@ def save_settings(data, path=SETTINGS_PATH):
     a single filesystem rename, so a reader can never observe a
     half-written file - cheap insurance against a Pi losing power
     mid-write, which the old direct open(path, "w") had no protection
-    against at all.
+    against at all. The JSON is wrapped in SETTINGS_HEADER/_FOOTER.
     '''
     tmp_path = path + ".tmp"
     with open(tmp_path, "w") as f:
-        json.dump(data, f, indent=2)
-        f.write("\n")
+        f.write(settings_text(data))
     os.replace(tmp_path, path)
 
 
@@ -578,10 +649,9 @@ def _migrate_legacy_xml(xml_text, path):
     tmp_path = path + ".tmp"
     try:
         with open(tmp_path, "w") as f:
-            json.dump(settings, f, indent=2)
-            f.write("\n")
+            f.write(settings_text(settings))
         with open(tmp_path, "r") as f:
-            round_tripped = json.load(f)
+            round_tripped = parse_settings_text(f.read())
         if "axes" not in round_tripped or "channel_assignments" not in round_tripped:
             raise ValueError("converted JSON is missing expected top-level keys")
         os.replace(tmp_path, path)
@@ -617,7 +687,7 @@ def load_settings(path=SETTINGS_PATH):
         return _migrate_legacy_xml(raw, path)
 
     try:
-        loaded = json.loads(raw)
+        loaded = parse_settings_text(raw)
     except ValueError as e:
         print("Could not parse " + path + " as JSON: " + str(e))
         return default_settings()

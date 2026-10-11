@@ -27,7 +27,7 @@
 #   Brainwave Embedded.                                               #
 #                                                                     #
 # Version                                                             #
-#   1.0 - 22 July 2026, R. Colvin 	                                  #
+#   1.0 - 22 July 2026                                                #
 #                                                                     #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.             #
 #                                                                     #
@@ -74,7 +74,7 @@
 #  Axis  Joint  Channel   Type     Seq  Plug  Comments
 #  ----  -----  -------  -------  ----  ----  ------------------------
 #   X      0       04    LINEAR     1    P15
-#   Y      -       --    ------     -		  Not available as LATHE=1
+#   Y      -       --    ------     -         Not available as LATHE=1
 #   Z      1       01    LINEAR     2    P12
 #
 #   A      -       08    ANGULAR    -    --   Not currently assigned to
@@ -144,7 +144,7 @@ addf motion-controller                      servo-thread
 
 setp hm2_7i92.0.dpll.01.timer-us            -50
 setp hm2_7i92.0.stepgen.timer-number        1
-setp hm2_7i92.0.watchdog.timeout_ns 		5000000
+setp hm2_7i92.0.watchdog.timeout_ns         5000000
 
 # ********************************************************************
 #    AA    XX    XX IIIIIIII  SSSSSS      YY    YY
@@ -161,7 +161,7 @@ setp hm2_7i92.0.watchdog.timeout_ns 		5000000
 #  ----  -----  -------  -------  ----  ----  ------------------------
 #   X      0       04    LINEAR     1    P15
 # ********************************************************************
-#  Modified 13 Jul 26 by R. Colvin
+#  Modified 13 July 2026
 # ********************************************************************
 
 # ROLE_BLOCK_START: X
@@ -218,7 +218,7 @@ setp pid.x.maxoutput                        [JOINT_0]MAX_OUTPUT
 #  ----  -----  -------  -------  ----  ----  ------------------------
 #   NA     NA      NA      NA      NA    NA
 # ********************************************************************
-#  Modified 10 July 2026 by R. Colvin
+#  Modified 10 July 2026
 # ********************************************************************
 # Axis Y is not used.
 
@@ -237,7 +237,7 @@ setp pid.x.maxoutput                        [JOINT_0]MAX_OUTPUT
 #  ----  -----  -------  -------  ----  ----  ------------------------
 #   Z      1       01    LINEAR     2    P12
 # ********************************************************************
-#  Modified 13 Jul 26 by R. Colvin
+#  Modified 13 July 2026
 # ********************************************************************
 
 # ROLE_BLOCK_START: Z
@@ -295,7 +295,7 @@ setp pid.z.maxoutput                        [JOINT_1]MAX_OUTPUT
 #  ----  -----  -------  -------  ----  ----  ------------------------
 #   B      2       05    ANGULAR    6    P16
 # ********************************************************************
-#  Modified 13 Jul 26 by R. Colvin
+#  Modified 13 July 2026
 # ********************************************************************
 
 # ROLE_BLOCK_START: B
@@ -361,7 +361,7 @@ setp pid.b.maxoutput                        [JOINT_2]MAX_OUTPUT
 #                                              REB_Setup/
 #                                              REB_Generate_Local_Ini.py
 # ********************************************************************
-#  Added 13 September 2026, Claude - any of X,Z,U,V,W,A,B,C,Sp0,Sp1 can
+#  Added 13 September 2026 - any of X,Z,U,V,W,A,B,C,Sp0,Sp1 can
 #  now be assigned to any of the 8 physical channels (see CLAUDE.md).
 #  This block mirrors AXIS_B's shape exactly. The "08" channel number
 #  and [JOINT_8] ini section below are placeholders only - never a real
@@ -436,7 +436,7 @@ setp pid.a.maxoutput                        [JOINT_8]MAX_OUTPUT
 #                                              REB_Setup/
 #                                              REB_Generate_Local_Ini.py
 # ********************************************************************
-#  Added 13 September 2026, Claude - see the AXIS_A block above for the
+#  Added 13 September 2026 - see the AXIS_A block above for the
 #  full explanation (placeholder channel/joint number, generator-
 #  rewritten on assignment, block omitted entirely when unassigned).
 # ********************************************************************
@@ -497,7 +497,7 @@ setp pid.c.maxoutput                        [JOINT_9]MAX_OUTPUT
 #  ----  -----  -------  -------  ----  ----  ------------------------
 #   U      3       02    LINEAR     3    P13
 # ********************************************************************
-#  Modified 13 Jul 26 by R. Colvin
+#  Modified 13 July 2026
 # ********************************************************************
 
 # ROLE_BLOCK_START: U
@@ -554,7 +554,7 @@ setp pid.u.maxoutput                        [JOINT_3]MAX_OUTPUT
 #  ----  -----  -------  -------  ----  ----  ------------------------
 #   V      4       03    LINEAR     4    P14
 # ********************************************************************
-#  Modified 13 Jul 26 by R. Colvin
+#  Modified 13 July 2026
 # ********************************************************************
 
 # ROLE_BLOCK_START: V
@@ -611,7 +611,7 @@ setp pid.v.maxoutput                        [JOINT_4]MAX_OUTPUT
 #  ----  -----  -------  -------  ----  ----  ------------------------
 #   W      5       00    LINEAR     5    P11
 # ********************************************************************
-#  Modified 13 Jul 26 by R. Colvin
+#  Modified 13 July 2026
 # ********************************************************************
 
 # ROLE_BLOCK_START: W
@@ -668,7 +668,7 @@ setp pid.w.maxoutput                        [JOINT_5]MAX_OUTPUT
 #  ----  -----  -------  -------  ----  ----  ------------------------
 #  Sp0     7       06      n/a     n/a   P17
 # ********************************************************************
-#  Modified 13 Jul 26 by R. Colvin
+#  Modified 13 July 2026
 # ********************************************************************
 
 # ROLE_BLOCK_START: Sp0
@@ -722,8 +722,8 @@ net spindle.0-enable                     => hm2_7i92.0.outm.00.out-06
 net spindle.0-index-enable              <=> spindle.0.index-enable
 net spindle.0-index-enable               => pid.p0.index-enable
 
-net spindle.0-output-pos				<=  pid.p0.output
-net spindle.0-output-pos				 => mux2.0.in1
+net spindle.0-output-pos                <=  pid.p0.output
+net spindle.0-output-pos                 => mux2.0.in1
 
 net spindle.0-pos-cmd                   <=  orient.0.command
 net spindle.0-pos-cmd                    => pid.p0.command
@@ -803,7 +803,7 @@ sets spindle.0-at-speed                     true
 #  ----  -----  -------  -------  ----  ----  ------------------------
 #  Sp1     6       07      n/a     n/a   P18
 # ********************************************************************
-#  Modified 13 Jul 26 by R. Colvin
+#  Modified 13 July 2026
 # ********************************************************************
 
 # ROLE_BLOCK_START: Sp1
@@ -912,7 +912,7 @@ sets spindle.1-at-speed                     true
 # ********************************************************************
 #  Connect miscellaneous signals to pins
 # ********************************************************************
-#  Modified 13 Jul 26 by R. Colvin
+#  Modified 13 July 2026
 # ********************************************************************
 
 # E-stop: the optional E-stop button (GX-16/2 plug, normally-closed,
@@ -941,7 +941,7 @@ net machine-is-on                           halui.machine.is-on
 
 # ********************************************************************
 #  Restore persisted axis scale/maxvel/maxaccel/PID/backlash values
-#  Added 4 September 2026 by Claude
+#  Added 04 September 2026
 # ********************************************************************
 # hm2_7i92.0.stepgen.*.position-scale/maxvel/maxaccel, pid.*.Pgain/
 # Igain/Dgain/FF0/FF1/FF2/maxoutput, and joint.*.backlash are all live HAL

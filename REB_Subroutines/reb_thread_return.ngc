@@ -1,6 +1,6 @@
 ; Rose Engine Butler - Threading tab's Return to Start.
 ; Called from MDI by REB_main.py's Thread_Return - not meant to be run by hand.
-; Created 24 September 2026 by R. Colvin
+; Created 24 September 2026
 ;
 ; Pulls the cutter straight out along X first, so it clears the thread,
 ; then moves Z and C back together.

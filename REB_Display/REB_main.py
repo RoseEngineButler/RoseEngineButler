@@ -26,7 +26,7 @@
 #   Brainwave Embedded.
 #
 # Version
-#   1.0 - 21 July 2026, R. Colvin
+#   1.0 - 21 July 2026
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #
@@ -232,7 +232,7 @@ _ACTIVE_ROLES_AT_STARTUP = set(_CHANNEL_ASSIGNMENTS_AT_STARTUP.values())
 # don't need their own entry - graying their container greys them too.
 AXIS_ROW_FIELDS = (
     "_Letter", "_ENA", "_Feed", "_Feed_UOM", "_Comment",
-    "_Idx_Dist", "_IdxDist_UOM", "_Idx_DegDiv_Box",
+    "_Idx_Dist", "_Idx_Count", "_IdxDist_UOM", "_Idx_DegDiv_Box",
     # Sync Move tab.
     "_Sync_Dist_Box", "_Sync_Dist_UOM", "_Sync_Rev", "_Sync_Fwd",
 )
@@ -254,7 +254,7 @@ _UNASSIGNED_ENA_LIGHT_COLOR = Gdk.Color.parse("gray")[1]
 SPINDLE_ROW_FIELDS = {
     "Sp0": (
         "Sp0_ENA", "Sp0_Set_Feed", "Sp0_Move_Fwd", "Sp0_Move_Stop", "Sp0_Move_Rev",
-        "Sp0_Idx_Dist", "Sp0_Idx_Fwd", "Sp0_Idx_Rev",
+        "Sp0_Idx_Dist", "Sp0_Idx_Count", "Sp0_Idx_Fwd", "Sp0_Idx_Rev",
         "Sp0_Set_Idx_bW_Deg", "Sp0_Set_Idx_bW_Div", "Sp0_Set_Idx_OnOff",
     ),
     "Sp1": (
@@ -1118,7 +1118,7 @@ class HandlerClass:
 # OpenRoseEngineButlerWebsite
 # Purpose:              This is used to open the Rose Engine Butler
 #                       website.
-# Updated:              ver 1.0, 6 August 2026, Claude
+# Updated:              ver 1.0, 06 August 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel_v1
@@ -1149,7 +1149,7 @@ class HandlerClass:
 # OpenGcodeLibrary
 # Purpose:              This is used to open the Rose Engine Butler
 #                       Gcode library web page.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Tab_Help
@@ -1180,7 +1180,7 @@ class HandlerClass:
 # OpenGcodeQuickReference
 # Purpose:              This is used to open the LinuxCNC Gcode Quick
 #                       Reference.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Tab_Help
@@ -1211,7 +1211,7 @@ class HandlerClass:
 # OpenLibrary
 # Purpose:              This is used to open the Rose Engine Butler
 #                       web page.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -1243,7 +1243,7 @@ class HandlerClass:
 # OpenOTHandyBook
 # Purpose:              This is used to open the Ornamental Turner's
 #                       Handy Book
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Tab_Help
@@ -1274,7 +1274,7 @@ class HandlerClass:
 # OpenUserForum
 # Purpose:              This is used to open the Rose Engine Butler
 #                       forum web page.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Tab_Help
@@ -1305,7 +1305,7 @@ class HandlerClass:
 # OpenUserManual
 # Purpose:              This is used to open the Rose Engine Butler
 #                       user manual web page.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Tab_Help
@@ -1349,7 +1349,7 @@ class HandlerClass:
 #                       Note:  sends M4, not M3 - see the Gcode0/Gcode1
 #                           comment below. This is an intentional,
 #                           empirically-verified swap, not a typo.
-# Updated:              ver 1.2, 8 August 2026, Claude
+# Updated:              ver 1.2, 08 August 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -1508,7 +1508,7 @@ class HandlerClass:
 #                           not higher, despite being the Fwd handler -
 #                           see Sp0_Move_Fwd's docstring for the same
 #                           empirically-verified swap applied here.
-# Updated:              ver 1.1, 8 August 2026, Claude
+# Updated:              ver 1.1, 08 August 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -1563,6 +1563,7 @@ class HandlerClass:
                 # sequential M19s. sign is -1, not +1 - see this
                 # function's docstring.
                 self._index_both_spindles_simultaneously(-1)
+                self._bump_idx_count("Sp0", -1)
                 return
 
             # M19 orients to an absolute angle, not a relative step, so compute
@@ -1599,6 +1600,7 @@ class HandlerClass:
                 c.wait_complete()
             else:
                 idx_log("Sp1 M19 skipped (Sp1_Idx_Bool is False)")
+            self._bump_idx_count("Sp0", -1)
         finally:
             _set_busy_cursor(widget, False)
 
@@ -1611,7 +1613,7 @@ class HandlerClass:
 #                           see Sp0_Move_Idx_Fwd/Sp0_Move_Fwd's
 #                           docstrings for the same empirically-verified
 #                           swap applied here.
-# Updated:              ver 1.1, 8 August 2026, Claude
+# Updated:              ver 1.1, 08 August 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -1663,6 +1665,7 @@ class HandlerClass:
                 # Both selected - see matching branch in Sp0_Move_Idx_Fwd.
                 # sign is +1, not -1 - see this function's docstring.
                 self._index_both_spindles_simultaneously(+1)
+                self._bump_idx_count("Sp0", +1)
                 return
 
             # See Sp0_Move_Idx_Fwd for why the target is computed per-spindle
@@ -1690,6 +1693,7 @@ class HandlerClass:
                 c.wait_complete()
             else:
                 idx_log("Sp1 M19 skipped (Sp1_Idx_Bool is False)")
+            self._bump_idx_count("Sp0", +1)
         finally:
             _set_busy_cursor(widget, False)
 
@@ -1702,7 +1706,7 @@ class HandlerClass:
 #                           comment below (and Sp0_Move_Fwd's). This is
 #                           an intentional, empirically-verified swap,
 #                           not a typo.
-# Updated:              ver 1.2, 8 August 2026, Claude
+# Updated:              ver 1.2, 08 August 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -1757,7 +1761,7 @@ class HandlerClass:
 #######################################################################
 # Move_Stop
 # Purpose:              This is used to stop any movement.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -1801,7 +1805,7 @@ class HandlerClass:
 #                           spindle (Sp0) & the rosette phaser
 #                           multiplier (Sp1).  (Sp1 gets multiplied
 #                           by the value of Sp1Pct
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -1874,7 +1878,7 @@ class HandlerClass:
 #                       measurement for the Sp0 & Sp1 spindles.
 #                       If degrees, set to divisions; 
 #                       if divisions, set to degrees.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -1892,6 +1896,40 @@ class HandlerClass:
 #   Written to UI:      (none)
 # ---------------------------------------------------------------------
 # Gcodes Called:        (none)
+#######################################################################
+# Index counters
+# Purpose:              The small number left of each Indexing row's
+#                       Distance (<key>_Idx_Count, a flat button holding
+#                       <key>_Idx_Count_Label; key = an axis letter, or
+#                       Sp0 for the shared spindle row): +1 for each
+#                       press of the row's Fwd (plus-sign column) index
+#                       button, -1 for each Rev (minus-sign column) - it
+#                       follows the column, not the button's id, since
+#                       the ids don't match their columns (X_Idx_Plus /
+#                       Sp0_Idx_Fwd sit under Rev). Counted once the move
+#                       has been sent, so a move stopped part way still
+#                       counts. Kept in self.<key>_Idx_Qty, reset to 0 at
+#                       startup, when the row's distance or deg/div
+#                       changes, and on a double-click of the number.
+#                       Never saved.
+# Updated:              ver 1.0, 11 October 2026
+#######################################################################
+    def _set_idx_count(self, key, value):
+        setattr(self, key + "_Idx_Qty", value)
+        label = self.builder.get_object(key + "_Idx_Count_Label")
+        if label is not None:
+            label.set_text(str(value))
+
+    def _bump_idx_count(self, key, delta):
+        self._set_idx_count(key, getattr(self, key + "_Idx_Qty", 0) + delta)
+        print(key + "_Idx_Qty = " + str(getattr(self, key + "_Idx_Qty")))
+
+    def Idx_Count_Pressed(self, widget, event):
+        # Double-click resets; a single click does nothing.
+        if event.type == Gdk.EventType._2BUTTON_PRESS:
+            self._set_idx_count(Gtk.Buildable.get_name(widget)[:-len("_Idx_Count")], 0)
+        return False
+
 #######################################################################
     def Sp0_Set_Idx_DegDiv(self,widget):
 
@@ -1919,6 +1957,7 @@ class HandlerClass:
 
         idx_log("Sp0_Idx_DegDiv = " + self.Sp0_Idx_DegDiv)
         idx_log("Sp0_Idx_Deg = " + str(self.Sp0_Idx_Deg))
+        self._set_idx_count("Sp0", 0)
 
 #######################################################################
 # Sp0_Set_Idx_Dist
@@ -1926,7 +1965,7 @@ class HandlerClass:
 #                           operation moves the spindles(s).  This is
 #                           used with self.Sp0_Idx_DegDiv to set the
 #                           actual movement distance.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -1960,12 +1999,13 @@ class HandlerClass:
         else:
             self.Sp0_Idx_Deg = round(self.Sp0_Idx_Dist, 1)
         idx_log("self.Sp0_Idx_Deg = " + str(self.Sp0_Idx_Deg))
+        self._set_idx_count("Sp0", 0)
 
 #######################################################################
 # Sp0_Set_Idx_OnOff
 # Purpose:              This is used to set the use of Sp1 indexing
 #                           on or off.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -2014,7 +2054,7 @@ class HandlerClass:
 # Purpose:              This is used to set the rotational distance
 #                           (degrees) for the Sp1 spindle (the
 #                           rosette phaser/multiplier).
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -2041,7 +2081,7 @@ class HandlerClass:
 # Sp1_Set_Idx_OnOff
 # Purpose:              This is used to set the use of Sp1 indexing
 #                           on or off.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -2072,7 +2112,7 @@ class HandlerClass:
 # Purpose:              This is used to set the speed for the rosette
 #                           phaser / multiplier (Sp0) as a percentage
 #                           of the spindle speed.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -2151,7 +2191,7 @@ class HandlerClass:
 #                       all back where they started. Only the main panel
 #                       component has these widgets; every other
 #                       component no-ops.
-# Updated:              ver 1.0, 22 September 2026, R. Colvin
+# Updated:              ver 1.0, 22 September 2026
 #######################################################################
     def _load_sync_move_tab(self):
         '''
@@ -2423,7 +2463,7 @@ class HandlerClass:
 #                       and waits on an index pulse this machine has no
 #                       source for. Only the main panel component has
 #                       these widgets; every other component no-ops.
-# Updated:              ver 1.0, 24 September 2026, R. Colvin
+# Updated:              ver 1.0, 24 September 2026
 #######################################################################
     def _load_threading_tab(self):
         '''
@@ -2866,7 +2906,7 @@ class HandlerClass:
 #                       "fault_sound" (the tower's own siren is all HAL).
 #                       Only the main panel component plays them; every
 #                       other component no-ops.
-# Updated:              ver 1.0, 07 October 2026, Claude
+# Updated:              ver 1.0, 07 October 2026
 #######################################################################
     def _load_sounds(self):
         if self.builder.get_object("Sync_Run") is None:
@@ -3028,7 +3068,7 @@ class HandlerClass:
 #######################################################################
 # __init__
 # Purpose:              This is used to initialize everything.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 #######################################################################
     def __init__(self, halcomp,builder,useropts):
         '''
@@ -3316,8 +3356,8 @@ def _axis_idx_move(axis, handler_name, gcode_sign):
     ("<axis>_Idx_Plus"/"<axis>_Idx_Minus" - every letter follows this
     pattern since REB_Panel_v1.ui's 18 September 2026 rebuild); gcode_sign
     ("+"/"-") is the actual sign sent in the G-code, and also which way
-    the Idx_Qty counter moves (matches B's old Fwd=+1/Rev=-1 behavior,
-    now applied to every channel instead of just B). Whether this move
+    the row's index counter moves: "+" (the Fwd column) counts up, "-"
+    (Rev) down - see "Index counters". Whether this move
     uses Idx_Dist (linear) or the derived Idx_Deg (angular) is decided
     at call time from the letter's own fixed type - see the module
     comment above.
@@ -3353,9 +3393,9 @@ def _axis_idx_move(axis, handler_name, gcode_sign):
             c.mdi(Gcode)
             c.wait_complete()
 
-            qty_delta = 1 if gcode_sign == "-" else -1
-            setattr(self, axis + "_Idx_Qty", getattr(self, axis + "_Idx_Qty") + qty_delta)
-            print(axis + "_Idx_Qty = " + str(getattr(self, axis + "_Idx_Qty")))
+            # Fwd (plus-sign column, sends "+") counts up, Rev counts down -
+            # see "Index counters".
+            self._bump_idx_count(axis, 1 if gcode_sign == "+" else -1)
         finally:
             _set_depressed(widget, False)
     handler.__name__ = handler_name
@@ -3393,6 +3433,7 @@ def _axis_set_idx_dist(axis):
             print(axis + "_Idx_Deg = " + str(getattr(self, axis + "_Idx_Deg")) + " deg")
         else:
             print(axis + "_Idx_Dist = " + str(value))
+        self._set_idx_count(axis, 0)
     handler.__name__ = axis + "_Set_Idx_Dist"
     return handler
 
@@ -3427,6 +3468,7 @@ def _axis_set_idx_degdiv(axis):
             setattr(self, axis + "_Idx_Deg", round(dist, 1))
         print(axis + "_Idx_Deg = " + str(getattr(self, axis + "_Idx_Deg")))
         print(axis + "_Idx_DegDiv = " + getattr(self, axis + "_Idx_DegDiv"))
+        self._set_idx_count(axis, 0)
     handler.__name__ = axis + "_Set_Idx_DegDiv"
     return handler
 

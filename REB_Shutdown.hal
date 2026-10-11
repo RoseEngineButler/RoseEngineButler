@@ -1,11 +1,11 @@
 #######################################################################
-#                    RRRRRR    EEEEEEEE  BBBBBBB 					  #
-#                    RR   RR   EE        BB    BB 			   	      #
-#                    RR   RR   EE        BB    BB					  #
-#                    RRRRRR    EEEEEE    BBBBBBB 					  #
-#                    RR   RR   EE        BB    BB					  #
-#                    RR    RR  EE        BB    BB					  #
-#                    RR    RR  EEEEEEEE  BBBBBBB					  #
+#                    RRRRRR    EEEEEEEE  BBBBBBB                      #
+#                    RR   RR   EE        BB    BB                     #
+#                    RR   RR   EE        BB    BB                     #
+#                    RRRRRR    EEEEEE    BBBBBBB                      #
+#                    RR   RR   EE        BB    BB                     #
+#                    RR    RR  EE        BB    BB                     #
+#                    RR    RR  EEEEEEEE  BBBBBBB                      #
 #                                                                     #
 # Rose Engine Butler                                                  #
 #######################################################################
@@ -26,7 +26,7 @@
 #   Brainwave Embedded.
 #
 # Version
-#   1.0 - dd mmm yyyy, pgmr
+#   1.0 - dd mmmm yyyy
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded. 
 #

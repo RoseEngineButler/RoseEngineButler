@@ -33,7 +33,7 @@
 #   Brainwave Embedded.
 #
 # Version
-#   1.0 - 4 September 2026, Claude
+#   1.0 - 04 September 2026
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #
@@ -2115,7 +2115,7 @@ class HandlerClass:
 
         try:
             with open(path, "r") as f:
-                data = json.load(f)
+                data = reb_settings_io.parse_settings_text(f.read())
         except (OSError, ValueError) as e:
             _show_settings_error(widget, "Could not read " + path + ":\n" + str(e))
             return
@@ -2457,7 +2457,7 @@ class HandlerClass:
 
         try:
             with open(path, "r") as f:
-                data = json.load(f)
+                data = reb_settings_io.parse_settings_text(f.read())
         except (OSError, ValueError) as e:
             _show_settings_error(widget, "Could not read " + path + ":\n" + str(e))
             return
