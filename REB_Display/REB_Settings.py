@@ -379,12 +379,12 @@ LIMIT_SWITCH_TYPES = ("NC", "NO")
 MANUAL_URL = "https://roseenginebutler.com/UserManual/index.php?n=Main."
 MANUAL_LINKS = {
     "Limit_Switch_Cabling_Link": MANUAL_URL + "LimitSwitchCabling",
-    "Limit_Switch_How_Link":     MANUAL_URL + "AxisSelection#LimitSwitches",
+    "Limit_Switch_How_Link":     MANUAL_URL + "InputsOutputsSound#LimitSwitches",
     "Estop_Cabling_Link":        MANUAL_URL + "E-StopCabling",
-    "Estop_How_Link":            MANUAL_URL + "AxisSelection#EStopButton",
+    "Estop_How_Link":            MANUAL_URL + "InputsOutputsSound#EStopButton",
     "Tower_Cabling_Link":        MANUAL_URL + "SignalTowerCabling",
-    "Tower_How_Link":            MANUAL_URL + "SignalTower",
-    "Sounds_How_Link":           MANUAL_URL + "Sounds",
+    "Tower_How_Link":            MANUAL_URL + "InputsOutputsSound#SignalTower",
+    "Sounds_How_Link":           MANUAL_URL + "InputsOutputsSound#Sounds",
     "Linear_Scale_Link":         MANUAL_URL + "ScaleSettingsForADevice",
     "Rotary_Scale_Link":         MANUAL_URL + "ScaleSettingsForADevice",
     "Spindle_Scale_Link":        MANUAL_URL + "ScaleSettingsForADevice",
