@@ -2730,15 +2730,47 @@ direction</property>
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
                 <child>
-                  <object class="GtkLabel" id="Idx_Hdr_Distance">
+                  <object class="GtkBox" id="Idx_Hdr_Box">
                     <property name="visible">True</property>
                     <property name="can-focus">False</property>
+                    <property name="halign">end</property>
                     <property name="valign">end</property>
-                    <property name="label" translatable="yes">Distance</property>
-                    <attributes>
-                      <attribute name="font-desc" value="DejaVu Serif 10"/>
-                      <attribute name="weight" value="bold"/>
-                    </attributes>
+                    <property name="spacing">4</property>
+                    <child>
+                      <object class="GtkLabel" id="Idx_Hdr_Count">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="tooltip-text" translatable="yes">Index count: +1 for each Fwd index, -1 for each Rev. Resets to 0 when LinuxCNC starts, when the distance or deg/div changes, or when you double-click a count.</property>
+                        <property name="valign">end</property>
+                        <property name="label" translatable="yes">#</property>
+                        <attributes>
+                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                          <attribute name="weight" value="bold"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">0</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="Idx_Hdr_Distance">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="valign">end</property>
+                        <property name="label" translatable="yes">Distance</property>
+                        <attributes>
+                          <attribute name="font-desc" value="DejaVu Serif 10"/>
+                          <attribute name="weight" value="bold"/>
+                        </attributes>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">1</property>
+                      </packing>
+                    </child>
                   </object>
                   <packing>
                     <property name="name">idx</property>
@@ -2777,19 +2809,60 @@ direction</property>
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
                 <child>
-                  <object class="HAL_SpinButton" id="Sp0_Idx_Dist">
+                  <object class="GtkBox" id="Sp0_Idx_Dist_Box">
                     <property name="visible">True</property>
-                    <property name="can-focus">True</property>
+                    <property name="can-focus">False</property>
                     <property name="halign">end</property>
-                    <property name="valign">center</property>
-                    <property name="text" translatable="yes">90.0</property>
-                    <property name="overwrite-mode">True</property>
-                    <property name="input-purpose">number</property>
-                    <property name="adjustment">Sp_Idx_Dis</property>
-                    <property name="digits">2</property>
-                    <property name="numeric">True</property>
-                    <property name="value">90</property>
-                    <signal name="value-changed" handler="Sp0_Set_Idx_Dist" swapped="no"/>
+                    <property name="spacing">4</property>
+                    <child>
+                      <object class="GtkButton" id="Sp0_Idx_Count">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="receives-default">False</property>
+                        <property name="tooltip-text" translatable="yes">Index count: +1 for each Fwd index, -1 for each Rev. Resets to 0 when LinuxCNC starts, when the distance or deg/div changes, or when you double-click it.</property>
+                        <property name="valign">center</property>
+                        <property name="relief">none</property>
+                        <signal name="button-press-event" handler="Idx_Count_Pressed" swapped="no"/>
+                        <child>
+                          <object class="GtkLabel" id="Sp0_Idx_Count_Label">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label">0</property>
+                            <property name="width-chars">3</property>
+                            <property name="xalign">0.5</property>
+                            <attributes>
+                              <attribute name="font-desc" value="Sans 9"/>
+                            </attributes>
+                          </object>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">0</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_SpinButton" id="Sp0_Idx_Dist">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="text" translatable="yes">90.0</property>
+                        <property name="overwrite-mode">True</property>
+                        <property name="input-purpose">number</property>
+                        <property name="adjustment">Sp_Idx_Dis</property>
+                        <property name="digits">2</property>
+                        <property name="numeric">True</property>
+                        <property name="value">90</property>
+                        <signal name="value-changed" handler="Sp0_Set_Idx_Dist" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">1</property>
+                      </packing>
+                    </child>
                   </object>
                   <packing>
                     <property name="name">idx</property>
@@ -3021,20 +3094,61 @@ direction</property>
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
                 <child>
-                  <object class="HAL_SpinButton" id="X_Idx_Dist">
+                  <object class="GtkBox" id="X_Idx_Dist_Box">
                     <property name="visible">True</property>
-                    <property name="can-focus">True</property>
+                    <property name="can-focus">False</property>
                     <property name="halign">end</property>
-                    <property name="valign">center</property>
-                    <property name="text" translatable="yes">0.000</property>
-                    <property name="overwrite-mode">True</property>
-                    <property name="input-purpose">number</property>
-                    <property name="adjustment">X_Idx_Dis</property>
-                    <property name="climb-rate">0.01</property>
-                    <property name="digits">3</property>
-                    <property name="numeric">True</property>
-                    <property name="update-policy">if-valid</property>
-                    <signal name="value-changed" handler="X_Set_Idx_Dist" swapped="no"/>
+                    <property name="spacing">4</property>
+                    <child>
+                      <object class="GtkButton" id="X_Idx_Count">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="receives-default">False</property>
+                        <property name="tooltip-text" translatable="yes">Index count: +1 for each Fwd index, -1 for each Rev. Resets to 0 when LinuxCNC starts, when the distance or deg/div changes, or when you double-click it.</property>
+                        <property name="valign">center</property>
+                        <property name="relief">none</property>
+                        <signal name="button-press-event" handler="Idx_Count_Pressed" swapped="no"/>
+                        <child>
+                          <object class="GtkLabel" id="X_Idx_Count_Label">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label">0</property>
+                            <property name="width-chars">3</property>
+                            <property name="xalign">0.5</property>
+                            <attributes>
+                              <attribute name="font-desc" value="Sans 9"/>
+                            </attributes>
+                          </object>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">0</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_SpinButton" id="X_Idx_Dist">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="text" translatable="yes">0.000</property>
+                        <property name="overwrite-mode">True</property>
+                        <property name="input-purpose">number</property>
+                        <property name="adjustment">X_Idx_Dis</property>
+                        <property name="climb-rate">0.01</property>
+                        <property name="digits">3</property>
+                        <property name="numeric">True</property>
+                        <property name="update-policy">if-valid</property>
+                        <signal name="value-changed" handler="X_Set_Idx_Dist" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">1</property>
+                      </packing>
+                    </child>
                   </object>
                   <packing>
                     <property name="name">idx</property>
@@ -3278,20 +3392,61 @@ direction</property>
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
                 <child>
-                  <object class="HAL_SpinButton" id="Z_Idx_Dist">
+                  <object class="GtkBox" id="Z_Idx_Dist_Box">
                     <property name="visible">True</property>
-                    <property name="can-focus">True</property>
+                    <property name="can-focus">False</property>
                     <property name="halign">end</property>
-                    <property name="valign">center</property>
-                    <property name="text" translatable="yes">0.000</property>
-                    <property name="overwrite-mode">True</property>
-                    <property name="input-purpose">number</property>
-                    <property name="adjustment">Z_Idx_Dis</property>
-                    <property name="climb-rate">0.01</property>
-                    <property name="digits">3</property>
-                    <property name="numeric">True</property>
-                    <property name="update-policy">if-valid</property>
-                    <signal name="value-changed" handler="Z_Set_Idx_Dist" swapped="no"/>
+                    <property name="spacing">4</property>
+                    <child>
+                      <object class="GtkButton" id="Z_Idx_Count">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="receives-default">False</property>
+                        <property name="tooltip-text" translatable="yes">Index count: +1 for each Fwd index, -1 for each Rev. Resets to 0 when LinuxCNC starts, when the distance or deg/div changes, or when you double-click it.</property>
+                        <property name="valign">center</property>
+                        <property name="relief">none</property>
+                        <signal name="button-press-event" handler="Idx_Count_Pressed" swapped="no"/>
+                        <child>
+                          <object class="GtkLabel" id="Z_Idx_Count_Label">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label">0</property>
+                            <property name="width-chars">3</property>
+                            <property name="xalign">0.5</property>
+                            <attributes>
+                              <attribute name="font-desc" value="Sans 9"/>
+                            </attributes>
+                          </object>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">0</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_SpinButton" id="Z_Idx_Dist">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="text" translatable="yes">0.000</property>
+                        <property name="overwrite-mode">True</property>
+                        <property name="input-purpose">number</property>
+                        <property name="adjustment">Z_Idx_Dis</property>
+                        <property name="climb-rate">0.01</property>
+                        <property name="digits">3</property>
+                        <property name="numeric">True</property>
+                        <property name="update-policy">if-valid</property>
+                        <signal name="value-changed" handler="Z_Set_Idx_Dist" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">1</property>
+                      </packing>
+                    </child>
                   </object>
                   <packing>
                     <property name="name">idx</property>
@@ -3537,20 +3692,61 @@ direction</property>
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
                 <child>
-                  <object class="HAL_SpinButton" id="U_Idx_Dist">
+                  <object class="GtkBox" id="U_Idx_Dist_Box">
                     <property name="visible">True</property>
-                    <property name="can-focus">True</property>
+                    <property name="can-focus">False</property>
                     <property name="halign">end</property>
-                    <property name="valign">center</property>
-                    <property name="text" translatable="yes">0.000</property>
-                    <property name="overwrite-mode">True</property>
-                    <property name="input-purpose">number</property>
-                    <property name="adjustment">U_Idx_Dis</property>
-                    <property name="climb-rate">0.01</property>
-                    <property name="digits">3</property>
-                    <property name="numeric">True</property>
-                    <property name="update-policy">if-valid</property>
-                    <signal name="value-changed" handler="U_Set_Idx_Dist" swapped="no"/>
+                    <property name="spacing">4</property>
+                    <child>
+                      <object class="GtkButton" id="U_Idx_Count">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="receives-default">False</property>
+                        <property name="tooltip-text" translatable="yes">Index count: +1 for each Fwd index, -1 for each Rev. Resets to 0 when LinuxCNC starts, when the distance or deg/div changes, or when you double-click it.</property>
+                        <property name="valign">center</property>
+                        <property name="relief">none</property>
+                        <signal name="button-press-event" handler="Idx_Count_Pressed" swapped="no"/>
+                        <child>
+                          <object class="GtkLabel" id="U_Idx_Count_Label">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label">0</property>
+                            <property name="width-chars">3</property>
+                            <property name="xalign">0.5</property>
+                            <attributes>
+                              <attribute name="font-desc" value="Sans 9"/>
+                            </attributes>
+                          </object>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">0</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_SpinButton" id="U_Idx_Dist">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="text" translatable="yes">0.000</property>
+                        <property name="overwrite-mode">True</property>
+                        <property name="input-purpose">number</property>
+                        <property name="adjustment">U_Idx_Dis</property>
+                        <property name="climb-rate">0.01</property>
+                        <property name="digits">3</property>
+                        <property name="numeric">True</property>
+                        <property name="update-policy">if-valid</property>
+                        <signal name="value-changed" handler="U_Set_Idx_Dist" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">1</property>
+                      </packing>
+                    </child>
                   </object>
                   <packing>
                     <property name="name">idx</property>
@@ -3796,20 +3992,61 @@ direction</property>
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
                 <child>
-                  <object class="HAL_SpinButton" id="V_Idx_Dist">
+                  <object class="GtkBox" id="V_Idx_Dist_Box">
                     <property name="visible">True</property>
-                    <property name="can-focus">True</property>
+                    <property name="can-focus">False</property>
                     <property name="halign">end</property>
-                    <property name="valign">center</property>
-                    <property name="text" translatable="yes">0.000</property>
-                    <property name="overwrite-mode">True</property>
-                    <property name="input-purpose">number</property>
-                    <property name="adjustment">V_Idx_Dis</property>
-                    <property name="climb-rate">0.01</property>
-                    <property name="digits">3</property>
-                    <property name="numeric">True</property>
-                    <property name="update-policy">if-valid</property>
-                    <signal name="value-changed" handler="V_Set_Idx_Dist" swapped="no"/>
+                    <property name="spacing">4</property>
+                    <child>
+                      <object class="GtkButton" id="V_Idx_Count">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="receives-default">False</property>
+                        <property name="tooltip-text" translatable="yes">Index count: +1 for each Fwd index, -1 for each Rev. Resets to 0 when LinuxCNC starts, when the distance or deg/div changes, or when you double-click it.</property>
+                        <property name="valign">center</property>
+                        <property name="relief">none</property>
+                        <signal name="button-press-event" handler="Idx_Count_Pressed" swapped="no"/>
+                        <child>
+                          <object class="GtkLabel" id="V_Idx_Count_Label">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label">0</property>
+                            <property name="width-chars">3</property>
+                            <property name="xalign">0.5</property>
+                            <attributes>
+                              <attribute name="font-desc" value="Sans 9"/>
+                            </attributes>
+                          </object>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">0</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_SpinButton" id="V_Idx_Dist">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="text" translatable="yes">0.000</property>
+                        <property name="overwrite-mode">True</property>
+                        <property name="input-purpose">number</property>
+                        <property name="adjustment">V_Idx_Dis</property>
+                        <property name="climb-rate">0.01</property>
+                        <property name="digits">3</property>
+                        <property name="numeric">True</property>
+                        <property name="update-policy">if-valid</property>
+                        <signal name="value-changed" handler="V_Set_Idx_Dist" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">1</property>
+                      </packing>
+                    </child>
                   </object>
                   <packing>
                     <property name="name">idx</property>
@@ -4055,20 +4292,61 @@ direction</property>
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
                 <child>
-                  <object class="HAL_SpinButton" id="W_Idx_Dist">
+                  <object class="GtkBox" id="W_Idx_Dist_Box">
                     <property name="visible">True</property>
-                    <property name="can-focus">True</property>
+                    <property name="can-focus">False</property>
                     <property name="halign">end</property>
-                    <property name="valign">center</property>
-                    <property name="text" translatable="yes">0.000</property>
-                    <property name="overwrite-mode">True</property>
-                    <property name="input-purpose">number</property>
-                    <property name="adjustment">W_Idx_Dis</property>
-                    <property name="climb-rate">0.01</property>
-                    <property name="digits">3</property>
-                    <property name="numeric">True</property>
-                    <property name="update-policy">if-valid</property>
-                    <signal name="value-changed" handler="W_Set_Idx_Dist" swapped="no"/>
+                    <property name="spacing">4</property>
+                    <child>
+                      <object class="GtkButton" id="W_Idx_Count">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="receives-default">False</property>
+                        <property name="tooltip-text" translatable="yes">Index count: +1 for each Fwd index, -1 for each Rev. Resets to 0 when LinuxCNC starts, when the distance or deg/div changes, or when you double-click it.</property>
+                        <property name="valign">center</property>
+                        <property name="relief">none</property>
+                        <signal name="button-press-event" handler="Idx_Count_Pressed" swapped="no"/>
+                        <child>
+                          <object class="GtkLabel" id="W_Idx_Count_Label">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label">0</property>
+                            <property name="width-chars">3</property>
+                            <property name="xalign">0.5</property>
+                            <attributes>
+                              <attribute name="font-desc" value="Sans 9"/>
+                            </attributes>
+                          </object>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">0</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_SpinButton" id="W_Idx_Dist">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="text" translatable="yes">0.000</property>
+                        <property name="overwrite-mode">True</property>
+                        <property name="input-purpose">number</property>
+                        <property name="adjustment">W_Idx_Dis</property>
+                        <property name="climb-rate">0.01</property>
+                        <property name="digits">3</property>
+                        <property name="numeric">True</property>
+                        <property name="update-policy">if-valid</property>
+                        <signal name="value-changed" handler="W_Set_Idx_Dist" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">1</property>
+                      </packing>
+                    </child>
                   </object>
                   <packing>
                     <property name="name">idx</property>
@@ -4314,19 +4592,60 @@ direction</property>
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
                 <child>
-                  <object class="HAL_SpinButton" id="A_Idx_Dist">
+                  <object class="GtkBox" id="A_Idx_Dist_Box">
                     <property name="visible">True</property>
-                    <property name="can-focus">True</property>
+                    <property name="can-focus">False</property>
                     <property name="halign">end</property>
-                    <property name="valign">center</property>
-                    <property name="text" translatable="yes">90.0</property>
-                    <property name="overwrite-mode">True</property>
-                    <property name="input-purpose">number</property>
-                    <property name="adjustment">A_Idx_Dis</property>
-                    <property name="digits">2</property>
-                    <property name="numeric">True</property>
-                    <property name="value">90</property>
-                    <signal name="value-changed" handler="A_Set_Idx_Dist" swapped="no"/>
+                    <property name="spacing">4</property>
+                    <child>
+                      <object class="GtkButton" id="A_Idx_Count">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="receives-default">False</property>
+                        <property name="tooltip-text" translatable="yes">Index count: +1 for each Fwd index, -1 for each Rev. Resets to 0 when LinuxCNC starts, when the distance or deg/div changes, or when you double-click it.</property>
+                        <property name="valign">center</property>
+                        <property name="relief">none</property>
+                        <signal name="button-press-event" handler="Idx_Count_Pressed" swapped="no"/>
+                        <child>
+                          <object class="GtkLabel" id="A_Idx_Count_Label">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label">0</property>
+                            <property name="width-chars">3</property>
+                            <property name="xalign">0.5</property>
+                            <attributes>
+                              <attribute name="font-desc" value="Sans 9"/>
+                            </attributes>
+                          </object>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">0</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_SpinButton" id="A_Idx_Dist">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="text" translatable="yes">90.0</property>
+                        <property name="overwrite-mode">True</property>
+                        <property name="input-purpose">number</property>
+                        <property name="adjustment">A_Idx_Dis</property>
+                        <property name="digits">2</property>
+                        <property name="numeric">True</property>
+                        <property name="value">90</property>
+                        <signal name="value-changed" handler="A_Set_Idx_Dist" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">1</property>
+                      </packing>
+                    </child>
                   </object>
                   <packing>
                     <property name="name">idx</property>
@@ -4569,19 +4888,60 @@ direction</property>
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
                 <child>
-                  <object class="HAL_SpinButton" id="B_Idx_Dist">
+                  <object class="GtkBox" id="B_Idx_Dist_Box">
                     <property name="visible">True</property>
-                    <property name="can-focus">True</property>
+                    <property name="can-focus">False</property>
                     <property name="halign">end</property>
-                    <property name="valign">center</property>
-                    <property name="text" translatable="yes">90.0</property>
-                    <property name="overwrite-mode">True</property>
-                    <property name="input-purpose">number</property>
-                    <property name="adjustment">B_Idx_Dis</property>
-                    <property name="digits">2</property>
-                    <property name="numeric">True</property>
-                    <property name="value">90</property>
-                    <signal name="value-changed" handler="B_Set_Idx_Dist" swapped="no"/>
+                    <property name="spacing">4</property>
+                    <child>
+                      <object class="GtkButton" id="B_Idx_Count">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="receives-default">False</property>
+                        <property name="tooltip-text" translatable="yes">Index count: +1 for each Fwd index, -1 for each Rev. Resets to 0 when LinuxCNC starts, when the distance or deg/div changes, or when you double-click it.</property>
+                        <property name="valign">center</property>
+                        <property name="relief">none</property>
+                        <signal name="button-press-event" handler="Idx_Count_Pressed" swapped="no"/>
+                        <child>
+                          <object class="GtkLabel" id="B_Idx_Count_Label">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label">0</property>
+                            <property name="width-chars">3</property>
+                            <property name="xalign">0.5</property>
+                            <attributes>
+                              <attribute name="font-desc" value="Sans 9"/>
+                            </attributes>
+                          </object>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">0</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_SpinButton" id="B_Idx_Dist">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="text" translatable="yes">90.0</property>
+                        <property name="overwrite-mode">True</property>
+                        <property name="input-purpose">number</property>
+                        <property name="adjustment">B_Idx_Dis</property>
+                        <property name="digits">2</property>
+                        <property name="numeric">True</property>
+                        <property name="value">90</property>
+                        <signal name="value-changed" handler="B_Set_Idx_Dist" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">1</property>
+                      </packing>
+                    </child>
                   </object>
                   <packing>
                     <property name="name">idx</property>
@@ -4826,19 +5186,60 @@ direction</property>
                 <property name="visible">True</property>
                 <property name="can-focus">False</property>
                 <child>
-                  <object class="HAL_SpinButton" id="C_Idx_Dist">
+                  <object class="GtkBox" id="C_Idx_Dist_Box">
                     <property name="visible">True</property>
-                    <property name="can-focus">True</property>
+                    <property name="can-focus">False</property>
                     <property name="halign">end</property>
-                    <property name="valign">center</property>
-                    <property name="text" translatable="yes">90.0</property>
-                    <property name="overwrite-mode">True</property>
-                    <property name="input-purpose">number</property>
-                    <property name="adjustment">C_Idx_Dis</property>
-                    <property name="digits">2</property>
-                    <property name="numeric">True</property>
-                    <property name="value">90</property>
-                    <signal name="value-changed" handler="C_Set_Idx_Dist" swapped="no"/>
+                    <property name="spacing">4</property>
+                    <child>
+                      <object class="GtkButton" id="C_Idx_Count">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="receives-default">False</property>
+                        <property name="tooltip-text" translatable="yes">Index count: +1 for each Fwd index, -1 for each Rev. Resets to 0 when LinuxCNC starts, when the distance or deg/div changes, or when you double-click it.</property>
+                        <property name="valign">center</property>
+                        <property name="relief">none</property>
+                        <signal name="button-press-event" handler="Idx_Count_Pressed" swapped="no"/>
+                        <child>
+                          <object class="GtkLabel" id="C_Idx_Count_Label">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label">0</property>
+                            <property name="width-chars">3</property>
+                            <property name="xalign">0.5</property>
+                            <attributes>
+                              <attribute name="font-desc" value="Sans 9"/>
+                            </attributes>
+                          </object>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">0</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="HAL_SpinButton" id="C_Idx_Dist">
+                        <property name="visible">True</property>
+                        <property name="can-focus">True</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="text" translatable="yes">90.0</property>
+                        <property name="overwrite-mode">True</property>
+                        <property name="input-purpose">number</property>
+                        <property name="adjustment">C_Idx_Dis</property>
+                        <property name="digits">2</property>
+                        <property name="numeric">True</property>
+                        <property name="value">90</property>
+                        <signal name="value-changed" handler="C_Set_Idx_Dist" swapped="no"/>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">1</property>
+                      </packing>
+                    </child>
                   </object>
                   <packing>
                     <property name="name">idx</property>
@@ -5807,6 +6208,26 @@ direction</property>
     <widgets>
       <widget name="Sync_Hdr_Distance"/>
       <widget name="X_Sync_Dist"/>
+    </widgets>
+  </object>
+  <object class="GtkSizeGroup" id="Idx_Count_Width_Group">
+    <widgets>
+      <widget name="Idx_Hdr_Count"/>
+      <widget name="Sp0_Idx_Count"/>
+      <widget name="X_Idx_Count"/>
+      <widget name="Z_Idx_Count"/>
+      <widget name="U_Idx_Count"/>
+      <widget name="V_Idx_Count"/>
+      <widget name="W_Idx_Count"/>
+      <widget name="A_Idx_Count"/>
+      <widget name="B_Idx_Count"/>
+      <widget name="C_Idx_Count"/>
+    </widgets>
+  </object>
+  <object class="GtkSizeGroup" id="Idx_Dist_Width_Group">
+    <widgets>
+      <widget name="Idx_Hdr_Distance"/>
+      <widget name="X_Idx_Dist"/>
     </widgets>
   </object>
 </interface>

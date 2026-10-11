@@ -232,7 +232,7 @@ _ACTIVE_ROLES_AT_STARTUP = set(_CHANNEL_ASSIGNMENTS_AT_STARTUP.values())
 # don't need their own entry - graying their container greys them too.
 AXIS_ROW_FIELDS = (
     "_Letter", "_ENA", "_Feed", "_Feed_UOM", "_Comment",
-    "_Idx_Dist", "_IdxDist_UOM", "_Idx_DegDiv_Box",
+    "_Idx_Dist", "_Idx_Count", "_IdxDist_UOM", "_Idx_DegDiv_Box",
     # Sync Move tab.
     "_Sync_Dist_Box", "_Sync_Dist_UOM", "_Sync_Rev", "_Sync_Fwd",
 )
@@ -254,7 +254,7 @@ _UNASSIGNED_ENA_LIGHT_COLOR = Gdk.Color.parse("gray")[1]
 SPINDLE_ROW_FIELDS = {
     "Sp0": (
         "Sp0_ENA", "Sp0_Set_Feed", "Sp0_Move_Fwd", "Sp0_Move_Stop", "Sp0_Move_Rev",
-        "Sp0_Idx_Dist", "Sp0_Idx_Fwd", "Sp0_Idx_Rev",
+        "Sp0_Idx_Dist", "Sp0_Idx_Count", "Sp0_Idx_Fwd", "Sp0_Idx_Rev",
         "Sp0_Set_Idx_bW_Deg", "Sp0_Set_Idx_bW_Div", "Sp0_Set_Idx_OnOff",
     ),
     "Sp1": (
@@ -1563,6 +1563,7 @@ class HandlerClass:
                 # sequential M19s. sign is -1, not +1 - see this
                 # function's docstring.
                 self._index_both_spindles_simultaneously(-1)
+                self._bump_idx_count("Sp0", -1)
                 return
 
             # M19 orients to an absolute angle, not a relative step, so compute
@@ -1599,6 +1600,7 @@ class HandlerClass:
                 c.wait_complete()
             else:
                 idx_log("Sp1 M19 skipped (Sp1_Idx_Bool is False)")
+            self._bump_idx_count("Sp0", -1)
         finally:
             _set_busy_cursor(widget, False)
 
@@ -1663,6 +1665,7 @@ class HandlerClass:
                 # Both selected - see matching branch in Sp0_Move_Idx_Fwd.
                 # sign is +1, not -1 - see this function's docstring.
                 self._index_both_spindles_simultaneously(+1)
+                self._bump_idx_count("Sp0", +1)
                 return
 
             # See Sp0_Move_Idx_Fwd for why the target is computed per-spindle
@@ -1690,6 +1693,7 @@ class HandlerClass:
                 c.wait_complete()
             else:
                 idx_log("Sp1 M19 skipped (Sp1_Idx_Bool is False)")
+            self._bump_idx_count("Sp0", +1)
         finally:
             _set_busy_cursor(widget, False)
 
@@ -1893,6 +1897,40 @@ class HandlerClass:
 # ---------------------------------------------------------------------
 # Gcodes Called:        (none)
 #######################################################################
+# Index counters
+# Purpose:              The small number left of each Indexing row's
+#                       Distance (<key>_Idx_Count, a flat button holding
+#                       <key>_Idx_Count_Label; key = an axis letter, or
+#                       Sp0 for the shared spindle row): +1 for each
+#                       press of the row's Fwd (plus-sign column) index
+#                       button, -1 for each Rev (minus-sign column) - it
+#                       follows the column, not the button's id, since
+#                       the ids don't match their columns (X_Idx_Plus /
+#                       Sp0_Idx_Fwd sit under Rev). Counted once the move
+#                       has been sent, so a move stopped part way still
+#                       counts. Kept in self.<key>_Idx_Qty, reset to 0 at
+#                       startup, when the row's distance or deg/div
+#                       changes, and on a double-click of the number.
+#                       Never saved.
+# Updated:              ver 1.0, 11 October 2026, Claude
+#######################################################################
+    def _set_idx_count(self, key, value):
+        setattr(self, key + "_Idx_Qty", value)
+        label = self.builder.get_object(key + "_Idx_Count_Label")
+        if label is not None:
+            label.set_text(str(value))
+
+    def _bump_idx_count(self, key, delta):
+        self._set_idx_count(key, getattr(self, key + "_Idx_Qty", 0) + delta)
+        print(key + "_Idx_Qty = " + str(getattr(self, key + "_Idx_Qty")))
+
+    def Idx_Count_Pressed(self, widget, event):
+        # Double-click resets; a single click does nothing.
+        if event.type == Gdk.EventType._2BUTTON_PRESS:
+            self._set_idx_count(Gtk.Buildable.get_name(widget)[:-len("_Idx_Count")], 0)
+        return False
+
+#######################################################################
     def Sp0_Set_Idx_DegDiv(self,widget):
 
         idx_log("=================================================")
@@ -1919,6 +1957,7 @@ class HandlerClass:
 
         idx_log("Sp0_Idx_DegDiv = " + self.Sp0_Idx_DegDiv)
         idx_log("Sp0_Idx_Deg = " + str(self.Sp0_Idx_Deg))
+        self._set_idx_count("Sp0", 0)
 
 #######################################################################
 # Sp0_Set_Idx_Dist
@@ -1960,6 +1999,7 @@ class HandlerClass:
         else:
             self.Sp0_Idx_Deg = round(self.Sp0_Idx_Dist, 1)
         idx_log("self.Sp0_Idx_Deg = " + str(self.Sp0_Idx_Deg))
+        self._set_idx_count("Sp0", 0)
 
 #######################################################################
 # Sp0_Set_Idx_OnOff
@@ -3316,8 +3356,8 @@ def _axis_idx_move(axis, handler_name, gcode_sign):
     ("<axis>_Idx_Plus"/"<axis>_Idx_Minus" - every letter follows this
     pattern since REB_Panel_v1.ui's 18 September 2026 rebuild); gcode_sign
     ("+"/"-") is the actual sign sent in the G-code, and also which way
-    the Idx_Qty counter moves (matches B's old Fwd=+1/Rev=-1 behavior,
-    now applied to every channel instead of just B). Whether this move
+    the row's index counter moves: "+" (the Fwd column) counts up, "-"
+    (Rev) down - see "Index counters". Whether this move
     uses Idx_Dist (linear) or the derived Idx_Deg (angular) is decided
     at call time from the letter's own fixed type - see the module
     comment above.
@@ -3353,9 +3393,9 @@ def _axis_idx_move(axis, handler_name, gcode_sign):
             c.mdi(Gcode)
             c.wait_complete()
 
-            qty_delta = 1 if gcode_sign == "-" else -1
-            setattr(self, axis + "_Idx_Qty", getattr(self, axis + "_Idx_Qty") + qty_delta)
-            print(axis + "_Idx_Qty = " + str(getattr(self, axis + "_Idx_Qty")))
+            # Fwd (plus-sign column, sends "+") counts up, Rev counts down -
+            # see "Index counters".
+            self._bump_idx_count(axis, 1 if gcode_sign == "+" else -1)
         finally:
             _set_depressed(widget, False)
     handler.__name__ = handler_name
@@ -3393,6 +3433,7 @@ def _axis_set_idx_dist(axis):
             print(axis + "_Idx_Deg = " + str(getattr(self, axis + "_Idx_Deg")) + " deg")
         else:
             print(axis + "_Idx_Dist = " + str(value))
+        self._set_idx_count(axis, 0)
     handler.__name__ = axis + "_Set_Idx_Dist"
     return handler
 
@@ -3427,6 +3468,7 @@ def _axis_set_idx_degdiv(axis):
             setattr(self, axis + "_Idx_Deg", round(dist, 1))
         print(axis + "_Idx_Deg = " + str(getattr(self, axis + "_Idx_Deg")))
         print(axis + "_Idx_DegDiv = " + getattr(self, axis + "_Idx_DegDiv"))
+        self._set_idx_count(axis, 0)
     handler.__name__ = axis + "_Set_Idx_DegDiv"
     return handler
 
