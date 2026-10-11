@@ -2822,7 +2822,7 @@ direction</property>
                         <property name="tooltip-text" translatable="yes">Index count: +1 for each Fwd index, -1 for each Rev. Resets to 0 when LinuxCNC starts, when the distance or deg/div changes, or when you double-click it.</property>
                         <property name="valign">center</property>
                         <property name="relief">none</property>
-                        <signal name="button-press-event" handler="Idx_Count_Pressed" swapped="no"/>
+                        <signal name="clicked" handler="Idx_Count_Clicked" swapped="no"/>
                         <child>
                           <object class="GtkLabel" id="Sp0_Idx_Count_Label">
                             <property name="visible">True</property>
@@ -3107,7 +3107,7 @@ direction</property>
                         <property name="tooltip-text" translatable="yes">Index count: +1 for each Fwd index, -1 for each Rev. Resets to 0 when LinuxCNC starts, when the distance or deg/div changes, or when you double-click it.</property>
                         <property name="valign">center</property>
                         <property name="relief">none</property>
-                        <signal name="button-press-event" handler="Idx_Count_Pressed" swapped="no"/>
+                        <signal name="clicked" handler="Idx_Count_Clicked" swapped="no"/>
                         <child>
                           <object class="GtkLabel" id="X_Idx_Count_Label">
                             <property name="visible">True</property>
@@ -3405,7 +3405,7 @@ direction</property>
                         <property name="tooltip-text" translatable="yes">Index count: +1 for each Fwd index, -1 for each Rev. Resets to 0 when LinuxCNC starts, when the distance or deg/div changes, or when you double-click it.</property>
                         <property name="valign">center</property>
                         <property name="relief">none</property>
-                        <signal name="button-press-event" handler="Idx_Count_Pressed" swapped="no"/>
+                        <signal name="clicked" handler="Idx_Count_Clicked" swapped="no"/>
                         <child>
                           <object class="GtkLabel" id="Z_Idx_Count_Label">
                             <property name="visible">True</property>
@@ -3705,7 +3705,7 @@ direction</property>
                         <property name="tooltip-text" translatable="yes">Index count: +1 for each Fwd index, -1 for each Rev. Resets to 0 when LinuxCNC starts, when the distance or deg/div changes, or when you double-click it.</property>
                         <property name="valign">center</property>
                         <property name="relief">none</property>
-                        <signal name="button-press-event" handler="Idx_Count_Pressed" swapped="no"/>
+                        <signal name="clicked" handler="Idx_Count_Clicked" swapped="no"/>
                         <child>
                           <object class="GtkLabel" id="U_Idx_Count_Label">
                             <property name="visible">True</property>
@@ -4005,7 +4005,7 @@ direction</property>
                         <property name="tooltip-text" translatable="yes">Index count: +1 for each Fwd index, -1 for each Rev. Resets to 0 when LinuxCNC starts, when the distance or deg/div changes, or when you double-click it.</property>
                         <property name="valign">center</property>
                         <property name="relief">none</property>
-                        <signal name="button-press-event" handler="Idx_Count_Pressed" swapped="no"/>
+                        <signal name="clicked" handler="Idx_Count_Clicked" swapped="no"/>
                         <child>
                           <object class="GtkLabel" id="V_Idx_Count_Label">
                             <property name="visible">True</property>
@@ -4305,7 +4305,7 @@ direction</property>
                         <property name="tooltip-text" translatable="yes">Index count: +1 for each Fwd index, -1 for each Rev. Resets to 0 when LinuxCNC starts, when the distance or deg/div changes, or when you double-click it.</property>
                         <property name="valign">center</property>
                         <property name="relief">none</property>
-                        <signal name="button-press-event" handler="Idx_Count_Pressed" swapped="no"/>
+                        <signal name="clicked" handler="Idx_Count_Clicked" swapped="no"/>
                         <child>
                           <object class="GtkLabel" id="W_Idx_Count_Label">
                             <property name="visible">True</property>
@@ -4605,7 +4605,7 @@ direction</property>
                         <property name="tooltip-text" translatable="yes">Index count: +1 for each Fwd index, -1 for each Rev. Resets to 0 when LinuxCNC starts, when the distance or deg/div changes, or when you double-click it.</property>
                         <property name="valign">center</property>
                         <property name="relief">none</property>
-                        <signal name="button-press-event" handler="Idx_Count_Pressed" swapped="no"/>
+                        <signal name="clicked" handler="Idx_Count_Clicked" swapped="no"/>
                         <child>
                           <object class="GtkLabel" id="A_Idx_Count_Label">
                             <property name="visible">True</property>
@@ -4901,7 +4901,7 @@ direction</property>
                         <property name="tooltip-text" translatable="yes">Index count: +1 for each Fwd index, -1 for each Rev. Resets to 0 when LinuxCNC starts, when the distance or deg/div changes, or when you double-click it.</property>
                         <property name="valign">center</property>
                         <property name="relief">none</property>
-                        <signal name="button-press-event" handler="Idx_Count_Pressed" swapped="no"/>
+                        <signal name="clicked" handler="Idx_Count_Clicked" swapped="no"/>
                         <child>
                           <object class="GtkLabel" id="B_Idx_Count_Label">
                             <property name="visible">True</property>
@@ -5199,7 +5199,7 @@ direction</property>
                         <property name="tooltip-text" translatable="yes">Index count: +1 for each Fwd index, -1 for each Rev. Resets to 0 when LinuxCNC starts, when the distance or deg/div changes, or when you double-click it.</property>
                         <property name="valign">center</property>
                         <property name="relief">none</property>
-                        <signal name="button-press-event" handler="Idx_Count_Pressed" swapped="no"/>
+                        <signal name="clicked" handler="Idx_Count_Clicked" swapped="no"/>
                         <child>
                           <object class="GtkLabel" id="C_Idx_Count_Label">
                             <property name="visible">True</property>

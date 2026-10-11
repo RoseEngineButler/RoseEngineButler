@@ -1910,7 +1910,8 @@ class HandlerClass:
 #                       has been sent, so a move stopped part way still
 #                       counts. Kept in self.<key>_Idx_Qty, reset to 0 at
 #                       startup, when the row's distance or deg/div
-#                       changes, and on a double-click of the number.
+#                       changes, and on a double-click of the number
+#                       (Idx_Count_Clicked).
 #                       Never saved.
 # Updated:              ver 1.0, 11 October 2026
 #######################################################################
@@ -1924,11 +1925,22 @@ class HandlerClass:
         self._set_idx_count(key, getattr(self, key + "_Idx_Qty", 0) + delta)
         print(key + "_Idx_Qty = " + str(getattr(self, key + "_Idx_Qty")))
 
-    def Idx_Count_Pressed(self, widget, event):
-        # Double-click resets; a single click does nothing.
-        if event.type == Gdk.EventType._2BUTTON_PRESS:
-            self._set_idx_count(Gtk.Buildable.get_name(widget)[:-len("_Idx_Count")], 0)
-        return False
+    def Idx_Count_Clicked(self, widget):
+        # Double-click resets; a single click does nothing. Built on the
+        # button's own "clicked" signal (two within the desktop's
+        # double-click time) rather than button-press-event's
+        # _2BUTTON_PRESS - a GtkButton's own click handling can take the
+        # real mouse presses before a button-press-event handler sees
+        # them (on 11 October 2026 clicking the number didn't reset it).
+        key = Gtk.Buildable.get_name(widget)[:-len("_Idx_Count")]
+        clicks = self.__dict__.setdefault("_idx_count_last_click", {})
+        now = time.monotonic()
+        limit = Gtk.Settings.get_default().get_property("gtk-double-click-time") / 1000.0
+        if now - clicks.get(key, -1e9) <= limit:
+            self._set_idx_count(key, 0)
+            clicks[key] = -1e9
+        else:
+            clicks[key] = now
 
 #######################################################################
     def Sp0_Set_Idx_DegDiv(self,widget):
