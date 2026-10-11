@@ -1298,6 +1298,134 @@ def _overlay_hal_files(text):
     return text, (n1, n2)
 
 
+# ********************************************************************
+# Startup splash
+# ********************************************************************
+# AXIS opens [DISPLAY]OPEN_FILE at startup and draws it in its preview.
+# REB_Splash.ngc (tracked) is an empty program - no axis words, since a
+# move naming an unassigned axis makes AXIS report an error. When X and
+# Z (the axes AXIS's lathe view draws in) are both assigned, this writes
+# REB_Splash.local.ngc instead, which draws "REB" with "ROSE ENGINE
+# BUTLER" beneath it in the preview, and points REB.local.ini's
+# OPEN_FILE at it. Every move is inside "if [#<_task> EQ 0]": 0 only in
+# the GUI's preview interpreter, 1 when the program really runs - so
+# pressing Run with the splash loaded never moves the machine. In the
+# lathe view Z runs left to right and +X runs DOWN the screen (toward
+# the operator - as in LinuxCNC's own axis-lathe.ngc), so "up" on the
+# screen is -X: _splash_moves negates every X.
+SPLASH_PATH = os.path.join(REPO_DIR, "REB_Display", "REB_Splash.ngc")
+LOCAL_SPLASH_PATH = os.path.join(REPO_DIR, "REB_Display", "REB_Splash.local.ngc")
+
+# Block capitals on a 4-wide, 6-tall grid, each one continuous stroke of
+# (across, up) points that starts and ends on the baseline - going back
+# over its own lines where needed, which doesn't show - so the only
+# rapids in the preview run along the baseline between letters.
+SPLASH_GLYPHS = {
+    "R": [(0, 0), (0, 6), (3, 6), (4, 5), (4, 4), (3, 3), (0, 3), (2, 3), (4, 0)],
+    "E": [(4, 0), (0, 0), (0, 6), (4, 6), (0, 6), (0, 3), (3, 3), (0, 3), (0, 0), (4, 0)],
+    "B": [(0, 0), (0, 6), (3, 6), (4, 5), (4, 4), (3, 3), (0, 3), (3, 3), (4, 2), (4, 1),
+          (3, 0), (0, 0), (3, 0)],
+    "O": [(1, 0), (0, 1), (0, 5), (1, 6), (3, 6), (4, 5), (4, 1), (3, 0), (1, 0), (3, 0)],
+    "S": [(1, 0), (0, 1), (1, 0), (3, 0), (4, 1), (4, 2), (3, 3), (1, 3), (0, 4), (0, 5),
+          (1, 6), (3, 6), (4, 5), (3, 6), (1, 6), (0, 5), (0, 4), (1, 3), (3, 3), (4, 2),
+          (4, 1), (3, 0)],
+    "N": [(0, 0), (0, 6), (4, 0), (4, 6), (4, 0)],
+    "G": [(3, 0), (4, 1), (4, 3), (2, 3), (4, 3), (4, 1), (3, 0), (1, 0), (0, 1), (0, 5),
+          (1, 6), (3, 6), (4, 5), (3, 6), (1, 6), (0, 5), (0, 1), (1, 0), (3, 0)],
+    "I": [(1, 0), (3, 0), (2, 0), (2, 6), (1, 6), (3, 6), (2, 6), (2, 0), (3, 0)],
+    "U": [(1, 0), (0, 1), (0, 6), (0, 1), (1, 0), (3, 0), (4, 1), (4, 6), (4, 1), (3, 0)],
+    "T": [(2, 0), (2, 6), (0, 6), (4, 6), (2, 6), (2, 0)],
+    "L": [(4, 0), (0, 0), (0, 6), (0, 0), (4, 0)],
+}
+SPLASH_ADVANCE = 5      # grid units from one letter to the next
+SPLASH_SPACE = 3        # grid units for a space
+
+# (text, inches per grid unit, baseline height in inches above the
+# origin on screen), drawn in this order: the name 0.3" tall on the
+# origin's baseline, then "REB" 1.8" tall above it; both centred on
+# Z = 0.
+SPLASH_LINES = (("ROSE ENGINE BUTLER", 0.05, 0.0), ("REB", 0.3, 0.6))
+
+
+def _splash_text_width(text):
+    units = sum(SPLASH_SPACE if ch == " " else SPLASH_ADVANCE for ch in text)
+    return units - (SPLASH_ADVANCE - 4)   # no gap after the last letter
+
+
+def _splash_moves():
+    '''
+    G-code lines drawing SPLASH_LINES (inches, absolute). Between the two
+    lines the tool rapids straight up at the end of the first, then along
+    the second's baseline, so no rapid crosses a letter.
+    '''
+    out = []
+    end_z = None
+    for text, unit, base_x in SPLASH_LINES:
+        if end_z is not None:
+            out.append("G0 Z%.4f X%.4f" % (end_z, 0.0 - base_x))
+        z = -_splash_text_width(text) * unit / 2.0
+        for ch in text:
+            if ch == " ":
+                z += SPLASH_SPACE * unit
+                continue
+            for n, (across, up) in enumerate(SPLASH_GLYPHS[ch]):
+                out.append("%s Z%.4f X%.4f" % ("G0" if n == 0 else "G1",
+                                               z + across * unit, 0.0 - (base_x + up * unit)))
+            end_z = z + SPLASH_GLYPHS[ch][-1][0] * unit
+            z += SPLASH_ADVANCE * unit
+    return out
+
+
+def generate_splash(role_layout):
+    '''
+    Writes REB_Splash.local.ngc - the drawing when X and Z are both
+    assigned this launch, otherwise a copy of the empty REB_Splash.ngc.
+    Returns True when written (REB.local.ini then points OPEN_FILE at
+    it); False leaves OPEN_FILE on the tracked, empty REB_Splash.ngc.
+    '''
+    try:
+        with open(SPLASH_PATH, "r") as f:
+            empty = f.read()
+    except OSError as e:
+        print("Could not read " + SPLASH_PATH + ": " + str(e))
+        return False
+    if "X" in role_layout.channel_of and "Z" in role_layout.channel_of:
+        text = "\n".join([
+            "(Rose Engine Butler startup splash - generated at each launch by)",
+            "(REB_Generate_Local_Ini.py. The drawing below only shows in the)",
+            "(preview: #<_task> is 0 there and 1 in a real run, so pressing)",
+            "(Run with this loaded does nothing.)",
+            "o100 if [#<_task> EQ 0]",
+            "G20 G90 G18 G8 F60",
+        ] + _splash_moves() + [
+            "o100 endif",
+            "M2",
+            "",
+        ])
+        what = "REB drawing"
+    else:
+        text = empty
+        what = "empty (X or Z not assigned)"
+    try:
+        with open(LOCAL_SPLASH_PATH, "w") as f:
+            f.write(text)
+    except OSError as e:
+        print("Could not write " + LOCAL_SPLASH_PATH + ": " + str(e))
+        return False
+    print("Wrote " + LOCAL_SPLASH_PATH + " (" + what + ")")
+    return True
+
+
+def _overlay_splash(text):
+    '''Points REB.local.ini's OPEN_FILE at REB_Splash.local.ngc.'''
+    return re.subn(
+        r'(?m)^(OPEN_FILE\s*= )REB_Display/REB_Splash\.ngc$',
+        r'\1REB_Display/REB_Splash.local.ngc',
+        text,
+        count=1,
+    )
+
+
 def main():
     try:
         with open(REB_INI_PATH, "r") as f:
@@ -1322,6 +1450,10 @@ def main():
                                     _read_signal_tower_active_low(settings),
                                     _read_limit_switch_type(settings)):
         sys.exit(1)
+
+    if generate_splash(role_layout):
+        text, n_splash = _overlay_splash(text)
+        print("Overlaid OPEN_FILE (" + str(n_splash) + " line(s)) -> REB_Splash.local.ngc")
 
     text, hal_files_result = _overlay_hal_files(text)
     n1, n2 = hal_files_result
