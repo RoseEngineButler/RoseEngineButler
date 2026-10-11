@@ -8,6 +8,8 @@ A LinuxCNC configuration (not a compiled software project) for the "Rose Engine 
 
 **Tracker:** `docs/REB_Tracker.md` is the one list of what's untested on a machine, what's open, and what was recently settled (since 11 October 2026). Read it at the start of REB work; when you build something that hasn't run on hardware yet, find a problem, or agree a follow-up, add it there (dated), and move items to its Done table when they're settled. Per-machine Claude memory isn't shared between Rich's Pi and Mac, so anything that matters goes in the tracker.
 
+**File conventions** (since 11 October 2026): each file's header "Version" entries read `x.x - dd Month yyyy` (two-digit day, full month), optionally followed by ` - what changed`, with no programmer's name; `REB_main.py`'s section banners use `# Updated: ver x.x, dd Month yyyy` the same way. Boxed comment headers are 71 columns with `#` in the last (73 in `REB_Tool.tbl`, whose lines start `; `). No tab characters in tracked text files - use spaces (the old tabs were width 4); the exception is the Mesa vendor source `REB_Setup/MesaCard/PIN_REB_34.vhd`, left as Mesa ships it.
+
 There is no build/compile/test step. "Testing" a change means loading the config in LinuxCNC (`linuxcnc REB.ini`) on the actual machine (or a sim) and observing axis/spindle behavior — most of this is real-time motion control tuning, not something that can be verified by static inspection alone.
 
 ## Repo vs. local machine state — read this before editing

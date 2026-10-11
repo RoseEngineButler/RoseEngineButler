@@ -35,8 +35,8 @@
 #   Brainwave Embedded.
 #
 # Version
-#   1.0 - 26 Oct 2025, R. Colvin
-#   1.1 - 23 Dec 2025, R. Colvin - Changed text from "upgrade" to
+#   1.0 - 26 October 2025
+#   1.1 - 23 December 2025 - Changed text from "upgrade" to
 #         "update".
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.

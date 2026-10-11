@@ -1,66 +1,66 @@
 #######################################################################
-#                    RRRRRR    EEEEEEEE  BBBBBBB 					  #
-#                    RR   RR   EE        BB    BB 			   	      #
-#                    RR   RR   EE        BB    BB					  #
-#                    RRRRRR    EEEEEE    BBBBBBB 					  #
-#                    RR   RR   EE        BB    BB					  #
-#                    RR    RR  EE        BB    BB					  #
-#                    RR    RR  EEEEEEEE  BBBBBBB					  #
+#                    RRRRRR    EEEEEEEE  BBBBBBB                      #
+#                    RR   RR   EE        BB    BB                     #
+#                    RR   RR   EE        BB    BB                     #
+#                    RRRRRR    EEEEEE    BBBBBBB                      #
+#                    RR   RR   EE        BB    BB                     #
+#                    RR    RR  EE        BB    BB                     #
+#                    RR    RR  EEEEEEEE  BBBBBBB                      #
 #                                                                     #
 # Rose Engine Butler                                                  #
 #######################################################################
-#																	  #
-# LinuxCNC configuration for use with a Rose Engine					  #
-#																	  #
-# File:																  #
-#   REB_PostGUI_v1.hal									  #
-#																	  #
-# Purpose:															  #
-#   This is used to setup hardware abstraction layer for LinuxCNC.	  #
-#																	  #
-# End User Customisation: 											  #
+#                                                                     #
+# LinuxCNC configuration for use with a Rose Engine                   #
+#                                                                     #
+# File:                                                               #
+#   REB_PostGUI_v1.hal                                                #
+#                                                                     #
+# Purpose:                                                            #
+#   This is used to setup hardware abstraction layer for LinuxCNC.    #
+#                                                                     #
+# End User Customisation:                                             #
 #   The end user of the Rose Engine Butler system may modify this     #
-#   file to accommodate their local configuration.  It is       	  #
+#   file to accommodate their local configuration.  It is             #
 #   recommended that a copy of this file be saved before changes are  #
-#   made.	                                                    	  #
-#																	  #
-#   Changes to this file are not supported by Colvin Tools nor		  #
-#   Brainwave Embedded.												  #
-#																	  #
-# Version															  #
-#   1.0 - 05 August 2025, R. Colvin                                   #
-#																	  #
-# Copyright (c) 2026 Colvin Tools and Brainwave Embedded. 			  #
-#																	  #
-# The following MIT/X Consortium License applies to the 			  #
+#   made.                                                             #
+#                                                                     #
+#   Changes to this file are not supported by Colvin Tools nor        #
+#   Brainwave Embedded.                                               #
+#                                                                     #
+# Version                                                             #
+#   1.0 - 05 August 2025                                              #
+#                                                                     #
+# Copyright (c) 2026 Colvin Tools and Brainwave Embedded.             #
+#                                                                     #
+# The following MIT/X Consortium License applies to the               #
 # Rose Engine Butler system. Use of this system constitutes consent   #
-# to the terms outlined below.									      #
-#																	  #
-# Permission is hereby granted, free of charge, to any person 		  #
-# obtaining a copy of this software and associated documentation 	  #
-# files (the "Software"), to deal in the Software without 			  #
+# to the terms outlined below.                                        #
+#                                                                     #
+# Permission is hereby granted, free of charge, to any person         #
+# obtaining a copy of this software and associated documentation      #
+# files (the "Software"), to deal in the Software without             #
 # restriction, including without limitation the rights to use, copy,  #
 # modify, merge, publish, distribute, sublicense, and/or sell copies  #
-# of the Software, and to permit persons to whom the Software is 	  #
-# furnished to do so, subject to the following conditions:			  #
-#																	  #
-# 		The above copyright notice and this permission notice shall   #
-# 		be included in all copies or substantial portions of the 	  #
-# 		Software.													  #
-#																	  #
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 	  #
+# of the Software, and to permit persons to whom the Software is      #
+# furnished to do so, subject to the following conditions:            #
+#                                                                     #
+#       The above copyright notice and this permission notice shall   #
+#       be included in all copies or substantial portions of the      #
+#       Software.                                                     #
+#                                                                     #
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,     #
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF  #
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND 			  #
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND               #
 # NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS #
 # BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN  #
 # ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN   #
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE    #
-# SOFTWARE.															  #
-#																	  #
-# Except as contained in this notice, the name of COPYRIGHT HOLDERS	  #
+# SOFTWARE.                                                           #
+#                                                                     #
+# Except as contained in this notice, the name of COPYRIGHT HOLDERS   #
 # shall not be used in advertising or otherwise to promote the sale,  #
-# use or other dealings in this Software without prior written		  #
-# authorization from COPYRIGHT HOLDERS.								  #
+# use or other dealings in this Software without prior written        #
+# authorization from COPYRIGHT HOLDERS.                               #
 #######################################################################
 #
 # ********************************************************************
@@ -79,7 +79,7 @@
 #  Axis  Joint  Channel   Type     Seq  Plug  Comments
 #  ----  -----  -------  -------  ----  ----  ------------------------
 #   X      0       02    LINEAR     1    P13
-#   Y      -       --    ------     -		  Not available as LATHE=1
+#   Y      -       --    ------     -         Not available as LATHE=1
 #   Z      1       00    LINEAR     2    P11
 #
 #   A      -       08    ANGULAR    -    --   Not currently assigned to
@@ -169,7 +169,7 @@ addf sp1-ena-flip servo-thread
 addf sp0-ena-and servo-thread
 addf sp1-ena-and servo-thread
 
-# net spindle.0-vel-cmd-rpm 				 => gladevcp.Sp0_Spd
+# net spindle.0-vel-cmd-rpm                  => gladevcp.Sp0_Spd
 net sp0-ena-btn                          <= gladevcp.Sp0_ENA-button
 net sp0-ena-btn                          => sp0-ena-flip.clk
 net sp0-ena-panel                        <= sp0-ena-flip.out
@@ -182,7 +182,7 @@ net sp0-ena-settings-allow               => sp0-ena-and.in1
 net spindle.0-enable                     <= sp0-ena-and.out
 net spindle.0-enable                     => gladevcp.Sp0_ENA-light
 
-# net spindle.1-vel-cmd-rpm 				 => gladevcp.Sp1_Spd
+# net spindle.1-vel-cmd-rpm                  => gladevcp.Sp1_Spd
 net sp1-ena-btn                          <= gladevcp.Sp1_ENA-button
 net sp1-ena-btn                          => sp1-ena-flip.clk
 net sp1-ena-panel                        <= sp1-ena-flip.out
@@ -272,8 +272,8 @@ net c-enable                             => gladevcp.C_ENA-light
 # ******************************************
 # Linear Axes
 
-# net x-vel-cmd							 => gladevcp.X_Spd
-# net x-pos-fb							 => gladevcp.X_DRO
+# net x-vel-cmd                          => gladevcp.X_Spd
+# net x-pos-fb                           => gladevcp.X_DRO
 
 addf x-ena-not servo-thread
 addf x-ena-flip servo-thread
@@ -295,10 +295,10 @@ net machine-is-on                        => x-estop-and.in1
 net x-enable                             <= x-estop-and.out
 net x-enable                             => gladevcp.X_ENA-light
 
-# net y-vel-cmd							 => gladevcp.Y_Spd
-# net y-pos-fb							 => gladevcp.Y_DRO
-# net y-enable        		             => gladevcp.Y_ENA_Status
-# net y-enable							<=  gladevcp.Y_ENA
+# net y-vel-cmd                          => gladevcp.Y_Spd
+# net y-pos-fb                           => gladevcp.Y_DRO
+# net y-enable                           => gladevcp.Y_ENA_Status
+# net y-enable                          <=  gladevcp.Y_ENA
 
 addf z-ena-not servo-thread
 addf u-ena-not servo-thread
@@ -317,8 +317,8 @@ addf u-estop-and servo-thread
 addf v-estop-and servo-thread
 addf w-estop-and servo-thread
 
-# net z-vel-cmd							 => gladevcp.Z_Spd
-# net z-pos-fb							 => gladevcp.Z_DRO
+# net z-vel-cmd                          => gladevcp.Z_Spd
+# net z-pos-fb                           => gladevcp.Z_DRO
 net z-ena-btn                            <= gladevcp.Z_ENA-button
 net z-ena-btn                            => z-ena-flip.clk
 net z-ena-panel                          <= z-ena-flip.out
@@ -334,8 +334,8 @@ net machine-is-on                        => z-estop-and.in1
 net z-enable                             <= z-estop-and.out
 net z-enable                             => gladevcp.Z_ENA-light
 
-# net u-vel-cmd							 => gladevcp.U_Spd
-# net u-pos-fb							 => gladevcp.U_DRO
+# net u-vel-cmd                          => gladevcp.U_Spd
+# net u-pos-fb                           => gladevcp.U_DRO
 net u-ena-btn                            <= gladevcp.U_ENA-button
 net u-ena-btn                            => u-ena-flip.clk
 net u-ena-panel                          <= u-ena-flip.out
@@ -351,8 +351,8 @@ net machine-is-on                        => u-estop-and.in1
 net u-enable                             <= u-estop-and.out
 net u-enable                             => gladevcp.U_ENA-light
 
-# net v-vel-cmd							 => gladevcp.V_Spd
-# net v-pos-fb							 => gladevcp.V_DRO
+# net v-vel-cmd                          => gladevcp.V_Spd
+# net v-pos-fb                           => gladevcp.V_DRO
 net v-ena-btn                            <= gladevcp.V_ENA-button
 net v-ena-btn                            => v-ena-flip.clk
 net v-ena-panel                          <= v-ena-flip.out
@@ -368,8 +368,8 @@ net machine-is-on                        => v-estop-and.in1
 net v-enable                             <= v-estop-and.out
 net v-enable                             => gladevcp.V_ENA-light
 
-# net w-vel-cmd							 => gladevcp.W_Spd
-# net w-pos-fb							 => gladevcp.W_DRO
+# net w-vel-cmd                          => gladevcp.W_Spd
+# net w-pos-fb                           => gladevcp.W_DRO
 net w-ena-btn                            <= gladevcp.W_ENA-button
 net w-ena-btn                            => w-ena-flip.clk
 net w-ena-panel                          <= w-ena-flip.out

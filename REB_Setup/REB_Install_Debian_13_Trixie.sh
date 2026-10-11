@@ -27,12 +27,12 @@
 #   Brainwave Embedded.
 #
 # Version
-#   1.0 - 26 Oct 2025, R. Colvin
-#   1.1 - 23 Dec 2025, R. Colvin - Changed text from "upgrade" to
+#   1.0 - 26 October 2025
+#   1.1 - 23 December 2025 - Changed text from "upgrade" to
 #         "update".
-#   1.2 - 22 Jan 2026, R. Colvin - Updated for the Trixie install.
-#   1.3 - 12 Aug 2026, R. Colvin - Added creation of gcode folder.
-#   1.4 - 22 Aug 2026, R. Colvin - Moved more install steps to use
+#   1.2 - 22 January 2026 - Updated for the Trixie install.
+#   1.3 - 12 August 2026 - Added creation of gcode folder.
+#   1.4 - 22 August 2026 - Moved more install steps to use
 #         this program.
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.

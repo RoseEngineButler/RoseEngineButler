@@ -26,7 +26,7 @@
 #   Brainwave Embedded.
 #
 # Version
-#   1.0 - 21 July 2026, R. Colvin
+#   1.0 - 21 July 2026
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #
@@ -1118,7 +1118,7 @@ class HandlerClass:
 # OpenRoseEngineButlerWebsite
 # Purpose:              This is used to open the Rose Engine Butler
 #                       website.
-# Updated:              ver 1.0, 6 August 2026, Claude
+# Updated:              ver 1.0, 06 August 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel_v1
@@ -1149,7 +1149,7 @@ class HandlerClass:
 # OpenGcodeLibrary
 # Purpose:              This is used to open the Rose Engine Butler
 #                       Gcode library web page.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Tab_Help
@@ -1180,7 +1180,7 @@ class HandlerClass:
 # OpenGcodeQuickReference
 # Purpose:              This is used to open the LinuxCNC Gcode Quick
 #                       Reference.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Tab_Help
@@ -1211,7 +1211,7 @@ class HandlerClass:
 # OpenLibrary
 # Purpose:              This is used to open the Rose Engine Butler
 #                       web page.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -1243,7 +1243,7 @@ class HandlerClass:
 # OpenOTHandyBook
 # Purpose:              This is used to open the Ornamental Turner's
 #                       Handy Book
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Tab_Help
@@ -1274,7 +1274,7 @@ class HandlerClass:
 # OpenUserForum
 # Purpose:              This is used to open the Rose Engine Butler
 #                       forum web page.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Tab_Help
@@ -1305,7 +1305,7 @@ class HandlerClass:
 # OpenUserManual
 # Purpose:              This is used to open the Rose Engine Butler
 #                       user manual web page.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Tab_Help
@@ -1349,7 +1349,7 @@ class HandlerClass:
 #                       Note:  sends M4, not M3 - see the Gcode0/Gcode1
 #                           comment below. This is an intentional,
 #                           empirically-verified swap, not a typo.
-# Updated:              ver 1.2, 8 August 2026, Claude
+# Updated:              ver 1.2, 08 August 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -1508,7 +1508,7 @@ class HandlerClass:
 #                           not higher, despite being the Fwd handler -
 #                           see Sp0_Move_Fwd's docstring for the same
 #                           empirically-verified swap applied here.
-# Updated:              ver 1.1, 8 August 2026, Claude
+# Updated:              ver 1.1, 08 August 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -1613,7 +1613,7 @@ class HandlerClass:
 #                           see Sp0_Move_Idx_Fwd/Sp0_Move_Fwd's
 #                           docstrings for the same empirically-verified
 #                           swap applied here.
-# Updated:              ver 1.1, 8 August 2026, Claude
+# Updated:              ver 1.1, 08 August 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -1706,7 +1706,7 @@ class HandlerClass:
 #                           comment below (and Sp0_Move_Fwd's). This is
 #                           an intentional, empirically-verified swap,
 #                           not a typo.
-# Updated:              ver 1.2, 8 August 2026, Claude
+# Updated:              ver 1.2, 08 August 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -1761,7 +1761,7 @@ class HandlerClass:
 #######################################################################
 # Move_Stop
 # Purpose:              This is used to stop any movement.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -1805,7 +1805,7 @@ class HandlerClass:
 #                           spindle (Sp0) & the rosette phaser
 #                           multiplier (Sp1).  (Sp1 gets multiplied
 #                           by the value of Sp1Pct
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -1878,7 +1878,7 @@ class HandlerClass:
 #                       measurement for the Sp0 & Sp1 spindles.
 #                       If degrees, set to divisions; 
 #                       if divisions, set to degrees.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -1912,7 +1912,7 @@ class HandlerClass:
 #                       startup, when the row's distance or deg/div
 #                       changes, and on a double-click of the number.
 #                       Never saved.
-# Updated:              ver 1.0, 11 October 2026, Claude
+# Updated:              ver 1.0, 11 October 2026
 #######################################################################
     def _set_idx_count(self, key, value):
         setattr(self, key + "_Idx_Qty", value)
@@ -1965,7 +1965,7 @@ class HandlerClass:
 #                           operation moves the spindles(s).  This is
 #                           used with self.Sp0_Idx_DegDiv to set the
 #                           actual movement distance.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -2005,7 +2005,7 @@ class HandlerClass:
 # Sp0_Set_Idx_OnOff
 # Purpose:              This is used to set the use of Sp1 indexing
 #                           on or off.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -2054,7 +2054,7 @@ class HandlerClass:
 # Purpose:              This is used to set the rotational distance
 #                           (degrees) for the Sp1 spindle (the
 #                           rosette phaser/multiplier).
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -2081,7 +2081,7 @@ class HandlerClass:
 # Sp1_Set_Idx_OnOff
 # Purpose:              This is used to set the use of Sp1 indexing
 #                           on or off.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -2112,7 +2112,7 @@ class HandlerClass:
 # Purpose:              This is used to set the speed for the rosette
 #                           phaser / multiplier (Sp0) as a percentage
 #                           of the spindle speed.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 # ---------------------------------------------------------------------
 # Called from:
 #   UI:                 REB_Panel
@@ -2191,7 +2191,7 @@ class HandlerClass:
 #                       all back where they started. Only the main panel
 #                       component has these widgets; every other
 #                       component no-ops.
-# Updated:              ver 1.0, 22 September 2026, R. Colvin
+# Updated:              ver 1.0, 22 September 2026
 #######################################################################
     def _load_sync_move_tab(self):
         '''
@@ -2463,7 +2463,7 @@ class HandlerClass:
 #                       and waits on an index pulse this machine has no
 #                       source for. Only the main panel component has
 #                       these widgets; every other component no-ops.
-# Updated:              ver 1.0, 24 September 2026, R. Colvin
+# Updated:              ver 1.0, 24 September 2026
 #######################################################################
     def _load_threading_tab(self):
         '''
@@ -2906,7 +2906,7 @@ class HandlerClass:
 #                       "fault_sound" (the tower's own siren is all HAL).
 #                       Only the main panel component plays them; every
 #                       other component no-ops.
-# Updated:              ver 1.0, 07 October 2026, Claude
+# Updated:              ver 1.0, 07 October 2026
 #######################################################################
     def _load_sounds(self):
         if self.builder.get_object("Sync_Run") is None:
@@ -3068,7 +3068,7 @@ class HandlerClass:
 #######################################################################
 # __init__
 # Purpose:              This is used to initialize everything.
-# Updated:              ver 1.0, 21 July 2026, R. Colvin
+# Updated:              ver 1.0, 21 July 2026
 #######################################################################
     def __init__(self, halcomp,builder,useropts):
         '''

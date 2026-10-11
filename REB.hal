@@ -27,7 +27,7 @@
 #   Brainwave Embedded.                                               #
 #                                                                     #
 # Version                                                             #
-#   1.0 - 22 July 2026, R. Colvin 	                                  #
+#   1.0 - 22 July 2026                                                #
 #                                                                     #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.             #
 #                                                                     #
@@ -74,7 +74,7 @@
 #  Axis  Joint  Channel   Type     Seq  Plug  Comments
 #  ----  -----  -------  -------  ----  ----  ------------------------
 #   X      0       04    LINEAR     1    P15
-#   Y      -       --    ------     -		  Not available as LATHE=1
+#   Y      -       --    ------     -         Not available as LATHE=1
 #   Z      1       01    LINEAR     2    P12
 #
 #   A      -       08    ANGULAR    -    --   Not currently assigned to
@@ -144,7 +144,7 @@ addf motion-controller                      servo-thread
 
 setp hm2_7i92.0.dpll.01.timer-us            -50
 setp hm2_7i92.0.stepgen.timer-number        1
-setp hm2_7i92.0.watchdog.timeout_ns 		5000000
+setp hm2_7i92.0.watchdog.timeout_ns         5000000
 
 # ********************************************************************
 #    AA    XX    XX IIIIIIII  SSSSSS      YY    YY
@@ -722,8 +722,8 @@ net spindle.0-enable                     => hm2_7i92.0.outm.00.out-06
 net spindle.0-index-enable              <=> spindle.0.index-enable
 net spindle.0-index-enable               => pid.p0.index-enable
 
-net spindle.0-output-pos				<=  pid.p0.output
-net spindle.0-output-pos				 => mux2.0.in1
+net spindle.0-output-pos                <=  pid.p0.output
+net spindle.0-output-pos                 => mux2.0.in1
 
 net spindle.0-pos-cmd                   <=  orient.0.command
 net spindle.0-pos-cmd                    => pid.p0.command

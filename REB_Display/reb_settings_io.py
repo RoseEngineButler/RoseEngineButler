@@ -48,7 +48,7 @@
 #   Brainwave Embedded.
 #
 # Version
-#   1.0 - 22 August 2026, Claude
+#   1.0 - 22 August 2026
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #

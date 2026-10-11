@@ -27,15 +27,15 @@
 #   Brainwave Embedded.
 #
 # Version
-#   1.0 - 27 Oct 2025, R. Colvin
-#   1.1 - 23 Dec 2025, R. Colvin - Changed text from "upgrade" to
+#   1.0 - 27 October 2025
+#   1.1 - 23 December 2025 - Changed text from "upgrade" to
 #         "update".
-#   1.2 - 22 January 2026, R. Colvin - Updated to run on Debian 13
+#   1.2 - 22 January 2026 - Updated to run on Debian 13
 #             Trixie: updated directories from
 #                /home/reuben/
 #             to
 #                /home/reuben/
-#   1.3 - 27 July 2026, R. Colvin - The repo remote moved from HTTPS
+#   1.3 - 27 July 2026 - The repo remote moved from HTTPS
 #             to SSH, authenticated with the reuben user's SSH key.
 #             Dropped sudo from the git commands so pull/stash run as
 #             reuben (whose key is registered with GitHub) instead of
