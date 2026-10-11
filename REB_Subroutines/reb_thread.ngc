@@ -1,6 +1,6 @@
 ; Rose Engine Butler - threading cycle for the main panel's Threading tab.
 ; Called from MDI by REB_main.py's Thread_Run - not meant to be run by hand.
-; Created 24 September 2026 by R. Colvin
+; Created 24 September 2026
 ;
 ; Cuts the same passes LinuxCNC's G76 would - first pass at depth J,
 ; each later pass J deeper (G76's default R1.0 constant-depth degression,

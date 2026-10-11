@@ -2115,7 +2115,7 @@ class HandlerClass:
 
         try:
             with open(path, "r") as f:
-                data = json.load(f)
+                data = reb_settings_io.parse_settings_text(f.read())
         except (OSError, ValueError) as e:
             _show_settings_error(widget, "Could not read " + path + ":\n" + str(e))
             return
@@ -2457,7 +2457,7 @@ class HandlerClass:
 
         try:
             with open(path, "r") as f:
-                data = json.load(f)
+                data = reb_settings_io.parse_settings_text(f.read())
         except (OSError, ValueError) as e:
             _show_settings_error(widget, "Could not read " + path + ":\n" + str(e))
             return

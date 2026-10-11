@@ -62,7 +62,7 @@
 #   expects it.
 #
 #   ------------------------------------------------------------------
-#   Any-role/any-channel generalization (13 September 2026, Rich)
+#   Any-role/any-channel generalization (13 September 2026)
 #   ------------------------------------------------------------------
 #   Any of 10 roles - the 8 axis letters X,Z,U,V,W,A,B,C or the 2
 #   spindles Sp0,Sp1 - can now be assigned to any of the 8 physical hm2
