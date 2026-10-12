@@ -87,7 +87,8 @@ Decided so far:
 
 Open questions:
 
-- **Mesa (Rich has asked their tech contact):** is two 7i92s through an
+- **Mesa (Rich has asked Peter there):** the 10.10.10.x address
+  plan above, and is two 7i92s through an
   unmanaged switch at a 1 ms servo period on a Pi 5 a setup they've seen
   work; any switch they recommend; and firmware - a 6-channel base card
   and a 4-channel expansion card with the inputs/outputs wanted (custom
@@ -99,9 +100,48 @@ Open questions:
 
 Points to settle in the design:
 
-- The second card needs its own IP address (today's card uses the
-  jumper default, 192.168.1.121), set once with `mesaflash` before the
-  box ships.
+- **Network: 10.10.10.x on every machine** (planned 12 October 2026,
+  waiting on Peter at Mesa to confirm). Pi wired 10.10.10.100, base card
+  10.10.10.10, expansion card 10.10.10.11, no gateway or DNS on the
+  wired connection. Moves off 192.168.1.x because a customer's home
+  Wi-Fi often uses it too, and the installer currently gives the wired
+  connection gateway/DNS 192.168.1.1 (`REB_Install_Debian_13_Trixie.sh`
+  line 100), which a card on .1 would collide with. Switch: standalone
+  gigabit unmanaged, only the Pi and the two cards on it; CAT-8 cables
+  (more than needed - the 7i92T is 100 Mbit - but fine).
+- **Setting a card's address** (the cards need EEPROM addresses; check
+  the 7i92T manual's W5/W6 table for which setting is "EEPROM", and
+  whether one is fixed at 10.10.10.10, which would let the base card skip
+  this). A new card always answers on 192.168.1.121, so do this with the
+  Pi still on 192.168.1.120 and only that card connected:
+  1. W5 and W6 down, power on.
+  2. `mesaflash --device 7i92t --addr 192.168.1.121 --write 7i92t_REB.bin --reload`
+  3. `mesaflash --device 7i92t --addr 192.168.1.121 --set ip=10.10.10.10`
+     (`.11` for the expansion card) - the option is `--set ip=`, not
+     `--setip`.
+  4. Power off, move the jumpers to EEPROM, power on (jumpers are only
+     read at power-up).
+  5. Once both cards are set, move the Pi:
+     `sudo nmcli con mod "Wired Ethernet" ipv4.method manual ipv4.addresses 10.10.10.100/24 ipv4.gateway "" ipv4.dns ""`
+     then `sudo nmcli con up "Wired Ethernet"`, and check each card with
+     `mesaflash --device 7i92t --addr 10.10.10.10 --readhmid`.
+  Recovery: W5/W6 back down returns a card to 192.168.1.121.
+- **HAL: one `loadrt hm2_eth` line for both cards** - a realtime module
+  can only be loaded once, so two lines fail. Comma-separated lists:
+  `board_ip="10.10.10.10,10.10.10.11"` and `config="...num_stepgens=6","...num_stepgens=4"`
+  gives `hm2_7i92.0` and `hm2_7i92.1` in that order, each needing its
+  own `read`/`write` `addf` and watchdog `setp`. Both cards can run the
+  same `7i92t_REB.bin` (8 stepgens; asking for fewer is fine).
+- **Existing 3 test machines:** only used for testing. Convert them with
+  a script (`REB_Change_Network.sh`, not written yet) or by phone, or
+  ship them back. Script plan: stop if LinuxCNC is running; check the
+  card answers at .121 (else change nothing); write 10.10.10.10 to its
+  EEPROM; pause for power off / jumper / power on; move the Pi's wired
+  connection; check the card answers at 10.10.10.10. The new address in
+  REB.hal (or the generator) must arrive at the same time as the script
+  runs - e.g. the script does the `git pull` itself, or the address comes
+  from settings. Installers change too (`nmcli` line, `mesaflash`
+  address).
 - Keep the switch private - nothing else (router, internet, file
   sharing) on that network, or the 1 ms timing suffers. The Pi's
   internet stays on Wi-Fi.
