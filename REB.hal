@@ -117,7 +117,11 @@ loadrt hostmot2
 # its 8 pins (Input0-7) become plain GPIO - the limit jacks and E-stop
 # button read them as hm2_7i92.0.gpio.NNN.in, and a spare one can be an
 # output (the signal tower's buzzer). See REB_Generate_Local_Ini.py.
-loadrt hm2_eth board_ip="192.168.1.121" config="num_encoders=0 num_inms=0 num_pwmgens=0 num_stepgens=8"
+# Two-box hardware: REB_Generate_Local_Ini.py rewrites this line every
+# launch (_card_setup_hal) - the base box's card alone, or both cards
+# (10.10.10.10 and .11) on one line when an expansion box is connected,
+# which also gets its own read/write and timer/watchdog setp lines below.
+loadrt hm2_eth board_ip="10.10.10.10" config="num_encoders=0 num_inms=0 num_pwmgens=0 num_stepgens=6"
 loadrt orient count=2
 # mux2.0/mux2.1 select spindle velocity source; mux2.2/mux2.3 select the
 # Sp0/Sp1 orient target angle source (M19 vs the simultaneous-index path -
