@@ -61,6 +61,8 @@
 #   1.1 - 14 October 2026 - Moves the Pi before the card is power-cycled,
 #         so a Pi restart at power-on no longer leaves it unable to
 #         reach the card.
+#   1.2 - 14 October 2026 - Offers to delete spare "Wired Ethernet"
+#         connections.
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #
@@ -242,6 +244,27 @@ set_pi_address() {
     fi
     run nmcli con up "$CONNECTION_UUID"
     sleep 2
+    remove_spare_connections
+}
+
+# Offers to delete the other connections called "Wired Ethernet" (left
+# by earlier installer runs - Rich's Pis had two or three). They do no
+# harm while the one used here has the higher priority, but one is less
+# confusing.
+remove_spare_connections() {
+    local spares uuid
+    spares=$(nmcli -t -f UUID,NAME con show 2>/dev/null \
+        | awk -F: -v n="$CONNECTION" -v keep="$CONNECTION_UUID" '$2 == n && $1 != keep {print $1}')
+    [ -z "$spares" ] && return 0
+    say "This Pi has $(echo "$spares" | wc -l) more connection(s) called '$CONNECTION', not in use:"
+    for uuid in $spares; do
+        say "    $uuid  $(nmcli -g ipv4.addresses con show "$uuid" 2>/dev/null)"
+    done
+    if confirm "Delete them (the one in use is kept)?"; then
+        for uuid in $spares; do
+            run nmcli con delete "$uuid"
+        done
+    fi
 }
 
 move_pi() {
