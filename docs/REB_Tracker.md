@@ -222,6 +222,10 @@ Progress on the `two-box` branch:
   was given to Rich (`~/Downloads/AxisSelection.pmwiki.txt`); publish it
   when `two-box` reaches `main`, and retake the
   `REBSettings-AxisSelection.png` and `SelectedAxes.png` screenshots then.
+  Rich took the new SelectedAxes screenshot 14 October 2026 using
+  `REB_SHOW_EXPANSION=1 ./REB_Launch.sh` (3037858 on `two-box`: the panel
+  shows the expansion box as connected, display only, settings untouched -
+  worked on the machine).
 - **Watchdog as E-stop - design needed:** a card's
   `watchdog.has_bit` stays true after it fires until something clears
   it, so wiring it straight into the E-stop chain could leave the
