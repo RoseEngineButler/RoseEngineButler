@@ -31,6 +31,13 @@
 #   only uses it once its W5/W6 jumpers are moved to the setting the
 #   7i92 manual calls EEPROM, which is read at power-up.
 #
+#   Once the address is stored the Pi is moved to 10.10.10.100 BEFORE
+#   the card is powered off and on: on a box where the Pi and the card
+#   share a power supply, powering the card on can restart the Pi (found
+#   14 October 2026), and a Pi left on 192.168.1.120 then can't reach
+#   the card and LinuxCNC won't start. If the Pi restarts at any point
+#   anyway, run this again with 'pi'.
+#
 #   Choices (menu, or as the first argument):
 #     base       set up the connected card as the base card (.10)
 #     expansion  set up the connected card as the expansion card (.11)
@@ -51,6 +58,9 @@
 #
 # Version
 #   1.0 - 14 October 2026
+#   1.1 - 14 October 2026 - Moves the Pi before the card is power-cycled,
+#         so a Pi restart at power-on no longer leaves it unable to
+#         reach the card.
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #
@@ -178,31 +188,66 @@ set_up_card() {   # $1 = new address, $2 = "base" or "expansion"
         exit 1
     fi
 
-    say "Address stored. Now:"
+    # Move the Pi now, while nothing else is happening: the power-cycle
+    # below can restart the Pi, and it must come back on 10.10.10.x.
+    say "Address stored. The Pi's wired connection now moves to ${PI_IP%/*},"
+    say "the network the card will be on after its jumpers are moved."
+    if confirm "Move the Pi's wired connection to ${PI_IP%/*} now?"; then
+        set_pi_address "$PI_IP"
+    else
+        say "Pi left on 192.168.1.x - run this again with 'pi' once every card"
+        say "is set up. Until then the Pi can't reach this card or start LinuxCNC."
+    fi
+
+    say "Now:"
     say "  1. Power the card off."
     say "  2. Move its W5/W6 jumpers to the setting the 7i92 manual calls EEPROM."
     say "  3. Power it back on. It will answer at $new_ip."
+    say "If the Pi restarts when the card powers on, that's the shared power"
+    say "supply - log back in and run this again with 'pi' to check the card."
     say "To undo: jumpers back to the factory setting = $FACTORY_CARD_IP again."
     pause ""
 
-    if confirm "Move the Pi's wired connection to 10.10.10.100 now and check the card?"; then
-        move_pi
-    else
-        say "Pi left on 192.168.1.x - choose 'pi' once every card is set up."
+    if ip -4 addr show | grep -q "inet ${PI_IP%/*}/"; then
+        say "Checking the card answers at $new_ip..."
+        if wait_for_card "$new_ip"; then
+            say "Card at $new_ip answers."
+        else
+            warn "No card answered at $new_ip. Check its power, cable and that      "
+            warn "W5/W6 are at the EEPROM setting, then run this again with 'pi'.   "
+            exit 1
+        fi
     fi
 }
 
+# A card takes a few seconds to answer after power-on; try for up to
+# about 15 seconds.
+wait_for_card() {
+    local tries
+    for tries in 1 2 3 4 5; do
+        card_answers "$1" && return 0
+        sleep 3
+    done
+    return 1
+}
+
 # --- move the Pi ------------------------------------------------------
-move_pi() {
-    title "Move the Pi's wired connection to ${PI_IP%/*}"
-    stop_if_linuxcnc_running
-    run nmcli con mod "$CONNECTION_UUID" ipv4.method manual ipv4.addresses "$PI_IP" ipv4.gateway "" ipv4.dns "" connection.autoconnect-priority 10
+# Gives the Pi's wired connection the address $1 (with /24). Stored in
+# the connection, so a restart keeps it.
+set_pi_address() {
+    run nmcli con mod "$CONNECTION_UUID" ipv4.method manual ipv4.addresses "$1" ipv4.gateway "" ipv4.dns "" connection.autoconnect-priority 10
     if [ $? != 0 ]; then
         warn "Changing the '$CONNECTION' connection failed - nothing else was changed."
         exit 1
     fi
     run nmcli con up "$CONNECTION_UUID"
     sleep 2
+}
+
+move_pi() {
+    title "Move the Pi's wired connection to ${PI_IP%/*}"
+    stop_if_linuxcnc_running
+    set_pi_address "$PI_IP"
     for card_ip in "$BASE_CARD_IP" "$EXPANSION_CARD_IP"; do
         if card_answers "$card_ip"; then
             say "Card at $card_ip answers."
@@ -220,9 +265,7 @@ move_pi_back() {
     say "from before the two-box change. A card already moved to 10.10.10.x"
     say "also needs its W5/W6 jumpers back at the factory setting."
     confirm "Continue?" || exit 0
-    run nmcli con mod "$CONNECTION_UUID" ipv4.method manual ipv4.addresses "$OLD_PI_IP" ipv4.gateway "" ipv4.dns "" connection.autoconnect-priority 10
-    run nmcli con up "$CONNECTION_UUID"
-    sleep 2
+    set_pi_address "$OLD_PI_IP"
     if card_answers "$FACTORY_CARD_IP"; then
         say "Card at $FACTORY_CARD_IP answers."
     else
