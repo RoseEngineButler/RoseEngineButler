@@ -1995,7 +1995,7 @@ W is parallel to Z</property>
                             <property name="label" translatable="yes">Channel 02</property>
                             <attributes>
                               <attribute name="font-desc" value="DejaVu Serif 10"/>
-                              <attribute name="weight" value="bold"/>
+                              <attribute name="foreground" value="#8c8c8c"/>
                             </attributes>
                           </object>
                         </child>
@@ -2061,7 +2061,7 @@ W is parallel to Z</property>
                             <property name="label" translatable="yes">Channel 03</property>
                             <attributes>
                               <attribute name="font-desc" value="DejaVu Serif 10"/>
-                              <attribute name="weight" value="bold"/>
+                              <attribute name="foreground" value="#8c8c8c"/>
                             </attributes>
                           </object>
                         </child>
@@ -2127,7 +2127,7 @@ W is parallel to Z</property>
                             <property name="label" translatable="yes">Channel 00</property>
                             <attributes>
                               <attribute name="font-desc" value="DejaVu Serif 10"/>
-                              <attribute name="weight" value="bold"/>
+                              <attribute name="foreground" value="#8c8c8c"/>
                             </attributes>
                           </object>
                         </child>
@@ -2193,7 +2193,7 @@ W is parallel to Z</property>
                             <property name="label" translatable="yes">Channel 05</property>
                             <attributes>
                               <attribute name="font-desc" value="DejaVu Serif 10"/>
-                              <attribute name="weight" value="bold"/>
+                              <attribute name="foreground" value="#8c8c8c"/>
                             </attributes>
                           </object>
                         </child>
@@ -2259,7 +2259,7 @@ W is parallel to Z</property>
                             <property name="label" translatable="yes">Channel 04</property>
                             <attributes>
                               <attribute name="font-desc" value="DejaVu Serif 10"/>
-                              <attribute name="weight" value="bold"/>
+                              <attribute name="foreground" value="#8c8c8c"/>
                             </attributes>
                           </object>
                         </child>
@@ -2325,7 +2325,7 @@ W is parallel to Z</property>
                             <property name="label" translatable="yes">Channel 01</property>
                             <attributes>
                               <attribute name="font-desc" value="DejaVu Serif 10"/>
-                              <attribute name="weight" value="bold"/>
+                              <attribute name="foreground" value="#8c8c8c"/>
                             </attributes>
                           </object>
                         </child>
@@ -2392,7 +2392,7 @@ W is parallel to Z</property>
                             <property name="label" translatable="yes">Channel 06</property>
                             <attributes>
                               <attribute name="font-desc" value="DejaVu Serif 10"/>
-                              <attribute name="weight" value="bold"/>
+                              <attribute name="foreground" value="#8c8c8c"/>
                             </attributes>
                           </object>
                         </child>
@@ -2459,7 +2459,7 @@ W is parallel to Z</property>
                             <property name="label" translatable="yes">Channel 07</property>
                             <attributes>
                               <attribute name="font-desc" value="DejaVu Serif 10"/>
-                              <attribute name="weight" value="bold"/>
+                              <attribute name="foreground" value="#8c8c8c"/>
                             </attributes>
                           </object>
                         </child>
@@ -2525,7 +2525,7 @@ W is parallel to Z</property>
                             <property name="label" translatable="yes">Channel 08</property>
                             <attributes>
                               <attribute name="font-desc" value="DejaVu Serif 10"/>
-                              <attribute name="weight" value="bold"/>
+                              <attribute name="foreground" value="#8c8c8c"/>
                             </attributes>
                           </object>
                         </child>
@@ -2591,7 +2591,7 @@ W is parallel to Z</property>
                             <property name="label" translatable="yes">Channel 09</property>
                             <attributes>
                               <attribute name="font-desc" value="DejaVu Serif 10"/>
-                              <attribute name="weight" value="bold"/>
+                              <attribute name="foreground" value="#8c8c8c"/>
                             </attributes>
                           </object>
                         </child>

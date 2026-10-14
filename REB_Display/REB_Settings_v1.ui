@@ -31,6 +31,8 @@
 #                                                                     #
 # Version                                                             #
 #   1.0 - 21 July 2026                                                #
+#   1.1 - 14 October 2026 - Base and expansion box channels side by   #
+#         side                                                        #
 #                                                                     #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.             #
 #                                                                     #
@@ -1538,8 +1540,8 @@ Changing an assignment will probably require you to move the actual motor cable 
                                         </child>
                                       </object>
                                       <packing>
-                                        <property name="left-attach">1</property>
-                                        <property name="top-attach">4</property>
+                                        <property name="left-attach">5</property>
+                                        <property name="top-attach">1</property>
                                       </packing>
                                     </child>
                                     <child>
@@ -1617,8 +1619,8 @@ Changing an assignment will probably require you to move the actual motor cable 
                                         </child>
                                       </object>
                                       <packing>
-                                        <property name="left-attach">1</property>
-                                        <property name="top-attach">5</property>
+                                        <property name="left-attach">5</property>
+                                        <property name="top-attach">2</property>
                                       </packing>
                                     </child>
                                     <child>
@@ -1695,8 +1697,8 @@ Changing an assignment will probably require you to move the actual motor cable 
                                         </child>
                                       </object>
                                       <packing>
-                                        <property name="left-attach">2</property>
-                                        <property name="top-attach">4</property>
+                                        <property name="left-attach">6</property>
+                                        <property name="top-attach">1</property>
                                       </packing>
                                     </child>
                                     <child>
@@ -1773,8 +1775,8 @@ Changing an assignment will probably require you to move the actual motor cable 
                                         </child>
                                       </object>
                                       <packing>
-                                        <property name="left-attach">2</property>
-                                        <property name="top-attach">5</property>
+                                        <property name="left-attach">6</property>
+                                        <property name="top-attach">2</property>
                                       </packing>
                                     </child>
                                     <child>
@@ -1797,12 +1799,25 @@ Changing an assignment will probably require you to move the actual motor cable 
                                       </packing>
                                     </child>
                                     <child>
+                                      <object class="GtkSeparator" id="Expansion_Divider">
+                                        <property name="visible">True</property>
+                                        <property name="can-focus">False</property>
+                                        <property name="orientation">vertical</property>
+                                        <property name="margin-start">6</property>
+                                        <property name="margin-end">6</property>
+                                      </object>
+                                      <packing>
+                                        <property name="left-attach">4</property>
+                                        <property name="top-attach">0</property>
+                                        <property name="height">3</property>
+                                      </packing>
+                                    </child>
+                                    <child>
                                       <object class="GtkBox" id="Expansion_Header_Box">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
                                         <property name="halign">center</property>
                                         <property name="spacing">12</property>
-                                        <property name="margin-top">12</property>
                                         <child>
                                           <object class="GtkLabel">
                                             <property name="visible">True</property>
@@ -1841,47 +1856,9 @@ Changing an assignment will probably require you to move the actual motor cable 
                                         </child>
                                       </object>
                                       <packing>
-                                        <property name="left-attach">1</property>
-                                        <property name="top-attach">3</property>
-                                        <property name="width">3</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkLabel">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">start</property>
-                                        <property name="valign">center</property>
-                                        <property name="margin-right">10</property>
-                                        <property name="margin-end">10</property>
-                                        <property name="label" translatable="yes">Top</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 12"/>
-                                          <attribute name="weight" value="bold"/>
-                                        </attributes>
-                                      </object>
-                                      <packing>
-                                        <property name="left-attach">0</property>
-                                        <property name="top-attach">4</property>
-                                      </packing>
-                                    </child>
-                                    <child>
-                                      <object class="GtkLabel">
-                                        <property name="visible">True</property>
-                                        <property name="can-focus">False</property>
-                                        <property name="halign">start</property>
-                                        <property name="valign">center</property>
-                                        <property name="margin-right">10</property>
-                                        <property name="margin-end">10</property>
-                                        <property name="label" translatable="yes">Bottom</property>
-                                        <attributes>
-                                          <attribute name="font-desc" value="DejaVu Serif 12"/>
-                                          <attribute name="weight" value="bold"/>
-                                        </attributes>
-                                      </object>
-                                      <packing>
-                                        <property name="left-attach">0</property>
-                                        <property name="top-attach">5</property>
+                                        <property name="left-attach">5</property>
+                                        <property name="top-attach">0</property>
+                                        <property name="width">2</property>
                                       </packing>
                                     </child>
                                   </object>
