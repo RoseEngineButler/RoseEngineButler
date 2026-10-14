@@ -203,6 +203,15 @@ Progress on the `two-box` branch:
   `git switch two-box`, move Sp0/Sp1 to base channels 00-05, and run
   LinuxCNC. Leave the current card at 192.168.1.121 until then, so
   `dev-rich` keeps working.
+- **Rich's Pi moved to the two-box network, 14 October 2026:** its
+  7i92 had 10.10.10.10 stored (no new firmware), the Pi's wired
+  connection is 10.10.10.100 (autoconnect priority 10 - the Pi had three
+  "Wired Ethernet" connections; fixed in the script and installer, 809510d
+  on `two-box`), and the Pi is on `two-box`. Plugs 06/07 do nothing on a
+  base box, so Sp0/Sp1 must be moved to channels 00-05 in REB Settings.
+  Settings copied to `~/Documents/REBset_v1.ini.before-two-box`. To run
+  `main`/`dev-rich` again: W5/W6 back to the factory setting,
+  `REB_Change_Network.sh back`, copy that file back.
 - **Watchdog as E-stop - design needed:** a card's
   `watchdog.has_bit` stays true after it fires until something clears
   it, so wiring it straight into the E-stop chain could leave the
