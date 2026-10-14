@@ -199,9 +199,26 @@ _CHANNEL_ASSIGNMENTS_AT_STARTUP = _read_persisted_channel_assignments()
 # below to grey out every widget belonging to a role that isn't active,
 # and by _clear_ena_override/_axis_idx_move to decide whether an ENA
 # press or jog move is meaningful at all.
+# For User Manual screenshots only (Rich, 14 October 2026): started as
+#     REB_SHOW_EXPANSION=1 ./REB_Launch.sh
+# the panel shows the expansion box as connected - its Axis Assignments
+# tiles and its axes' rows - without changing REBset_v1.ini or the HAL
+# files, so LinuxCNC still starts with only the base box's card. Those
+# rows aren't wired to anything; don't use them. A normal launch is back
+# to normal.
+SHOW_EXPANSION_FOR_SCREENSHOTS = os.environ.get("REB_SHOW_EXPANSION") == "1"
+
+def _panel_settings():
+    '''REBset_v1.ini's settings, with the expansion box marked connected
+    when SHOW_EXPANSION_FOR_SCREENSHOTS is set.'''
+    settings = reb_settings_io.load_settings()
+    if SHOW_EXPANSION_FOR_SCREENSHOTS:
+        settings["expansion_box"] = True
+    return settings
+
 _ACTIVE_ROLES_AT_STARTUP = {
     role for channel_id, role in _CHANNEL_ASSIGNMENTS_AT_STARTUP.items()
-    if channel_id in reb_settings_io.active_channels(reb_settings_io.load_settings())}
+    if channel_id in reb_settings_io.active_channels(_panel_settings())}
 
 # <letter>_-prefixed widget-id suffixes every axis-letter row
 # (X/Z/U/V/W/A/B/C) has, since REB_Panel_v1.ui's 18 September 2026
@@ -959,7 +976,7 @@ class HandlerClass:
         # 06-09, to the right of the base box's 3 x 2) only show while
         # it's connected (Rich's choice, 14 October 2026). no_show_all
         # keeps a later show_all() from bringing them back.
-        expansion = reb_settings_io.load_settings().get("expansion_box") is True
+        expansion = _panel_settings().get("expansion_box") is True
         for channel_id in reb_settings_io.EXPANSION_CHANNELS:
             tile = self.builder.get_object("Panel_Channel_" + channel_id + "_Axis")
             while tile is not None and not isinstance(tile, Gtk.Frame):
