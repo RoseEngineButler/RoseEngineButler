@@ -34,6 +34,9 @@
 #   1.3 - 12 August 2026 - Added creation of gcode folder.
 #   1.4 - 22 August 2026 - Moved more install steps to use
 #         this program.
+#   1.5 - 14 October 2026 - Two-box network: no gateway/DNS on the
+#         wired connection; REB_Change_Network.sh flashes the card,
+#         sets it to 10.10.10.10 and moves the Pi to 10.10.10.100.
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #
@@ -97,7 +100,13 @@ echo -e "${TITLE}card)                                                          
 # Add the wired Ethernet network connectin
 echo -e "${CMNTTEXT}Add the wired Ethernet network connectin${NOCOLOR}"
 
-nmcli con add type ethernet con-name "Wired Ethernet" ipv4.address 192.168.1.120/24 ipv4.method manual ipv4.gateway 192.168.1.1 ipv4.dns 192.168.1.1
+# 192.168.1.120 for now - a new Mesa card answers at its factory
+# address, 192.168.1.121. REB_Change_Network.sh (Step 2) moves this
+# connection to 10.10.10.100 once the card is set up. No gateway or DNS:
+# nothing but the Pi and the Mesa cards is on this network, and a
+# gateway here would clash with a home network that also uses
+# 192.168.1.x - the Pi's internet is on Wi-Fi.
+nmcli con add type ethernet con-name "Wired Ethernet" ipv4.address 192.168.1.120/24 ipv4.method manual
 if [ $? != 0 ]; then
     echo -e "${KEYNOTE}ERROR: nmcli failed.                                             ${NOCOLOR}"
     echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                   ${NOCOLOR}"
@@ -121,13 +130,17 @@ sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/MesaCard/7i92t_
 sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/MesaCard/7i92t_REB.pin .
 sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/MesaCard/PIN_REB_34.vhd .
 
-# Flash the Mesa card
-echo -e "${CMNTTEXT}Flash the Mesa Card Configuration${NOCOLOR}"
-mesaflash --device 7i92t --addr 192.168.1.121 --write 7i92t_REB.bin --reload
+# Flash the Mesa card and give it its address. REB_Change_Network.sh
+# writes the firmware, stores 10.10.10.10 on the card (the base box's
+# card - the expansion box's is set up the same way, as 10.10.10.11,
+# with "REB_Change_Network.sh expansion"), walks through moving its
+# W5/W6 jumpers, and moves this Pi's wired connection to 10.10.10.100.
+echo -e "${CMNTTEXT}Flash the Mesa Card Configuration and set its address${NOCOLOR}"
+/home/reuben/linuxcnc/configs/RoseEngineButler/REB_Change_Network.sh base
 if [ $? != 0 ]; then
-    echo -e "${KEYNOTE}ERROR: mesaflash failed.                                             ${NOCOLOR}"
+    echo -e "${KEYNOTE}ERROR: setting up the Mesa card failed.                              ${NOCOLOR}"
     echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-    exit $?
+    exit 1
 fi
 
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
