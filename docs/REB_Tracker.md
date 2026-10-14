@@ -164,6 +164,27 @@ connected. Pictures: `docs/mockups/two_box_axis_selection.png` and
 on the `two-box-mockup` branch (display only - channels 08/09 and jacks
 4-6 do nothing; don't merge it): start the real screens from it.
 
+Progress on the `two-box` branch:
+
+- **Step 1 - HAL side, done 14 October 2026 (8cfd0b7, not run on
+  hardware):** ten channels in the shared settings module, the
+  `expansion_box` setting, the startup generator pointing each role at
+  its card, one `hm2_eth` line for one or both cards at 10.10.10.10 /
+  .11 (fixed in the code - Rich's choice), the second card's read/write
+  and timer/watchdog lines, and limit jacks 4-6 on the second card.
+  Base box defaults (Rich, 14 October 2026): X Z B W Sp0 Sp1 on 00-05,
+  then U V A C on 06-09. Existing settings need no conversion: 00-05
+  keep their meaning, 08/09 get the unused roles. **Development boxes:**
+  roles on 06/07 (Rich's box has Sp0/Sp1 there) go inactive without an
+  expansion box - move them to base channels to test.
+- **Watchdog as E-stop - design needed:** a card's
+  `watchdog.has_bit` stays true after it fires until something clears
+  it, so wiring it straight into the E-stop chain could leave the
+  machine stuck in E-stop. Work out how a reset clears it first.
+- Next: step 2 (REB Settings), step 3 (`REB_main.py`,
+  `REB_Scale_Persist.py`, `REB_Settings_Restore.py` - still 8 channels
+  on one card), step 4 (`REB_Change_Network.sh`, installers).
+
 Software work once the design is fixed (not started):
 
 1. Channels 00-09 across two cards (`hm2_7i92.0` for 00-05,
