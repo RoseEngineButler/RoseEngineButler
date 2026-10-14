@@ -184,13 +184,19 @@ Progress on the `two-box` branch:
   as `expansion_box`), Limit Jacks 1-3 over 4-6 on Inputs, Outputs and
   Sounds. The expansion side is greyed and ignored until connected; a
   greyed limit jack keeps its choice.
+- **Step 3 - runtime programs, done 14 October 2026 (09b7fad, not run
+  on the machine):** the main panel's code, the shutdown save and the
+  startup restore use the same channel model and "active only on a
+  channel in use" rule as the generator, so roles and joint numbers
+  match (checked in four setups), and reach channels 06-09 on the second
+  card. The panel's Axis Assignments tiles follow the new plug layout,
+  with the expansion box's four tiles shown only when it's connected
+  (Rich's choice).
 - **Watchdog as E-stop - design needed:** a card's
   `watchdog.has_bit` stays true after it fires until something clears
   it, so wiring it straight into the E-stop chain could leave the
   machine stuck in E-stop. Work out how a reset clears it first.
-- Next: step 3 (`REB_main.py`,
-  `REB_Scale_Persist.py`, `REB_Settings_Restore.py` - still 8 channels
-  on one card), step 4 (`REB_Change_Network.sh`, installers).
+- Next: step 4 (`REB_Change_Network.sh`, installers).
 
 Software work once the design is fixed (not started):
 
