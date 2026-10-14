@@ -3347,6 +3347,19 @@ def _channel_axis_changed(channel_id):
         if role not in CHANNEL_ROLES:
             return
 
+        # A role held by a greyed-out expansion channel (no expansion box)
+        # can't be taken back there, so it would stay "Duplicate!" for
+        # good (found by Rich 14 October 2026). Swap instead: that channel
+        # takes the role this one gives up, so every role is still on
+        # exactly one channel when the expansion box is connected later.
+        previous = self._channel_assignments[channel_id]
+        if not self._expansion_box:
+            for other_id in EXPANSION_CHANNELS:
+                if other_id != channel_id and self._channel_assignments[other_id] == role:
+                    self._channel_assignments[other_id] = previous
+                    print("Channel " + other_id + " (expansion box) takes " + previous
+                          + " so " + role + " can go on channel " + channel_id)
+
         self._channel_assignments[channel_id] = role
 
         self._applying_channel_assignments = True
