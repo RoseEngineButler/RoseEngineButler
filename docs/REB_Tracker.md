@@ -216,6 +216,12 @@ Progress on the `two-box` branch:
   2026 (6465a4d on `two-box`, not yet seen in AXIS):** each tile has a
   "Channel NN" label like REB Settings. Makes the panel 34 px taller -
   check it still fits a 1080-line screen.
+- **User Manual for two-box, 14 October 2026:** REB Settings' new "How
+  the Expansion Box Works" button (327b341 on `two-box`) opens
+  `Main.AxisSelection#ExpansionBox`. Draft page text with that section
+  was given to Rich (`~/Downloads/AxisSelection.pmwiki.txt`); publish it
+  when `two-box` reaches `main`, and retake the
+  `REBSettings-AxisSelection.png` and `SelectedAxes.png` screenshots then.
 - **Watchdog as E-stop - design needed:** a card's
   `watchdog.has_bit` stays true after it fires until something clears
   it, so wiring it straight into the E-stop chain could leave the
