@@ -192,11 +192,23 @@ Progress on the `two-box` branch:
   card. The panel's Axis Assignments tiles follow the new plug layout,
   with the expansion box's four tiles shown only when it's connected
   (Rich's choice).
+- **Step 4 - network, written 14 October 2026 (tested with --dry-run
+  only):** `REB_Change_Network.sh` sets a card up as the base (.10) or
+  expansion (.11) card and moves the Pi to 10.10.10.100 (or back to
+  192.168.1.120); the Debian 13 installer uses it and drops the
+  192.168.1.1 gateway/DNS. **To test when Rich's new 7i92 arrives:**
+  connect only the new card, run `REB_Change_Network.sh base` (or
+  `expansion`), confirm which W5/W6 setting the 7i92 manual calls
+  EEPROM, check it answers at its new address after power-up; then
+  `git switch two-box`, move Sp0/Sp1 to base channels 00-05, and run
+  LinuxCNC. Leave the current card at 192.168.1.121 until then, so
+  `dev-rich` keeps working.
 - **Watchdog as E-stop - design needed:** a card's
   `watchdog.has_bit` stays true after it fires until something clears
   it, so wiring it straight into the E-stop chain could leave the
   machine stuck in E-stop. Work out how a reset clears it first.
-- Next: step 4 (`REB_Change_Network.sh`, installers).
+- Next: testing on hardware once the new 7i92 arrives, then the
+  watchdog design.
 
 Software work once the design is fixed (not started):
 
