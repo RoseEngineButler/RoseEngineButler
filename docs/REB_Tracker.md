@@ -212,6 +212,10 @@ Progress on the `two-box` branch:
   Settings copied to `~/Documents/REBset_v1.ini.before-two-box`. To run
   `main`/`dev-rich` again: W5/W6 back to the factory setting,
   `REB_Change_Network.sh back`, copy that file back.
+- **Channel numbers on the panel's Axis Assignments tiles, 14 October
+  2026 (6465a4d on `two-box`, not yet seen in AXIS):** each tile has a
+  "Channel NN" label like REB Settings. Makes the panel 34 px taller -
+  check it still fits a 1080-line screen.
 - **Watchdog as E-stop - design needed:** a card's
   `watchdog.has_bit` stays true after it fires until something clears
   it, so wiring it straight into the E-stop chain could leave the
