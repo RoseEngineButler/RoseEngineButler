@@ -2208,7 +2208,7 @@ This will also give you the ability to run or index them using the panel to the 
                                           <property name="can-focus">False</property>
                                           <property name="halign">start</property>
                                           <property name="valign">center</property>
-                                          <property name="label" translatable="yes">The base box drives channels 00-05. The optional expansion box adds channels 06-09 and limit jacks 4-6.
+                                          <property name="label" translatable="yes">The base box has channels 00-05, limit switch jacks 1-3, the E-stop button, and the signal tower. The optional expansion box adds channels 06-09 and limit switch jacks 4-6. Each plug's number matches its channel number.
 
 Only tick Connected if the expansion box is plugged in. With it ticked, LinuxCNC looks for the expansion box when it starts, and if it can't find it, LinuxCNC will fail to start. If that happens, untick Connected here and start LinuxCNC again.
 
@@ -2216,7 +2216,7 @@ Turn on both boxes before starting LinuxCNC.
 
 Ticking or unticking Connected takes effect the next time LinuxCNC starts.
 
-Without the expansion box, its channels are greyed out and the axes on them can't be used. Choosing one of those axes on a base box channel swaps the two, so the axis that was on the base box channel moves to the expansion box channel.
+Without the expansion box, its channels and limit switch jacks are greyed out and the axes on them can't be used. They keep their assignments, ready for when an expansion box is connected. Choosing one of those axes on a base box channel swaps the two, so the axis that was on the base box channel moves to the expansion box channel. For example, if Sp0 is on channel 06 and W is on channel 04, choosing Sp0 for channel 04 puts W on channel 06.
 </property>
                                           <property name="wrap">True</property>
                                           <attributes>
