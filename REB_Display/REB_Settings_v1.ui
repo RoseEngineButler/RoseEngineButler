@@ -2180,6 +2180,55 @@ This will also give you the ability to run or index them using the panel to the 
                                           <property name="position">5</property>
                                         </packing>
                                       </child>
+                                      <child>
+                                        <object class="GtkLabel">
+                                          <property name="visible">True</property>
+                                          <property name="can-focus">False</property>
+                                          <property name="halign">start</property>
+                                          <property name="valign">start</property>
+                                          <property name="hexpand">True</property>
+                                          <property name="margin-top">16</property>
+                                          <property name="label" translatable="yes">Expansion Box Notes</property>
+                                          <property name="justify">center</property>
+                                          <attributes>
+                                            <attribute name="font-desc" value="DejaVu Serif 16"/>
+                                            <attribute name="weight" value="bold"/>
+                                            <attribute name="foreground" value="#1a1a5f5fb4b4"/>
+                                          </attributes>
+                                        </object>
+                                        <packing>
+                                          <property name="expand">False</property>
+                                          <property name="fill">True</property>
+                                          <property name="position">6</property>
+                                        </packing>
+                                      </child>
+                                      <child>
+                                        <object class="GtkLabel">
+                                          <property name="visible">True</property>
+                                          <property name="can-focus">False</property>
+                                          <property name="halign">start</property>
+                                          <property name="valign">center</property>
+                                          <property name="label" translatable="yes">The base box drives channels 00-05. The optional expansion box adds channels 06-09 and limit jacks 4-6.
+
+Only tick Connected if the expansion box is plugged in. With it ticked, LinuxCNC looks for the expansion box when it starts, and if it can't find it, LinuxCNC will fail to start. If that happens, untick Connected here and start LinuxCNC again.
+
+Turn on both boxes before starting LinuxCNC.
+
+Ticking or unticking Connected takes effect the next time LinuxCNC starts.
+
+Without the expansion box, its channels are greyed out and the axes on them can't be used. Choosing one of those axes on a base box channel swaps the two, so the axis that was on the base box channel moves to the expansion box channel.
+</property>
+                                          <property name="wrap">True</property>
+                                          <attributes>
+                                            <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                          </attributes>
+                                        </object>
+                                        <packing>
+                                          <property name="expand">False</property>
+                                          <property name="fill">True</property>
+                                          <property name="position">7</property>
+                                        </packing>
+                                      </child>
                                     </object>
                                   </child>
                                   <property name="shadow-type">none</property>
