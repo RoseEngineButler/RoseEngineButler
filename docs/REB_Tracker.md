@@ -177,11 +177,18 @@ Progress on the `two-box` branch:
   keep their meaning, 08/09 get the unused roles. **Development boxes:**
   roles on 06/07 (Rich's box has Sp0/Sp1 there) go inactive without an
   expansion box - move them to base channels to test.
+- **Step 2 - REB Settings, done 14 October 2026 (c6f1f5c, tested off
+  screen against a copy of Rich's settings, not on the machine):** the
+  approved mock-up made real - Base Box above Expansion Box on Axis
+  Selection with a working "Expansion Box - Connected" checkbox (saved
+  as `expansion_box`), Limit Jacks 1-3 over 4-6 on Inputs, Outputs and
+  Sounds. The expansion side is greyed and ignored until connected; a
+  greyed limit jack keeps its choice.
 - **Watchdog as E-stop - design needed:** a card's
   `watchdog.has_bit` stays true after it fires until something clears
   it, so wiring it straight into the E-stop chain could leave the
   machine stuck in E-stop. Work out how a reset clears it first.
-- Next: step 2 (REB Settings), step 3 (`REB_main.py`,
+- Next: step 3 (`REB_main.py`,
   `REB_Scale_Persist.py`, `REB_Settings_Restore.py` - still 8 channels
   on one card), step 4 (`REB_Change_Network.sh`, installers).
 
