@@ -2044,6 +2044,7 @@ from File</property>
                           <child>
                             <object class="GtkScrolledWindow" id="Axis_Selection_Notes_Scroll">
                               <property name="visible">True</property>
+                              <property name="propagate-natural-height">True</property>
                               <property name="can-focus">True</property>
                               <property name="hexpand">True</property>
                               <property name="vexpand">True</property>
@@ -2087,6 +2088,7 @@ from File</property>
                                           <property name="label" translatable="yes">When you wish to drive the spindle and rosette phaser/multiplier, there are two options.
 </property>
                                           <property name="wrap">True</property>
+                                          <property name="max-width-chars">80</property>
                                           <attributes>
                                             <attribute name="font-desc" value="DejaVu Serif 10"/>
                                           </attributes>
@@ -2131,6 +2133,7 @@ from File</property>
 This will also give you the ability to run or index them using the panel to the right side of the system.
 </property>
                                           <property name="wrap">True</property>
+                                          <property name="max-width-chars">80</property>
                                           <attributes>
                                             <attribute name="font-desc" value="DejaVu Serif 10"/>
                                           </attributes>
@@ -2170,6 +2173,7 @@ This will also give you the ability to run or index them using the panel to the 
                                           <property name="valign">center</property>
                                           <property name="label" translatable="yes">You can also use an angular axis to drive the motion.  Usually, this is C as that rotates about the Z axis, but it could also be A or B.  This is the approach needed if you need to coordinate the spindles' movement with other axes, such as when using a Gcode program.</property>
                                           <property name="wrap">True</property>
+                                          <property name="max-width-chars">80</property>
                                           <attributes>
                                             <attribute name="font-desc" value="DejaVu Serif 10"/>
                                           </attributes>
@@ -2219,6 +2223,7 @@ Ticking or unticking Connected takes effect the next time LinuxCNC starts.
 Without the expansion box, its channels and limit switch jacks are greyed out and the axes on them can't be used. They keep their assignments, ready for when an expansion box is connected. Choosing one of those axes on a base box channel swaps the two, so the axis that was on the base box channel moves to the expansion box channel. For example, if Sp0 is on channel 06 and W is on channel 04, choosing Sp0 for channel 04 puts W on channel 06.
 </property>
                                           <property name="wrap">True</property>
+                                          <property name="max-width-chars">80</property>
                                           <attributes>
                                             <attribute name="font-desc" value="DejaVu Serif 10"/>
                                           </attributes>
