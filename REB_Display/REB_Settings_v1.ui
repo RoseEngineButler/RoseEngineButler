@@ -2157,7 +2157,7 @@ This will also give you the ability to run or index them using the panel to the 
                           <property name="halign">start</property>
                           <property name="valign">start</property>
                           <property name="hexpand">True</property>
-                          <property name="label" translatable="yes">Inputs, Outputs and Sounds</property>
+                          <property name="label" translatable="yes">Inputs, Outputs, and Sounds</property>
                           <property name="justify">center</property>
                           <attributes>
                             <attribute name="font-desc" value="DejaVu Serif 20"/>
@@ -3175,7 +3175,7 @@ The button plugs into the E-stop (GX-16) plug. Check Connected only when a butto
                     <object class="GtkLabel" id="Settings_Tab_IO_Label">
                       <property name="visible">True</property>
                       <property name="can-focus">False</property>
-                      <property name="label" translatable="yes">Inputs, Outputs and Sounds</property>
+                      <property name="label" translatable="yes">Inputs, Outputs, and Sounds</property>
                     </object>
                     <packing>
                       <property name="position">1</property>
