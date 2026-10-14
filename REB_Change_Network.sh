@@ -65,6 +65,18 @@ NOCOLOR='\e[0m'
 REPO_DIR="/home/reuben/linuxcnc/configs/RoseEngineButler"
 FIRMWARE="$REPO_DIR/REB_Setup/MesaCard/7i92t_REB.bin"
 CONNECTION="Wired Ethernet"
+
+# A Pi where the installer was run more than once has several
+# connections called "Wired Ethernet" (found 14 October 2026), and nmcli
+# then changes just one of them. Use the one on eth0 now (else the
+# first), by its UUID, and give it a higher autoconnect priority so the
+# Pi starts with that one.
+CONNECTION_UUID=$(nmcli -t -f UUID,NAME,DEVICE con show --active 2>/dev/null \
+    | awk -F: -v n="$CONNECTION" '$2 == n && $3 == "eth0" {print $1; exit}')
+if [ -z "$CONNECTION_UUID" ]; then
+    CONNECTION_UUID=$(nmcli -t -f UUID,NAME con show 2>/dev/null \
+        | awk -F: -v n="$CONNECTION" '$2 == n {print $1; exit}')
+fi
 FACTORY_CARD_IP="192.168.1.121"
 OLD_PI_IP="192.168.1.120/24"
 BASE_CARD_IP="10.10.10.10"
@@ -184,12 +196,12 @@ set_up_card() {   # $1 = new address, $2 = "base" or "expansion"
 move_pi() {
     title "Move the Pi's wired connection to ${PI_IP%/*}"
     stop_if_linuxcnc_running
-    run nmcli con mod "$CONNECTION" ipv4.method manual ipv4.addresses "$PI_IP" ipv4.gateway "" ipv4.dns ""
+    run nmcli con mod "$CONNECTION_UUID" ipv4.method manual ipv4.addresses "$PI_IP" ipv4.gateway "" ipv4.dns "" connection.autoconnect-priority 10
     if [ $? != 0 ]; then
         warn "Changing the '$CONNECTION' connection failed - nothing else was changed."
         exit 1
     fi
-    run nmcli con up "$CONNECTION"
+    run nmcli con up "$CONNECTION_UUID"
     sleep 2
     for card_ip in "$BASE_CARD_IP" "$EXPANSION_CARD_IP"; do
         if card_answers "$card_ip"; then
@@ -208,8 +220,8 @@ move_pi_back() {
     say "from before the two-box change. A card already moved to 10.10.10.x"
     say "also needs its W5/W6 jumpers back at the factory setting."
     confirm "Continue?" || exit 0
-    run nmcli con mod "$CONNECTION" ipv4.method manual ipv4.addresses "$OLD_PI_IP" ipv4.gateway "" ipv4.dns ""
-    run nmcli con up "$CONNECTION"
+    run nmcli con mod "$CONNECTION_UUID" ipv4.method manual ipv4.addresses "$OLD_PI_IP" ipv4.gateway "" ipv4.dns "" connection.autoconnect-priority 10
+    run nmcli con up "$CONNECTION_UUID"
     sleep 2
     if card_answers "$FACTORY_CARD_IP"; then
         say "Card at $FACTORY_CARD_IP answers."

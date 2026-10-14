@@ -106,6 +106,11 @@ echo -e "${CMNTTEXT}Add the wired Ethernet network connectin${NOCOLOR}"
 # nothing but the Pi and the Mesa cards is on this network, and a
 # gateway here would clash with a home network that also uses
 # 192.168.1.x - the Pi's internet is on Wi-Fi.
+# Remove any left by an earlier run of this installer first - with
+# several of the same name, nmcli and REB_Change_Network.sh change only one.
+for uuid in $(nmcli -t -f UUID,NAME con show | awk -F: '$2 == "Wired Ethernet" {print $1}'); do
+    nmcli con delete "$uuid"
+done
 nmcli con add type ethernet con-name "Wired Ethernet" ipv4.address 192.168.1.120/24 ipv4.method manual
 if [ $? != 0 ]; then
     echo -e "${KEYNOTE}ERROR: nmcli failed.                                             ${NOCOLOR}"
