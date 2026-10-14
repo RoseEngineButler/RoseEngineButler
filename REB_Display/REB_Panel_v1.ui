@@ -31,6 +31,8 @@
 #   1.0 - 21 July 2026                                                #
 #   1.1 - 22 September 2026 - Indexing/Sync Move tabs                 #
 #   1.2 - 24 September 2026 - Threading tab                           #
+#   1.3 - 14 October 2026 - Channel number on each Axis Assignments   #
+#         tile                                                        #
 #                                                                     #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.             #
 #                                                                     #
@@ -1986,6 +1988,17 @@ W is parallel to Z</property>
                             </child>
                           </object>
                         </child>
+                        <child type="label">
+                          <object class="GtkLabel" id="Panel_Channel_02_Name">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label" translatable="yes">Channel 02</property>
+                            <attributes>
+                              <attribute name="font-desc" value="DejaVu Serif 10"/>
+                              <attribute name="weight" value="bold"/>
+                            </attributes>
+                          </object>
+                        </child>
                       </object>
                       <packing>
                         <property name="left-attach">1</property>
@@ -2039,6 +2052,17 @@ W is parallel to Z</property>
                                 <property name="position">1</property>
                               </packing>
                             </child>
+                          </object>
+                        </child>
+                        <child type="label">
+                          <object class="GtkLabel" id="Panel_Channel_03_Name">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label" translatable="yes">Channel 03</property>
+                            <attributes>
+                              <attribute name="font-desc" value="DejaVu Serif 10"/>
+                              <attribute name="weight" value="bold"/>
+                            </attributes>
                           </object>
                         </child>
                       </object>
@@ -2096,6 +2120,17 @@ W is parallel to Z</property>
                             </child>
                           </object>
                         </child>
+                        <child type="label">
+                          <object class="GtkLabel" id="Panel_Channel_00_Name">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label" translatable="yes">Channel 00</property>
+                            <attributes>
+                              <attribute name="font-desc" value="DejaVu Serif 10"/>
+                              <attribute name="weight" value="bold"/>
+                            </attributes>
+                          </object>
+                        </child>
                       </object>
                       <packing>
                         <property name="left-attach">0</property>
@@ -2149,6 +2184,17 @@ W is parallel to Z</property>
                                 <property name="position">1</property>
                               </packing>
                             </child>
+                          </object>
+                        </child>
+                        <child type="label">
+                          <object class="GtkLabel" id="Panel_Channel_05_Name">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label" translatable="yes">Channel 05</property>
+                            <attributes>
+                              <attribute name="font-desc" value="DejaVu Serif 10"/>
+                              <attribute name="weight" value="bold"/>
+                            </attributes>
                           </object>
                         </child>
                       </object>
@@ -2206,6 +2252,17 @@ W is parallel to Z</property>
                             </child>
                           </object>
                         </child>
+                        <child type="label">
+                          <object class="GtkLabel" id="Panel_Channel_04_Name">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label" translatable="yes">Channel 04</property>
+                            <attributes>
+                              <attribute name="font-desc" value="DejaVu Serif 10"/>
+                              <attribute name="weight" value="bold"/>
+                            </attributes>
+                          </object>
+                        </child>
                       </object>
                       <packing>
                         <property name="left-attach">2</property>
@@ -2259,6 +2316,17 @@ W is parallel to Z</property>
                                 <property name="position">1</property>
                               </packing>
                             </child>
+                          </object>
+                        </child>
+                        <child type="label">
+                          <object class="GtkLabel" id="Panel_Channel_01_Name">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label" translatable="yes">Channel 01</property>
+                            <attributes>
+                              <attribute name="font-desc" value="DejaVu Serif 10"/>
+                              <attribute name="weight" value="bold"/>
+                            </attributes>
                           </object>
                         </child>
                       </object>
@@ -2317,6 +2385,17 @@ W is parallel to Z</property>
                             </child>
                           </object>
                         </child>
+                        <child type="label">
+                          <object class="GtkLabel" id="Panel_Channel_06_Name">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label" translatable="yes">Channel 06</property>
+                            <attributes>
+                              <attribute name="font-desc" value="DejaVu Serif 10"/>
+                              <attribute name="weight" value="bold"/>
+                            </attributes>
+                          </object>
+                        </child>
                       </object>
                       <packing>
                         <property name="left-attach">3</property>
@@ -2371,6 +2450,17 @@ W is parallel to Z</property>
                                 <property name="position">1</property>
                               </packing>
                             </child>
+                          </object>
+                        </child>
+                        <child type="label">
+                          <object class="GtkLabel" id="Panel_Channel_07_Name">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label" translatable="yes">Channel 07</property>
+                            <attributes>
+                              <attribute name="font-desc" value="DejaVu Serif 10"/>
+                              <attribute name="weight" value="bold"/>
+                            </attributes>
                           </object>
                         </child>
                       </object>
@@ -2428,6 +2518,17 @@ W is parallel to Z</property>
                             </child>
                           </object>
                         </child>
+                        <child type="label">
+                          <object class="GtkLabel" id="Panel_Channel_08_Name">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label" translatable="yes">Channel 08</property>
+                            <attributes>
+                              <attribute name="font-desc" value="DejaVu Serif 10"/>
+                              <attribute name="weight" value="bold"/>
+                            </attributes>
+                          </object>
+                        </child>
                       </object>
                       <packing>
                         <property name="left-attach">4</property>
@@ -2481,6 +2582,17 @@ W is parallel to Z</property>
                                 <property name="position">1</property>
                               </packing>
                             </child>
+                          </object>
+                        </child>
+                        <child type="label">
+                          <object class="GtkLabel" id="Panel_Channel_09_Name">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="label" translatable="yes">Channel 09</property>
+                            <attributes>
+                              <attribute name="font-desc" value="DejaVu Serif 10"/>
+                              <attribute name="weight" value="bold"/>
+                            </attributes>
                           </object>
                         </child>
                       </object>

@@ -913,7 +913,8 @@ class HandlerClass:
         '''
         Reads the persisted channel -> axis letter assignment and
         populates the main panel's own read-only "Axis Assignments"
-        display (Panel_Channel_0N_Axis/_Type - REB_Panel_v1.ui), if
+        display (Panel_Channel_0N_Axis/_Type - REB_Panel_v1.ui; each
+        tile's "Channel 0N" frame label, _Name, is fixed text), if
         this component owns those widgets. Unlike the Axis Selection
         tab's combos, these are plain labels with no signal handlers -
         purely informational; the Settings tab is the only place the
