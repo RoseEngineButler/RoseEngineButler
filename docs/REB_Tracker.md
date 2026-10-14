@@ -164,6 +164,65 @@ connected. Pictures: `docs/mockups/two_box_axis_selection.png` and
 on the `two-box-mockup` branch (display only - channels 08/09 and jacks
 4-6 do nothing; don't merge it): start the real screens from it.
 
+Progress on the `two-box` branch:
+
+- **Step 1 - HAL side, done 14 October 2026 (8cfd0b7, not run on
+  hardware):** ten channels in the shared settings module, the
+  `expansion_box` setting, the startup generator pointing each role at
+  its card, one `hm2_eth` line for one or both cards at 10.10.10.10 /
+  .11 (fixed in the code - Rich's choice), the second card's read/write
+  and timer/watchdog lines, and limit jacks 4-6 on the second card.
+  Base box defaults (Rich, 14 October 2026): X Z B W Sp0 Sp1 on 00-05,
+  then U V A C on 06-09. Existing settings need no conversion: 00-05
+  keep their meaning, 08/09 get the unused roles. **Development boxes:**
+  roles on 06/07 (Rich's box has Sp0/Sp1 there) go inactive without an
+  expansion box - move them to base channels to test.
+- **Step 2 - REB Settings, done 14 October 2026 (c6f1f5c, tested off
+  screen against a copy of Rich's settings, not on the machine):** the
+  approved mock-up made real - Base Box above Expansion Box on Axis
+  Selection with a working "Expansion Box - Connected" checkbox (saved
+  as `expansion_box`), Limit Jacks 1-3 over 4-6 on Inputs, Outputs and
+  Sounds. The expansion side is greyed and ignored until connected; a
+  greyed limit jack keeps its choice.
+- **Step 3 - runtime programs, done 14 October 2026 (09b7fad, not run
+  on the machine):** the main panel's code, the shutdown save and the
+  startup restore use the same channel model and "active only on a
+  channel in use" rule as the generator, so roles and joint numbers
+  match (checked in four setups), and reach channels 06-09 on the second
+  card. The panel's Axis Assignments tiles follow the new plug layout,
+  with the expansion box's four tiles shown only when it's connected
+  (Rich's choice).
+- **Step 4 - network, written 14 October 2026 (tested with --dry-run
+  only):** `REB_Change_Network.sh` sets a card up as the base (.10) or
+  expansion (.11) card and moves the Pi to 10.10.10.100 (or back to
+  192.168.1.120); the Debian 13 installer uses it and drops the
+  192.168.1.1 gateway/DNS. **To test when Rich's new 7i92 arrives:**
+  connect only the new card, run `REB_Change_Network.sh base` (or
+  `expansion`), confirm which W5/W6 setting the 7i92 manual calls
+  EEPROM, check it answers at its new address after power-up; then
+  `git switch two-box`, move Sp0/Sp1 to base channels 00-05, and run
+  LinuxCNC. Leave the current card at 192.168.1.121 until then, so
+  `dev-rich` keeps working.
+- **Rich's Pi moved to the two-box network, 14 October 2026:** its
+  7i92 had 10.10.10.10 stored (no new firmware), the Pi's wired
+  connection is 10.10.10.100 (autoconnect priority 10 - the Pi had three
+  "Wired Ethernet" connections; fixed in the script and installer, 809510d
+  on `two-box`), and the Pi is on `two-box`. Plugs 06/07 do nothing on a
+  base box, so Sp0/Sp1 must be moved to channels 00-05 in REB Settings.
+  Settings copied to `~/Documents/REBset_v1.ini.before-two-box`. To run
+  `main`/`dev-rich` again: W5/W6 back to the factory setting,
+  `REB_Change_Network.sh back`, copy that file back.
+- **Channel numbers on the panel's Axis Assignments tiles, 14 October
+  2026 (6465a4d on `two-box`, not yet seen in AXIS):** each tile has a
+  "Channel NN" label like REB Settings. Makes the panel 34 px taller -
+  check it still fits a 1080-line screen.
+- **Watchdog as E-stop - design needed:** a card's
+  `watchdog.has_bit` stays true after it fires until something clears
+  it, so wiring it straight into the E-stop chain could leave the
+  machine stuck in E-stop. Work out how a reset clears it first.
+- Next: testing on hardware once the new 7i92 arrives, then the
+  watchdog design.
+
 Software work once the design is fixed (not started):
 
 1. Channels 00-09 across two cards (`hm2_7i92.0` for 00-05,
