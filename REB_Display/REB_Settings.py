@@ -1244,6 +1244,23 @@ class HandlerClass:
             if grid.child_get_property(child, "top-attach") > row:
                 child.set_visible(shown)
 
+    def _fit_notes_height(self, scroll, allocation):
+        '''
+        Makes the Axis Selection page's notes column as tall as its text
+        needs at the width it actually got (14 October 2026). The window's
+        own scrolled page measures wrapped text as if each paragraph were
+        one long line, so the column came out too short and the end of
+        the Expansion Box Notes was cut off; limiting the line length
+        fixed that but left the text in a narrow strip.
+        '''
+        child = scroll.get_child()
+        if child is None:
+            return
+        needed = child.get_preferred_height_for_width(allocation.width)[1]
+        if needed != scroll.get_min_content_height():
+            # Not from inside size-allocate - set it on the next idle.
+            GLib.idle_add(scroll.set_min_content_height, needed)
+
     def apply_advanced_visibility(self):
         # Called after window.show_all(), which would otherwise show the
         # advanced rows of a closed expander.
@@ -2982,6 +2999,11 @@ class HandlerClass:
         # Restore the persisted device-name list (REBset_v1.ini) into
         # the Other page's Device Names text box.
         self._load_device_names()
+
+        # Axis Selection's notes column: see _fit_notes_height.
+        notes = self.builder.get_object("Axis_Selection_Notes_Scroll")
+        if notes is not None:
+            notes.connect("size-allocate", self._fit_notes_height)
 
         # Restore the persisted channel -> axis letter assignment
         # (REBset_v1.ini) into the Axis Selection tab's six combos.
