@@ -154,16 +154,22 @@ SETTINGS_PATH = "/home/reuben/Documents/REBset_v1.ini"
 # per-role dicts and CURRENT_LETTER/CURRENT_LETTER_INTERNAL_ID/PID_AXES/
 # EXTRA_SETTINGS_LETTERS - see _ROLE_CHANNEL_OF and JOINT_NUMBER below,
 # both now computed fresh from the persisted assignment instead.
-CHANNEL_DEFAULT_ROLE = {
-    "00": "W",
-    "01": "Z",
-    "02": "U",
-    "03": "V",
-    "04": "X",
-    "05": "B",
-    "06": "Sp0",
-    "07": "Sp1",
-}
+#
+# Two-box hardware (14 October 2026): the 10 channels, their defaults
+# and which card/stepgen each is on now come from reb_settings_io
+# (CHANNEL_DEFAULT_ROLE, CHANNEL_IDS, BASE_CHANNELS, EXPANSION_CHANNELS,
+# channel_hal) - shared, since completing an old 8-channel assignment
+# must work the same in every program. Channels 06-09 are the optional
+# expansion box's; their roles only count while "expansion_box" is set.
+CHANNEL_DEFAULT_ROLE = reb_settings_io.CHANNEL_DEFAULT_ROLE
+CHANNEL_IDS = reb_settings_io.CHANNEL_IDS
+EXPANSION_CHANNELS = reb_settings_io.EXPANSION_CHANNELS
+
+
+def _stepgen_pin(channel_id, suffix):
+    '''A channel's stepgen HAL pin on whichever card it's on, e.g. ".position-scale".'''
+    card, stepgen = reb_settings_io.channel_hal(channel_id)
+    return card + ".stepgen." + stepgen + suffix
 
 # The 8 letters selectable on the Axis Selection tab (Y removed - not
 # used on this machine, LATHE=1) and the 2 spindles - the 10 possible
@@ -192,41 +198,38 @@ def _axis_type_for_letter(letter):
 def _save_channel_assignments(assignments):
     '''
     Persists the Axis Selection tab's channel -> role choices into
-    REBset_v1.ini's "channel_assignments" dict. assignments is a dict of
-    channel id ("00".."07") -> role; any channel missing from it falls
-    back to CHANNEL_DEFAULT_ROLE.
+    REBset_v1.ini's "channel_assignments" dict, for all 10 channels
+    (a missing one falls back to CHANNEL_DEFAULT_ROLE).
     '''
     settings = reb_settings_io.load_settings()
     settings["channel_assignments"] = {
         channel_id: assignments.get(channel_id, CHANNEL_DEFAULT_ROLE[channel_id])
-        for channel_id in sorted(CHANNEL_DEFAULT_ROLE)
+        for channel_id in CHANNEL_IDS
     }
     reb_settings_io.save_settings(settings)
     print("Saved channel assignments: " + str(settings["channel_assignments"]))
 
 def _read_persisted_channel_assignments():
     '''
-    Reads the persisted channel -> role map, falling back to
-    CHANNEL_DEFAULT_ROLE for any channel whose entry is missing or
-    unrecognized - same "absent -> shipped default" convention as
-    _load_measurement_system.
+    The persisted channel -> role map, completed to all 10 channels with
+    each role used once (reb_settings_io.complete_channel_assignments -
+    an old 8-channel file keeps its 00-07 and 08/09 get the unused roles).
     '''
-    assignments = dict(CHANNEL_DEFAULT_ROLE)
-    stored = reb_settings_io.load_settings().get("channel_assignments", {})
-    for channel_id, role in stored.items():
-        if channel_id in assignments and role in CHANNEL_ROLES:
-            assignments[channel_id] = role
+    return reb_settings_io.complete_channel_assignments(
+        reb_settings_io.load_settings().get("channel_assignments"))
 
-    # Defensive against a hand-edited or corrupted file (REBset_v1.ini's
-    # own header says "should not be modified directly"): if the same
-    # role somehow ended up on two channels, ignore the persisted data
-    # entirely rather than regenerating REB.ini/REB.hal with a duplicate
-    # role.
-    if len(set(assignments.values())) != len(assignments):
-        print("Duplicate role(s) in persisted channel_assignments - using shipped defaults")
-        return dict(CHANNEL_DEFAULT_ROLE)
+# The optional expansion box (two-box hardware, 14 October 2026): the
+# Axis Selection page's Expansion_Box_Connected checkbox, persisted as
+# REBset_v1.ini's "expansion_box" (absent = not connected). Without it,
+# channels 06-09 and limit jacks 4-6 are greyed out and ignored.
+def _save_expansion_box(connected):
+    settings = reb_settings_io.load_settings()
+    settings["expansion_box"] = bool(connected)
+    reb_settings_io.save_settings(settings)
+    print("Saved expansion box: " + ("connected" if connected else "not connected"))
 
-    return assignments
+def _read_persisted_expansion_box():
+    return reb_settings_io.load_settings().get("expansion_box") is True
 
 # The 3 GX-12 limit jacks on the panel. Each takes one normally-closed
 # limit switch (or both ends of an axis's travel wired in series) and
@@ -239,7 +242,9 @@ def _read_persisted_channel_assignments():
 # "B", "B min", "B max", or "" = not used)
 # and wired into HAL at the next launch by REB_Generate_Local_Ini.py,
 # whose LIMIT_JACK_INPUT maps each jack to its 7i92 input.
-LIMIT_JACKS = ("1", "2", "3")
+LIMIT_JACKS = ("1", "2", "3", "4", "5", "6")
+# Jacks 4-6 are on the expansion box - see _read_persisted_expansion_box.
+EXPANSION_LIMIT_JACKS = ("4", "5", "6")
 LIMIT_JACK_NOT_USED = "Not used"
 
 # limit_switches value suffix -> which end(s) of travel it covers, and
@@ -448,7 +453,8 @@ _CHANNEL_ASSIGNMENTS_AT_STARTUP = _read_persisted_channel_assignments()
 # forever AXIS_STEPGEN dict - unlike that dict, a role's channel is no
 # longer fixed at all, so this has to be computed fresh from the
 # persisted assignment instead of hardcoded.
-_ROLE_CHANNEL_OF = {role: channel_id for channel_id, role in _CHANNEL_ASSIGNMENTS_AT_STARTUP.items()}
+_ROLE_CHANNEL_OF = {role: channel_id for channel_id, role in _CHANNEL_ASSIGNMENTS_AT_STARTUP.items()
+                    if channel_id in reb_settings_io.active_channels(reb_settings_io.load_settings())}
 
 # Letter -> this session's actual joint number, for whichever axis
 # letters are currently assigned to a channel (JOINTS itself is dynamic
@@ -699,11 +705,11 @@ def _stepgen_step_rate_ceiling(stepgen_ch):
     '''
     try:
         steplen_result = subprocess.run(
-            ["halcmd", "getp", "hm2_7i92.0.stepgen." + stepgen_ch + ".steplen"],
+            ["halcmd", "getp", _stepgen_pin(stepgen_ch, ".steplen")],
             check=True, capture_output=True, text=True
         )
         stepspace_result = subprocess.run(
-            ["halcmd", "getp", "hm2_7i92.0.stepgen." + stepgen_ch + ".stepspace"],
+            ["halcmd", "getp", _stepgen_pin(stepgen_ch, ".stepspace")],
             check=True, capture_output=True, text=True
         )
         steplen = float(steplen_result.stdout.strip())
@@ -888,7 +894,7 @@ class HandlerClass:
                 # file for whenever this role is assigned.
                 continue
 
-            hal_pin = "hm2_7i92.0.stepgen." + channel_id + ".position-scale"
+            hal_pin = _stepgen_pin(channel_id, ".position-scale")
             if self._linuxcnc_running:
                 try:
                     subprocess.run(
@@ -939,7 +945,7 @@ class HandlerClass:
                 if stepgen_ch is None or not self._linuxcnc_running:
                     continue
 
-                hal_pin = "hm2_7i92.0.stepgen." + stepgen_ch + hal_suffix
+                hal_pin = _stepgen_pin(stepgen_ch, hal_suffix)
                 try:
                     subprocess.run(
                         ["halcmd", "setp", hal_pin, str(value)],
@@ -1409,7 +1415,7 @@ class HandlerClass:
         if self.builder.get_object("Channel_00_Axis") is None:
             return
 
-        for channel_id in CHANNEL_DEFAULT_ROLE:
+        for channel_id in CHANNEL_IDS:
             combo = self.builder.get_object("Channel_" + channel_id + "_Axis")
             if combo is None:
                 continue
@@ -1470,7 +1476,8 @@ class HandlerClass:
         for role in self._channel_assignments.values():
             role_counts[role] = role_counts.get(role, 0) + 1
 
-        sp0_assigned = "Sp0" in self._channel_assignments.values()
+        active = self._active_roles()
+        sp0_assigned = "Sp0" in active
 
         any_violation = False
         for channel_id, role in self._channel_assignments.items():
@@ -1480,13 +1487,65 @@ class HandlerClass:
             if role_counts[role] > 1:
                 warning.set_markup('<span foreground="red" weight="bold">Duplicate!</span>')
                 any_violation = True
-            elif role == "Sp1" and not sp0_assigned:
+            elif role == "Sp1" and role in active and not sp0_assigned:
                 warning.set_markup('<span foreground="red" weight="bold">Sp1 needs Sp0!</span>')
                 any_violation = True
             else:
                 warning.set_text("")
 
         return any_violation
+
+    def _active_roles(self):
+        '''
+        The roles on channels in use right now: the base box's six, plus
+        the expansion box's four while it's marked connected.
+        '''
+        return {role for channel_id, role in self._channel_assignments.items()
+                if self._expansion_box or channel_id not in EXPANSION_CHANNELS}
+
+    def _load_expansion_box(self):
+        '''
+        Reads the persisted "expansion_box" setting into the Axis
+        Selection page's checkbox and greys the expansion side to match.
+        Must run before _load_channel_assignments/_load_limit_jacks, which
+        use self._expansion_box.
+        '''
+        self._expansion_box = _read_persisted_expansion_box()
+        check = self.builder.get_object("Expansion_Box_Connected")
+        if check is not None:
+            self._applying_expansion_box = True
+            check.set_active(self._expansion_box)
+            self._applying_expansion_box = False
+        self._apply_expansion_sensitivity()
+
+    def _apply_expansion_sensitivity(self):
+        '''Greys channels 06-09 and limit jacks 4-6 out unless the expansion box is connected.'''
+        ids = (["Channel_" + c + "_Axis" for c in EXPANSION_CHANNELS]
+               + ["Limit_Jack_" + j + "_Axis" for j in EXPANSION_LIMIT_JACKS])
+        for wid in ids:
+            w = self.builder.get_object(wid)
+            while w is not None and not isinstance(w, Gtk.Frame):
+                w = w.get_parent()
+            if w is not None:
+                w.set_sensitive(self._expansion_box)
+
+    def Expansion_Box_Toggled(self, widget):
+        '''
+        Persists the expansion box checkbox, greys or ungreys its side of
+        both pages, and re-checks the channels and limit jacks - roles on
+        channels 06-09 count only while it's connected (e.g. Sp1 there
+        needs Sp0 somewhere in use). Takes effect at the next launch.
+        '''
+        if self._applying_expansion_box:
+            return
+        self._expansion_box = widget.get_active()
+        _save_expansion_box(self._expansion_box)
+        self._apply_expansion_sensitivity()
+        if self._update_validation_warnings():
+            return
+        if self._rebuild_limit_jack_combos():
+            _save_limit_jacks(self._limit_jacks)
+        self._update_limit_jack_warnings()
 
     def _load_channel_assignments(self):
         '''
@@ -1552,7 +1611,7 @@ class HandlerClass:
         if self.builder.get_object("Limit_Jack_1_Axis") is None:
             return False
 
-        assigned = set(self._channel_assignments.values())
+        assigned = self._active_roles()
         values = ("",) + tuple(
             letter + suffix
             for letter in AXIS_SELECTION_LETTERS if letter in assigned
@@ -1561,16 +1620,25 @@ class HandlerClass:
         cleared = False
         self._applying_limit_jacks = True
         for jack in LIMIT_JACKS:
-            parsed = _parse_limit_value(self._limit_jacks[jack])
-            if parsed and parsed[0] not in assigned:
-                self._limit_jacks[jack] = ""
-                self._limit_jack_notices[jack] = parsed[0] + " not assigned - cleared"
-                cleared = True
+            jack_values = values
+            if jack in EXPANSION_LIMIT_JACKS and not self._expansion_box:
+                # Greyed out with no expansion box: keep its choice as it
+                # is (shown, not cleared) so connecting the box brings it back.
+                if self._limit_jacks[jack] not in jack_values:
+                    jack_values = jack_values + (self._limit_jacks[jack],)
+            else:
+                parsed = _parse_limit_value(self._limit_jacks[jack])
+                if parsed and parsed[0] not in assigned:
+                    self._limit_jacks[jack] = ""
+                    self._limit_jack_notices[jack] = parsed[0] + " not assigned - cleared"
+                    cleared = True
             combo = self.builder.get_object("Limit_Jack_" + jack + "_Axis")
+            if combo is None:
+                continue
             combo.remove_all()
-            for value in values:
+            for value in jack_values:
                 combo.append(value, _limit_value_label(value))
-            combo.set_active(values.index(self._limit_jacks[jack]))
+            combo.set_active(jack_values.index(self._limit_jacks[jack]))
         self._applying_limit_jacks = False
         return cleared
 
@@ -1712,10 +1780,14 @@ class HandlerClass:
         if self.builder.get_object("Limit_Jack_1_Warning") is None:
             return False
 
-        parsed = {jack: _parse_limit_value(self._limit_jacks[jack]) for jack in LIMIT_JACKS}
+        in_use = [j for j in LIMIT_JACKS if self._expansion_box or j not in EXPANSION_LIMIT_JACKS]
+        parsed = {jack: (_parse_limit_value(self._limit_jacks[jack]) if jack in in_use else None)
+                  for jack in LIMIT_JACKS}
         any_violation = False
         for jack in LIMIT_JACKS:
             warning = self.builder.get_object("Limit_Jack_" + jack + "_Warning")
+            if warning is None:
+                continue
             problem = None
             if parsed[jack]:
                 for other in LIMIT_JACKS:
@@ -2705,7 +2777,7 @@ class HandlerClass:
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
 
-        hal_pin = "hm2_7i92.0.stepgen." + channel_id + ".position-scale"
+        hal_pin = _stepgen_pin(channel_id, ".position-scale")
         cmd = ["halcmd", "setp", hal_pin, str(Sp0_Scale)]
 
         try:
@@ -2780,7 +2852,7 @@ class HandlerClass:
         except FileNotFoundError:
             print("halcmd not found - is the LinuxCNC environment sourced?")
 
-        hal_pin = "hm2_7i92.0.stepgen." + channel_id + ".position-scale"
+        hal_pin = _stepgen_pin(channel_id, ".position-scale")
         cmd = ["halcmd", "setp", hal_pin, str(Sp1_Scale)]
 
         try:
@@ -2843,6 +2915,7 @@ class HandlerClass:
         # _rebuild_all_channel_combo_items) driving the six Axis Selection
         # combos.
         self._applying_channel_assignments = False
+        self._applying_expansion_box = False
 
         # Same suppression as above, for _load_limit_jacks driving the
         # three Limit_Jack_N_Axis combos.
@@ -2911,6 +2984,7 @@ class HandlerClass:
 
         # Restore the persisted channel -> axis letter assignment
         # (REBset_v1.ini) into the Axis Selection tab's six combos.
+        self._load_expansion_box()
         self._load_channel_assignments()
 
         # Restore the persisted limit jack -> axis letter choices
@@ -3018,7 +3092,7 @@ def _axis_set_scale_letter(letter):
         c.wait_complete()
 
         scale = round(widget.get_value(), 3)
-        hal_pin = "hm2_7i92.0.stepgen." + channel_id + ".position-scale"
+        hal_pin = _stepgen_pin(channel_id, ".position-scale")
         status_pin = "gladevcp." + letter + "_ENA-light"
         ena_signal = letter.lower() + "-ena-settings-allow"
 
@@ -3175,7 +3249,7 @@ def _axis_set_max(axis, param):
             print(axis + " is not currently assigned to a channel - value kept, no live HAL write")
             return
 
-        hal_pin = "hm2_7i92.0.stepgen." + channel_id + hal_suffix
+        hal_pin = _stepgen_pin(channel_id, hal_suffix)
         value = widget.get_value()
         try:
             subprocess.run(
@@ -3218,7 +3292,7 @@ def _axis_set_max_letter(letter, param):
             print(letter + " is not currently assigned to a channel - value kept, no live HAL write")
             return
 
-        hal_pin = "hm2_7i92.0.stepgen." + channel_id + hal_suffix
+        hal_pin = _stepgen_pin(channel_id, hal_suffix)
         value = widget.get_value()
         try:
             subprocess.run(
@@ -3295,7 +3369,7 @@ def _channel_axis_changed(channel_id):
     handler.__name__ = "Channel_" + channel_id + "_Axis_Changed"
     return handler
 
-for _channel_id in CHANNEL_DEFAULT_ROLE:
+for _channel_id in CHANNEL_IDS:
     setattr(HandlerClass, "Channel_" + _channel_id + "_Axis_Changed", _channel_axis_changed(_channel_id))
 del _channel_id
 
