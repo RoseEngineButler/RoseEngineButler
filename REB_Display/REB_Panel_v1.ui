@@ -1988,7 +1988,7 @@ W is parallel to Z</property>
                         </child>
                       </object>
                       <packing>
-                        <property name="left-attach">0</property>
+                        <property name="left-attach">1</property>
                         <property name="top-attach">0</property>
                       </packing>
                     </child>
@@ -2044,7 +2044,7 @@ W is parallel to Z</property>
                       </object>
                       <packing>
                         <property name="left-attach">1</property>
-                        <property name="top-attach">0</property>
+                        <property name="top-attach">1</property>
                       </packing>
                     </child>
                     <child>
@@ -2098,7 +2098,7 @@ W is parallel to Z</property>
                         </child>
                       </object>
                       <packing>
-                        <property name="left-attach">2</property>
+                        <property name="left-attach">0</property>
                         <property name="top-attach">0</property>
                       </packing>
                     </child>
@@ -2153,8 +2153,8 @@ W is parallel to Z</property>
                         </child>
                       </object>
                       <packing>
-                        <property name="left-attach">3</property>
-                        <property name="top-attach">0</property>
+                        <property name="left-attach">2</property>
+                        <property name="top-attach">1</property>
                       </packing>
                     </child>
                     <child>
@@ -2208,8 +2208,8 @@ W is parallel to Z</property>
                         </child>
                       </object>
                       <packing>
-                        <property name="left-attach">0</property>
-                        <property name="top-attach">1</property>
+                        <property name="left-attach">2</property>
+                        <property name="top-attach">0</property>
                       </packing>
                     </child>
                     <child>
@@ -2263,7 +2263,7 @@ W is parallel to Z</property>
                         </child>
                       </object>
                       <packing>
-                        <property name="left-attach">1</property>
+                        <property name="left-attach">0</property>
                         <property name="top-attach">1</property>
                       </packing>
                     </child>
@@ -2273,6 +2273,7 @@ W is parallel to Z</property>
                         <property name="can-focus">False</property>
                         <property name="label-xalign">0</property>
                         <property name="shadow-type">in</property>
+                        <property name="margin-start">12</property>
                         <child>
                           <object class="GtkBox">
                             <property name="visible">True</property>
@@ -2318,8 +2319,8 @@ W is parallel to Z</property>
                         </child>
                       </object>
                       <packing>
-                        <property name="left-attach">2</property>
-                        <property name="top-attach">1</property>
+                        <property name="left-attach">3</property>
+                        <property name="top-attach">0</property>
                       </packing>
                     </child>
                     <child>
@@ -2328,6 +2329,7 @@ W is parallel to Z</property>
                         <property name="can-focus">False</property>
                         <property name="label-xalign">0</property>
                         <property name="shadow-type">in</property>
+                        <property name="margin-start">12</property>
                         <child>
                           <object class="GtkBox">
                             <property name="visible">True</property>
@@ -2374,6 +2376,116 @@ W is parallel to Z</property>
                       </object>
                       <packing>
                         <property name="left-attach">3</property>
+                        <property name="top-attach">1</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkFrame">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label-xalign">0</property>
+                        <property name="shadow-type">in</property>
+                        <child>
+                          <object class="GtkBox">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="orientation">vertical</property>
+                            <property name="spacing">2</property>
+                            <child>
+                              <object class="GtkLabel" id="Panel_Channel_08_Axis">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="halign">center</property>
+                                <property name="valign">center</property>
+                                <property name="label" translatable="yes">Sp0</property>
+                                <attributes>
+                                  <attribute name="font-desc" value="DejaVu Serif 24"/>
+                                  <attribute name="weight" value="bold"/>
+                                </attributes>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkLabel" id="Panel_Channel_08_Type">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="halign">center</property>
+                                <property name="valign">center</property>
+                                <property name="label" translatable="yes">Spindle</property>
+                                <attributes>
+                                  <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                </attributes>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="left-attach">4</property>
+                        <property name="top-attach">0</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkFrame">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label-xalign">0</property>
+                        <property name="shadow-type">in</property>
+                        <child>
+                          <object class="GtkBox">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <property name="orientation">vertical</property>
+                            <property name="spacing">2</property>
+                            <child>
+                              <object class="GtkLabel" id="Panel_Channel_09_Axis">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="halign">center</property>
+                                <property name="valign">center</property>
+                                <property name="label" translatable="yes">Sp1</property>
+                                <attributes>
+                                  <attribute name="font-desc" value="DejaVu Serif 24"/>
+                                  <attribute name="weight" value="bold"/>
+                                </attributes>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">0</property>
+                              </packing>
+                            </child>
+                            <child>
+                              <object class="GtkLabel" id="Panel_Channel_09_Type">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="halign">center</property>
+                                <property name="valign">center</property>
+                                <property name="label" translatable="yes">RPM</property>
+                                <attributes>
+                                  <attribute name="font-desc" value="DejaVu Serif 10"/>
+                                </attributes>
+                              </object>
+                              <packing>
+                                <property name="expand">False</property>
+                                <property name="fill">True</property>
+                                <property name="position">1</property>
+                              </packing>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="left-attach">4</property>
                         <property name="top-attach">1</property>
                       </packing>
                     </child>

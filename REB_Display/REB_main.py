@@ -99,16 +99,10 @@ SETTINGS_PATH = "/home/reuben/Documents/REBset_v1.ini"
 # PANEL_INTERNAL_IDS/_load_panel_axis_controls below) - this dict is
 # now used only to seed/validate the persisted assignment, the same way
 # REB_Settings.py already uses its own copy.
-CHANNEL_DEFAULT_ROLE = {
-    "00": "W",
-    "01": "Z",
-    "02": "U",
-    "03": "V",
-    "04": "X",
-    "05": "B",
-    "06": "Sp0",
-    "07": "Sp1",
-}
+# Two-box hardware (14 October 2026): the 10 channels, their defaults
+# and the old-file completion come from reb_settings_io - shared, so the
+# panel greys exactly the roles REB_Generate_Local_Ini.py left out.
+CHANNEL_DEFAULT_ROLE = reb_settings_io.CHANNEL_DEFAULT_ROLE
 
 # The 8 letters selectable on the Axis Selection tab (Y removed - not
 # used on this machine) and the 2 spindles - the 10 possible roles a
@@ -172,28 +166,11 @@ TYPE_ADJUSTMENT_PROFILE = {
 
 def _read_persisted_channel_assignments():
     '''
-    Reads the persisted channel -> role map, falling back to
-    CHANNEL_DEFAULT_ROLE for any channel whose entry is missing or
-    unrecognized - same "absent -> shipped default" convention as
-    _load_measurement_system. Mirrors REB_Settings.py's own function of
-    the same name exactly (duplicated, not imported - see
-    CHANNEL_DEFAULT_ROLE's comment above).
+    The persisted channel -> role map, completed to all 10 channels
+    (reb_settings_io.complete_channel_assignments).
     '''
-    assignments = dict(CHANNEL_DEFAULT_ROLE)
-    stored = reb_settings_io.load_settings().get("channel_assignments", {})
-    for channel_id, role in stored.items():
-        if channel_id in assignments and role in CHANNEL_ROLES:
-            assignments[channel_id] = role
-
-    # Defensive against a hand-edited or corrupted file (REBset_v1.ini's
-    # own header says "should not be modified directly"): if the same
-    # role somehow ended up on two channels, ignore the persisted data
-    # entirely rather than displaying a duplicate role as active twice.
-    if len(set(assignments.values())) != len(assignments):
-        print("Duplicate role(s) in persisted channel_assignments - using shipped defaults")
-        return dict(CHANNEL_DEFAULT_ROLE)
-
-    return assignments
+    return reb_settings_io.complete_channel_assignments(
+        reb_settings_io.load_settings().get("channel_assignments"))
 
 # The 10 roles, in the order the operator sees them top-to-bottom on
 # REB_Panel_v1.ui (Sp0, Sp1, then the 8 axis letters) - since the 18
@@ -222,7 +199,9 @@ _CHANNEL_ASSIGNMENTS_AT_STARTUP = _read_persisted_channel_assignments()
 # below to grey out every widget belonging to a role that isn't active,
 # and by _clear_ena_override/_axis_idx_move to decide whether an ENA
 # press or jog move is meaningful at all.
-_ACTIVE_ROLES_AT_STARTUP = set(_CHANNEL_ASSIGNMENTS_AT_STARTUP.values())
+_ACTIVE_ROLES_AT_STARTUP = {
+    role for channel_id, role in _CHANNEL_ASSIGNMENTS_AT_STARTUP.items()
+    if channel_id in reb_settings_io.active_channels(reb_settings_io.load_settings())}
 
 # <letter>_-prefixed widget-id suffixes every axis-letter row
 # (X/Z/U/V/W/A/B/C) has, since REB_Panel_v1.ui's 18 September 2026
@@ -974,6 +953,19 @@ class HandlerClass:
             type_label = self.builder.get_object("Panel_Channel_" + channel_id + "_Type")
             if type_label is not None:
                 type_label.set_text(types[channel_id].capitalize())
+
+        # Two-box hardware: the expansion box's four tiles (channels
+        # 06-09, to the right of the base box's 3 x 2) only show while
+        # it's connected (Rich's choice, 14 October 2026). no_show_all
+        # keeps a later show_all() from bringing them back.
+        expansion = reb_settings_io.load_settings().get("expansion_box") is True
+        for channel_id in reb_settings_io.EXPANSION_CHANNELS:
+            tile = self.builder.get_object("Panel_Channel_" + channel_id + "_Axis")
+            while tile is not None and not isinstance(tile, Gtk.Frame):
+                tile = tile.get_parent()
+            if tile is not None:
+                tile.set_no_show_all(not expansion)
+                tile.set_visible(expansion)
 
     def _load_panel_axis_controls(self):
         '''
