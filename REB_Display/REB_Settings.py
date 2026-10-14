@@ -390,6 +390,7 @@ MANUAL_LINKS = {
     "Tower_Cabling_Link":        MANUAL_URL + "SignalTowerCabling",
     "Tower_How_Link":            MANUAL_URL + "InputsOutputsSound#SignalTower",
     "Sounds_How_Link":           MANUAL_URL + "InputsOutputsSound#Sounds",
+    "Expansion_Box_How_Link":    MANUAL_URL + "AxisSelection#ExpansionBox",
     "Linear_Scale_Link":         MANUAL_URL + "ScaleSettingsForADevice",
     "Rotary_Scale_Link":         MANUAL_URL + "ScaleSettingsForADevice",
     "Spindle_Scale_Link":        MANUAL_URL + "ScaleSettingsForADevice",

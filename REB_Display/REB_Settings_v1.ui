@@ -2229,6 +2229,24 @@ Without the expansion box, its channels are greyed out and the axes on them can'
                                           <property name="position">7</property>
                                         </packing>
                                       </child>
+                                      <child>
+                                        <object class="GtkButton" id="Expansion_Box_How_Link">
+                                          <property name="label" translatable="yes">How the Expansion Box Works</property>
+                                          <property name="visible">True</property>
+                                          <property name="can-focus">True</property>
+                                          <property name="receives-default">True</property>
+                                          <property name="tooltip-text" translatable="yes">Opens the User Manual section on the base box and the expansion box.</property>
+                                          <property name="halign">start</property>
+                                          <property name="margin-top">4</property>
+                                          <property name="margin-bottom">6</property>
+                                          <signal name="clicked" handler="Open_Manual_Link" swapped="no"/>
+                                        </object>
+                                        <packing>
+                                          <property name="expand">False</property>
+                                          <property name="fill">True</property>
+                                          <property name="position">8</property>
+                                        </packing>
+                                      </child>
                                     </object>
                                   </child>
                                   <property name="shadow-type">none</property>
