@@ -214,6 +214,23 @@ Progress on the `two-box` branch:
   Settings copied to `~/Documents/REBset_v1.ini.before-two-box`. To run
   `main`/`dev-rich` again: W5/W6 back to the factory setting,
   `REB_Change_Network.sh back`, copy that file back.
+- **Expansion card set up on Rich's Pi, 16 October 2026:** the new card
+  (a 7I92T - mesaflash only finds it with `--device 7i92t`, as the
+  scripts already use) arrived with Mesa's stock firmware (10 stepgens,
+  2 QCount). Claude ran `REB_Change_Network.sh expansion`'s commands by
+  hand (the script's questions can't be answered from Claude's shell):
+  a temporary 192.168.1.120 on eth0 to reach the factory address,
+  `7i92t_REB.bin` written and verified (`--reload` then showed 8
+  stepgens, InM, OutM), `--set ip=10.10.10.11`, then Rich moved W5/W6
+  to EEPROM and powered it on. Both cards now answer on the switch -
+  base 10.10.10.10 (MAC 00:60:1b:12:81:33), expansion 10.10.10.11
+  (00:60:1b:12:81:97) - with REB firmware, also after Rich connected
+  P1/P2 and mounted the board. The Pi's uptime was 6 minutes when the
+  card came back, so the power-on restart (Open items) may have
+  happened again; it came back on 10.10.10.100 on its own. The script
+  itself still hasn't run on hardware. Not yet checked: LinuxCNC on
+  `two-box` with Expansion Box Connected ticked, and the expansion
+  box's P1/P2 wiring.
 - **Channel numbers on the panel's Axis Assignments tiles, 14 October
   2026 (6465a4d on `two-box`, not yet seen in AXIS):** each tile has a
   "Channel NN" label like REB Settings. Makes the panel 34 px taller -
@@ -232,7 +249,8 @@ Progress on the `two-box` branch:
   `watchdog.has_bit` stays true after it fires until something clears
   it, so wiring it straight into the E-stop chain could leave the
   machine stuck in E-stop. Work out how a reset clears it first.
-- Next: testing on hardware once the new 7i92 arrives, then the
+- Next: run LinuxCNC on `two-box` with both cards (Expansion Box
+  Connected ticked) and test channels 06-09 and jacks 4-6, then the
   watchdog design.
 
 Software work once the design is fixed (not started):
