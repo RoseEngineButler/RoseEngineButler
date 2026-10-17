@@ -292,8 +292,12 @@ Progress on the `two-box` branch:
   "joint 0 (1) on limit switch error", machine off, red latched, 3 s
   buzzer and panel siren; F2 brought the machine back and put red out.
   Jack 6 (I/O 010), set to Z with jack 5 cleared: the same, twice.
-- Next: Rich's single-card machine rebuild and network rehearsal (Open items) before `two-box`
-  goes to `main`.
+- **Hold (Rich, 16 October 2026): don't merge `two-box` into `dev-rich`
+  or `main` until the S/N 1 and S/N 2 address changes are resolved**
+  (Open items: "Move S/N 1 and S/N 2 to 10.10.10.x"). Merging `dev-rich`
+  into `two-box` is fine.
+- Next: Rich's single-card machine rebuild and network rehearsal (Open
+  items), then S/N 1 and S/N 2.
 
 Software work once the design is fixed (not started):
 
