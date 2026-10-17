@@ -1151,6 +1151,15 @@ def _card_setup_hal(hal_text, expansion_box, problems):
             continue
         extra = line.group(0).replace("hm2_7i92.0.", "hm2_7i92.1.")
         hal_text = hal_text[:line.end()] + "\n" + extra + hal_text[line.end():]
+        if fn == "read":
+            # Both cards' read-requests first, so they answer at the same
+            # time - each read otherwise sends its own request and waits
+            # for the reply, one card after the other, and the two waits
+            # took the servo thread to 859 of its 1000 us (16 October
+            # 2026, "Unexpected realtime delay").
+            requests = "\n".join(line.group(0).replace(".read" + " " * 9, ".read-request ", 1).replace(
+                "hm2_7i92.0.", card) for card in ("hm2_7i92.0.", "hm2_7i92.1."))
+            hal_text = hal_text[:line.start()] + requests + "\n" + hal_text[line.start():]
     setps = list(re.finditer(r'(?m)^setp hm2_7i92\.0\.(dpll|stepgen\.timer-number|watchdog)\b.*$', hal_text))
     if len(setps) != 3:
         problems.append("REB.hal: expected 3 card setp lines (dpll, stepgen timer, watchdog), found %d" % len(setps))
