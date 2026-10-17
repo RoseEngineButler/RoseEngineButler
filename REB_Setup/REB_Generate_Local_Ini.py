@@ -1144,22 +1144,25 @@ def _card_setup_hal(hal_text, expansion_box, problems):
         problems.append("REB.hal: expected one 'loadrt hm2_eth' line, found %d" % n)
     if not expansion_box:
         return hal_text
-    for fn in ("read", "write"):
-        line = re.search(r'(?m)^addf hm2_7i92\.0\.%s\b.*$' % fn, hal_text)
-        if not line:
-            problems.append("REB.hal: no 'addf hm2_7i92.0.%s' line" % fn)
-            continue
+    line = re.search(r'(?m)^addf hm2_7i92\.0\.read\b.*$', hal_text)
+    if not line:
+        problems.append("REB.hal: no 'addf hm2_7i92.0.read' line")
+    else:
+        # Both cards' read-requests first, so they answer at the same
+        # time - each read otherwise sends its own request and waits for
+        # the reply, one card after the other, and the two waits took the
+        # servo thread to 859 of its 1000 us (16 October 2026,
+        # "Unexpected realtime delay"). Order from Peter Wallace at Mesa
+        # for two cards: read-requests, reads, everything else, writes -
+        # the writes go last in generate_local_hal_files (_card_write_hal).
+        requests = "\n".join(line.group(0).replace(".read" + " " * 9, ".read-request ", 1).replace(
+            "hm2_7i92.0.", card) for card in ("hm2_7i92.0.", "hm2_7i92.1."))
         extra = line.group(0).replace("hm2_7i92.0.", "hm2_7i92.1.")
-        hal_text = hal_text[:line.end()] + "\n" + extra + hal_text[line.end():]
-        if fn == "read":
-            # Both cards' read-requests first, so they answer at the same
-            # time - each read otherwise sends its own request and waits
-            # for the reply, one card after the other, and the two waits
-            # took the servo thread to 859 of its 1000 us (16 October
-            # 2026, "Unexpected realtime delay").
-            requests = "\n".join(line.group(0).replace(".read" + " " * 9, ".read-request ", 1).replace(
-                "hm2_7i92.0.", card) for card in ("hm2_7i92.0.", "hm2_7i92.1."))
-            hal_text = hal_text[:line.start()] + requests + "\n" + hal_text[line.start():]
+        hal_text = (hal_text[:line.start()] + requests + "\n" + line.group(0) + "\n" + extra
+                    + hal_text[line.end():])
+    hal_text, n = re.subn(r'(?m)^addf hm2_7i92\.0\.write\b.*\n', "", hal_text)
+    if n != 1:
+        problems.append("REB.hal: expected one 'addf hm2_7i92.0.write' line, found %d" % n)
     setps = list(re.finditer(r'(?m)^setp hm2_7i92\.0\.(dpll|stepgen\.timer-number|watchdog)\b.*$', hal_text))
     if len(setps) != 3:
         problems.append("REB.hal: expected 3 card setp lines (dpll, stepgen timer, watchdog), found %d" % len(setps))
@@ -1168,6 +1171,22 @@ def _card_setup_hal(hal_text, expansion_box, problems):
         end = setps[-1].end()
         hal_text = hal_text[:end] + "\n" + extra + hal_text[end:]
     return hal_text
+
+
+def _card_write_hal(expansion_box):
+    '''
+    With the expansion box, both cards' write functions, added after
+    everything else in REB.local.hal (_card_setup_hal took the base
+    card's out of REB.hal's read/write pair) so each cycle sends what
+    motion and the PIDs just worked out. REB_PostGUI_v1.local.hal's
+    ENA-button logic is added later still, after the GUI loads; its
+    enables reach the cards one cycle later, as before. One card:
+    REB.hal's own order, unchanged.
+    '''
+    if not expansion_box:
+        return ""
+    return ("\n# Both cards' writes last (Peter Wallace at Mesa, for two cards).\n"
+            + "".join("addf %-38s servo-thread\n" % ("hm2_7i92.%d.write" % n) for n in (0, 1)))
 
 
 def _retarget_axis_block(block_text, letter, channel_id, joint_num, problems):
@@ -1281,6 +1300,7 @@ def generate_local_hal_files(role_layout, limit_jacks=None, estop_button=False,
     limit_text, limit_summary, limit_nets = _limit_jack_hal(limit_jacks or {}, role_layout, limit_switch_type)
     limit_text += _estop_button_hal(estop_button)
     limit_text += _signal_tower_hal(signal_tower, limit_nets, role_layout, fault_sound)
+    limit_text += _card_write_hal(role_layout.expansion_box)
     end_banner = hal_text.rfind("\n# *********************** NOTHING FOLLOWS")
     if end_banner == -1:
         hal_text += limit_text
