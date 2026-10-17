@@ -44,6 +44,7 @@ Built and committed, but not yet seen working on real hardware.
 | Pi restarts when the 7i92 is switched on | 14 October 2026 | Every REB box (S/N 1, 2 and 3) powers the Pi and the 7i92 from one 24V -> 5V module; switching the card on while the Pi runs restarts the Pi without a shutdown (risk to the SD card). In normal use both come on together, so it only bites during the W5/W6 jumper change. Handled in the procedure, not the hardware (16 October 2026, 91ca961 on `two-box`): `REB_Change_Network.sh` now stores the card's address, moves the Pi, then offers to shut the Pi down - switch the machine off, move W5/W6, switch on, run `REB_Change_Network.sh check`. The installer does the same at its end (`--no-shutdown` in its Step 2). Dry-run only so far. Spare "Wired Ethernet" profiles: the other machine still has three - the script offers to delete them. |
 | Move S/N 1 and S/N 2 to 10.10.10.x | 16 October 2026 | Rich's decision: every machine and the shipping boxes on 10.10.10.x (base card .10, expansion .11, Pi .100), so a customer can just add an expansion box. Once `two-box` is on `main`, each owner: update, then `REB_Change_Network.sh base` (card already has REB firmware - answer no to writing it), shut down, move W5/W6, switch on, `check`. Order doesn't matter: the generator uses 192.168.1.121 while the Pi is still on 192.168.1.x (91ca961). Decide: by phone with the owners, or in person. Rehearse first on Rich's single-card machine (row below). |
 | Rich's single-card machine: back to as-built, then retest the move | 16 October 2026 | Its Mesa card was pulled; when it's rebuilt: card W5/W6 at the factory setting (192.168.1.121), Pi back with `REB_Change_Network.sh back` (192.168.1.120), check LinuxCNC starts as built (on `two-box`, this also tests the generator's 192.168.1.121 fallback and the one-card HAL order). Then run `REB_Change_Network.sh base` for real - the first full run of the script on hardware - including the shutdown step, and `check`. |
+| No sound from the speaker on Rich's Pi | 16 October 2026 | The Pi's audio output is "Dummy Output" (`wpctl status`), so the fault siren and done/pause beeps play into nothing - found when the lost-card siren pin fired but nothing was heard. The HDMI audio device exists but isn't selected: check the monitor has speakers / select HDMI (or a USB speaker) as the output, then retest the speaker sounds. |
 | Spindles on the second machine | 08 October 2026 | Sp0/Sp1 don't run there. They work on the prototype, so this is that machine's wiring - check its cables, plugs and drives first. |
 | Limit jack pin map | 28 September 2026 | `LIMIT_JACK_INPUT` (jacks 1/2/3 -> I/O 002/006/010) is a placeholder until the PCB wiring is final. Space is left on the Axis Selection page for a Limit Jack 4. |
 | Tell Roy about the C speed-up | 07 October 2026 | Close LinuxCNC, run the update **twice** in a row before starting LinuxCNC again, and check the output shows C's new limits. |
@@ -271,26 +272,22 @@ Progress on the `two-box` branch:
   `REB_SHOW_EXPANSION=1 ./REB_Launch.sh` (3037858 on `two-box`: the panel
   shows the expansion box as connected, display only, settings untouched -
   worked on the machine).
-- **Lost card = E-stop - tested, design agreed in outline, 16 October
-  2026:** pulling the expansion card's cable while jogging W (twice,
-  same result): after 5 lost packets `hm2_eth` sets the card's
-  `io_error` parameter and stops talking to it (`packet-error-exceeded`
-  TRUE; console "error finishing read"). Its axes stop, but **the
-  machine stays on and the base box's axes keep moving** - nothing
-  else is reported. Plugging the cable back in, and E-stop + reset,
-  recover nothing. Recovery that worked (in E-stop): `setp
-  hm2_7i92.1.io_error 0` (the Pi reconnects and reads `has_bit` TRUE -
-  the card's watchdog bit, "Watchdog has bit!" message), then `setp
-  hm2_7i92.1.watchdog.has_bit 0`; after F1/F2, W jogged normally, no
-  jump. Design: each card's `packet-error-exceeded` and
-  `watchdog.has_bit`, OR'd with the E-stop button, into
-  `estop-latch.0.fault-in`; while in E-stop, `REB_main.py` clears
-  `io_error` then `has_bit` on any card that needs it and says which
-  box lost contact (a card still unplugged fails again, so F1 won't
-  reset until it's fixed). Not yet tested: the base card's cable (the
-  E-stop button input is on that card).
-- Next: build the lost-card E-stop above and repeat the cable test
-  (expansion card, then base card); trip limit jacks 4-6.
+- **Lost card = E-stop - built and tested, 16 October 2026** (5cfd3a0,
+  c44705b on `two-box`): pulling a card's cable while jogging, before
+  this, left the machine on and the other box's axes running - after 5
+  lost packets `hm2_eth` sets the card's `io_error` and stops talking to
+  it, and nothing brought it back. Now each card's
+  `packet-error-exceeded` and `watchdog.has_bit` (OR'd into net
+  `card-fault`) latch E-stop with the E-stop button, light the tower's
+  red and sound the siren; AXIS says "Expansion box (or Base box) lost
+  contact"; while in E-stop `REB_main.py` clears `io_error` (at most
+  every 5 s - each failed try prints "error finishing read") then
+  `has_bit`, so F1 resets once the cable is back. Tested on Rich's box:
+  expansion card - E-stop, red, buzzer, F1 refused while unplugged,
+  recovered, red off at F2, W jogged; base card - same, but the tower
+  stays dark (its outputs are on that card; very unlikely failure - Pi,
+  switch and base card share a box).
+- Next: trip limit jacks 4-6 on the expansion box.
 
 Software work once the design is fixed (not started):
 
