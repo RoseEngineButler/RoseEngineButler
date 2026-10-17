@@ -148,6 +148,7 @@
 
 import os
 import re
+import subprocess
 import sys
 
 REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -193,6 +194,15 @@ CHANNEL_ROLES = AXIS_SELECTION_LETTERS + SPINDLE_IDS
 # asking for fewer just leaves the rest as plain GPIO.
 BASE_CARD_IP = "10.10.10.10"
 EXPANSION_CARD_IP = "10.10.10.11"
+
+# A machine built before the two-box network (Pi wired 192.168.1.120,
+# card at its factory 192.168.1.121) keeps working until it's moved with
+# REB_Change_Network.sh: _base_card_ip picks the card address from the
+# Pi's own wired address, so an update can arrive before or after the
+# move (16 October 2026). Only eth0 is looked at - a home Wi-Fi is often
+# on 192.168.1.x too.
+FACTORY_CARD_IP = "192.168.1.121"
+WIRED_DEVICE = "eth0"
 CARD_CONFIG = "num_encoders=0 num_inms=0 num_pwmgens=0 num_stepgens=%d"
 
 # Each axis letter's OWN, PERMANENT [AXIS_<letter>]/[JOINT_n] joint
@@ -1124,10 +1134,32 @@ def _retarget_channel(block_text, role, channel_id, problems):
     return block_text
 
 
-def _card_setup_hal(hal_text, expansion_box, problems):
+def _base_card_ip():
+    '''
+    The base card's address for this launch: FACTORY_CARD_IP while the
+    Pi's wired connection is still on 192.168.1.x (a machine not yet
+    moved to the two-box network), else BASE_CARD_IP - also when eth0
+    has no address at all (cable unplugged or link down), since
+    10.10.10.x is the standard and LinuxCNC can't reach a card then
+    anyway.
+    '''
+    try:
+        out = subprocess.run(["ip", "-4", "-o", "addr", "show", "dev", WIRED_DEVICE],
+                             capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        out = ""
+    if " inet 192.168.1." in out:
+        return FACTORY_CARD_IP
+    if " inet 10.10.10." not in out:
+        print("Note: " + WIRED_DEVICE + " has no 10.10.10.x or 192.168.1.x address"
+              " (cable unplugged?) - using " + BASE_CARD_IP + ".")
+    return BASE_CARD_IP
+
+
+def _card_setup_hal(hal_text, expansion_box, problems, base_card_ip=BASE_CARD_IP):
     '''
     Rewrites REB.hal's card setup for this launch: one hm2_eth load for
-    the base card (BASE_CARD_IP, 6 stepgens) or both cards (plus
+    the base card (base_card_ip, 6 stepgens) or both cards (plus
     EXPANSION_CARD_IP, 4 stepgens) - a realtime module can only be loaded
     once, so both cards go on one line as comma-separated lists, giving
     hm2_7i92.0 and hm2_7i92.1 in that order. REB.hal's write line is
@@ -1136,7 +1168,7 @@ def _card_setup_hal(hal_text, expansion_box, problems):
     own read next to the base card's, and its own copy of the base card's
     timer and watchdog setp lines.
     '''
-    ips = [BASE_CARD_IP] + ([EXPANSION_CARD_IP] if expansion_box else [])
+    ips = [base_card_ip] + ([EXPANSION_CARD_IP] if expansion_box else [])
     configs = [CARD_CONFIG % len(reb_settings_io.BASE_CHANNELS)] + (
         [CARD_CONFIG % len(reb_settings_io.EXPANSION_CHANNELS)] if expansion_box else [])
     load = 'loadrt hm2_eth board_ip="%s" config=%s' % (
@@ -1226,7 +1258,7 @@ def _retarget_spindle_block(block_text, spindle_id, channel_id, spindle_num, pro
 
 def generate_local_hal_files(role_layout, limit_jacks=None, estop_button=False,
                              signal_tower=False, fault_sound="both",
-                             limit_switch_type="NC"):
+                             limit_switch_type="NC", base_card_ip=BASE_CARD_IP):
     '''
     Regenerates REB.local.hal from the tracked REB.hal: for each of the
     8 currently-active roles, retargets its own isolated
@@ -1295,7 +1327,7 @@ def generate_local_hal_files(role_layout, limit_jacks=None, estop_button=False,
         cursor = end
     pieces.append(hal_text[cursor:])
     hal_text = "".join(pieces)
-    hal_text = _card_setup_hal(hal_text, role_layout.expansion_box, problems)
+    hal_text = _card_setup_hal(hal_text, role_layout.expansion_box, problems, base_card_ip)
 
     # Goes just before REB.hal's closing "NOTHING FOLLOWS" banner, if
     # present, so that banner still ends the file.
@@ -1325,8 +1357,8 @@ def generate_local_hal_files(role_layout, limit_jacks=None, estop_button=False,
         print("Could not write generated .local.hal file: " + str(e))
         return False
 
-    print("Expansion box: " + ("connected (cards %s and %s)" % (BASE_CARD_IP, EXPANSION_CARD_IP)
-                                 if role_layout.expansion_box else "not connected (card %s)" % BASE_CARD_IP))
+    print("Expansion box: " + ("connected (cards %s and %s)" % (base_card_ip, EXPANSION_CARD_IP)
+                                 if role_layout.expansion_box else "not connected (card %s)" % base_card_ip))
     print("Regenerated REB.local.hal: " + ", ".join(retargeted))
     print("Limit jacks: " + (", ".join(limit_summary) or "none in use"))
     print("E-stop button: " + ("connected" if estop_button else "not connected"))
@@ -1507,6 +1539,16 @@ def main():
     settings = reb_settings_io.load_settings()
     assignments = _read_channel_assignments(settings)
     role_layout = RoleLayout(assignments, _read_expansion_box(settings))
+    base_card_ip = _base_card_ip()
+    if base_card_ip == FACTORY_CARD_IP and role_layout.expansion_box:
+        # Both cards would need 192.168.1.121. Refuse rather than quietly
+        # dropping the expansion box: REB_main.py and the other programs
+        # count its channels from the same setting, so joint numbers
+        # would no longer match this HAL.
+        print("Expansion Box is ticked in REB Settings, but the Pi's wired connection")
+        print("is still on 192.168.1.x. Run REB_Change_Network.sh to move it to the")
+        print("10.10.10.x network, or untick Expansion Box in REB Settings.")
+        sys.exit(1)
 
     # Regenerate REB.local.hal/REB_PostGUI_v1.local.hal FIRST and abort
     # immediately if it fails (see generate_local_hal_files) - if the
@@ -1517,7 +1559,7 @@ def main():
                                     _read_estop_button(settings),
                                     _read_signal_tower(settings),
                                     _read_fault_sound(settings),
-                                    _read_limit_switch_type(settings)):
+                                    _read_limit_switch_type(settings), base_card_ip):
         sys.exit(1)
 
     if generate_splash(role_layout):

@@ -31,19 +31,30 @@
 #   only uses it once its W5/W6 jumpers are moved to the setting the
 #   7i92 manual calls EEPROM, which is read at power-up.
 #
-#   Once the address is stored the Pi is moved to 10.10.10.100 BEFORE
-#   the card is powered off and on: on a box where the Pi and the card
-#   share a power supply, powering the card on can restart the Pi (found
-#   14 October 2026), and a Pi left on 192.168.1.120 then can't reach
-#   the card and LinuxCNC won't start. If the Pi restarts at any point
-#   anyway, run this again with 'pi'.
+#   Once the address is stored the Pi is moved to 10.10.10.100, then
+#   shut down for the jumper change. Every REB box powers the Pi and the
+#   card from one 24V -> 5V module, and switching the card on while the
+#   Pi runs restarts the Pi without a shutdown (found 14 October 2026 on
+#   S/N 3; S/N 1 and 2 are built the same way) - so the whole machine is
+#   switched off, the jumpers moved, and switched on, and the Pi starts
+#   up already on 10.10.10.x. Afterwards 'check' shows which cards
+#   answer. If the Pi restarts at any point anyway, run this again with
+#   'pi'.
+#
+#   REB_Generate_Local_Ini.py picks the base card's address from the
+#   Pi's wired address (192.168.1.121 while the Pi is on 192.168.1.x),
+#   so an update can arrive before or after this script is run.
 #
 #   Choices (menu, or as the first argument):
 #     base       set up the connected card as the base card (.10)
 #     expansion  set up the connected card as the expansion card (.11)
 #     pi         move the Pi's wired connection to 10.10.10.100
 #     back       put the Pi's wired connection back on 192.168.1.120
+#     check      show the Pi's wired address and which cards answer
 #   Add --dry-run to show every command without running any of them.
+#   --no-shutdown (used by the installer) stops after the address is
+#   stored and the Pi moved; the installer gives the shutdown and
+#   jumper steps at its end, so its remaining steps still run.
 #
 #   Nothing is changed without asking first. Recovery for a card: put
 #   W5/W6 back to their factory setting and it answers at 192.168.1.121
@@ -63,6 +74,9 @@
 #         reach the card.
 #   1.2 - 14 October 2026 - Offers to delete spare "Wired Ethernet"
 #         connections.
+#   1.3 - 16 October 2026 - Shuts the Pi down for the jumper change (the
+#         Pi and card share one 5V supply); adds 'check' and
+#         --no-shutdown.
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #
@@ -96,12 +110,14 @@ EXPANSION_CARD_IP="10.10.10.11"
 PI_IP="10.10.10.100/24"
 
 DRY_RUN=false
+NO_SHUTDOWN=false
 CHOICE=""
 for arg in "$@"; do
     case "$arg" in
         --dry-run) DRY_RUN=true ;;
-        base|expansion|pi|back) CHOICE="$arg" ;;
-        *) echo "Unknown option: $arg (use base, expansion, pi, back, --dry-run)"; exit 1 ;;
+        --no-shutdown) NO_SHUTDOWN=true ;;
+        base|expansion|pi|back|check) CHOICE="$arg" ;;
+        *) echo "Unknown option: $arg (use base, expansion, pi, back, check, --dry-run, --no-shutdown)"; exit 1 ;;
     esac
 done
 
@@ -201,12 +217,36 @@ set_up_card() {   # $1 = new address, $2 = "base" or "expansion"
         say "is set up. Until then the Pi can't reach this card or start LinuxCNC."
     fi
 
-    say "Now:"
+    if $NO_SHUTDOWN && ip -4 addr show | grep -q "inet ${PI_IP%/*}/"; then
+        say "Address stored and the Pi moved. The card's W5/W6 jumpers are moved"
+        say "after the installation finishes - it will say how."
+        return 0
+    fi
+    if ip -4 addr show | grep -q "inet ${PI_IP%/*}/"; then
+        say "The card's jumpers are only read when it's switched on, and the Pi and"
+        say "the card run from the same 5V supply: switching the card on while the"
+        say "Pi is running restarts the Pi without shutting it down. So:"
+        say "  1. Shut the Pi down (next question) and wait for the screen to go dark."
+        say "  2. Switch the machine off."
+        say "  3. Move the card's W5/W6 jumpers to the setting the 7i92 manual calls"
+        say "     EEPROM, and reconnect any card you unplugged for this."
+        say "  4. Switch the machine on. Once the Pi has started, run"
+        say "     $REPO_DIR/REB_Change_Network.sh check"
+        say "     - it should say the card at $new_ip answers."
+        say "To undo: jumpers back to the factory setting = $FACTORY_CARD_IP again."
+        if confirm "Shut the Pi down now?"; then
+            run sudo poweroff
+            exit 0
+        fi
+        say "Not shutting down - only for a card with its own power supply:"
+    else
+        say "Now:"
+    fi
     say "  1. Power the card off."
     say "  2. Move its W5/W6 jumpers to the setting the 7i92 manual calls EEPROM."
     say "  3. Power it back on. It will answer at $new_ip."
-    say "If the Pi restarts when the card powers on, that's the shared power"
-    say "supply - log back in and run this again with 'pi' to check the card."
+    say "If the Pi restarts when the card powers on, log back in and run this"
+    say "again with 'check'."
     say "To undo: jumpers back to the factory setting = $FACTORY_CARD_IP again."
     pause ""
 
@@ -280,6 +320,29 @@ move_pi() {
     done
 }
 
+# --- check ------------------------------------------------------------
+check_network() {
+    title "Network check"
+    stop_if_linuxcnc_running
+    local addr card_ip
+    addr=$(ip -4 -o addr show dev eth0 2>/dev/null | awk '{print $4}' | head -1)
+    say "Pi's wired connection (eth0): ${addr:-no address - is the cable plugged in?}"
+    case "$addr" in
+        10.10.10.*)  for card_ip in "$BASE_CARD_IP" "$EXPANSION_CARD_IP"; do
+                         if card_answers "$card_ip"; then
+                             say "Card at $card_ip answers."
+                         else
+                             say "No card at $card_ip (fine for $EXPANSION_CARD_IP if there's no expansion box)."
+                         fi
+                     done ;;
+        192.168.1.*) if card_answers "$FACTORY_CARD_IP"; then
+                         say "Card at $FACTORY_CARD_IP answers (not yet moved to 10.10.10.x)."
+                     else
+                         say "No card at $FACTORY_CARD_IP."
+                     fi ;;
+    esac
+}
+
 # --- put the Pi back --------------------------------------------------
 move_pi_back() {
     title "Put the Pi's wired connection back on ${OLD_PI_IP%/*}"
@@ -304,9 +367,10 @@ if [ -z "$CHOICE" ]; then
     echo "  2) Set up a card as the expansion card  ($EXPANSION_CARD_IP)"
     echo "  3) Move the Pi's wired connection to    ${PI_IP%/*}"
     echo "  4) Put the Pi back on                   ${OLD_PI_IP%/*}"
-    read -r -p "Choose 1-4: " pick
+    echo "  5) Check the network"
+    read -r -p "Choose 1-5: " pick
     case "$pick" in
-        1) CHOICE=base ;; 2) CHOICE=expansion ;; 3) CHOICE=pi ;; 4) CHOICE=back ;;
+        1) CHOICE=base ;; 2) CHOICE=expansion ;; 3) CHOICE=pi ;; 4) CHOICE=back ;; 5) CHOICE=check ;;
         *) echo "Nothing chosen."; exit 0 ;;
     esac
 fi
@@ -315,5 +379,6 @@ case "$CHOICE" in
     expansion) set_up_card "$EXPANSION_CARD_IP" expansion ;;
     pi)        move_pi ;;
     back)      move_pi_back ;;
+    check)     check_network ;;
 esac
 title "Done"
