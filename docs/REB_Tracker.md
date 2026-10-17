@@ -271,12 +271,26 @@ Progress on the `two-box` branch:
   `REB_SHOW_EXPANSION=1 ./REB_Launch.sh` (3037858 on `two-box`: the panel
   shows the expansion box as connected, display only, settings untouched -
   worked on the machine).
-- **Watchdog as E-stop - design needed:** a card's
-  `watchdog.has_bit` stays true after it fires until something clears
-  it, so wiring it straight into the E-stop chain could leave the
-  machine stuck in E-stop. Work out how a reset clears it first.
-- Next: trip limit jacks 4-6 on the expansion box, then the watchdog
-  design.
+- **Lost card = E-stop - tested, design agreed in outline, 16 October
+  2026:** pulling the expansion card's cable while jogging W (twice,
+  same result): after 5 lost packets `hm2_eth` sets the card's
+  `io_error` parameter and stops talking to it (`packet-error-exceeded`
+  TRUE; console "error finishing read"). Its axes stop, but **the
+  machine stays on and the base box's axes keep moving** - nothing
+  else is reported. Plugging the cable back in, and E-stop + reset,
+  recover nothing. Recovery that worked (in E-stop): `setp
+  hm2_7i92.1.io_error 0` (the Pi reconnects and reads `has_bit` TRUE -
+  the card's watchdog bit, "Watchdog has bit!" message), then `setp
+  hm2_7i92.1.watchdog.has_bit 0`; after F1/F2, W jogged normally, no
+  jump. Design: each card's `packet-error-exceeded` and
+  `watchdog.has_bit`, OR'd with the E-stop button, into
+  `estop-latch.0.fault-in`; while in E-stop, `REB_main.py` clears
+  `io_error` then `has_bit` on any card that needs it and says which
+  box lost contact (a card still unplugged fails again, so F1 won't
+  reset until it's fixed). Not yet tested: the base card's cable (the
+  E-stop button input is on that card).
+- Next: build the lost-card E-stop above and repeat the cable test
+  (expansion card, then base card); trip limit jacks 4-6.
 
 Software work once the design is fixed (not started):
 
