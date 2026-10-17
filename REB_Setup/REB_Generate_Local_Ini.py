@@ -1130,9 +1130,11 @@ def _card_setup_hal(hal_text, expansion_box, problems):
     the base card (BASE_CARD_IP, 6 stepgens) or both cards (plus
     EXPANSION_CARD_IP, 4 stepgens) - a realtime module can only be loaded
     once, so both cards go on one line as comma-separated lists, giving
-    hm2_7i92.0 and hm2_7i92.1 in that order. With the expansion box, its
-    card also gets its own read/write functions (next to the base card's)
-    and its own copy of the base card's timer and watchdog setp lines.
+    hm2_7i92.0 and hm2_7i92.1 in that order. REB.hal's write line is
+    taken out (_card_write_hal adds it back last). With the expansion
+    box, both cards get read-requests before the reads, its card gets its
+    own read next to the base card's, and its own copy of the base card's
+    timer and watchdog setp lines.
     '''
     ips = [BASE_CARD_IP] + ([EXPANSION_CARD_IP] if expansion_box else [])
     configs = [CARD_CONFIG % len(reb_settings_io.BASE_CHANNELS)] + (
@@ -1142,6 +1144,10 @@ def _card_setup_hal(hal_text, expansion_box, problems):
     hal_text, n = re.subn(r'(?m)^loadrt hm2_eth .*$', lambda m: load, hal_text)
     if n != 1:
         problems.append("REB.hal: expected one 'loadrt hm2_eth' line, found %d" % n)
+    # The write goes last, after the HAL this script adds (_card_write_hal).
+    hal_text, n = re.subn(r'(?m)^addf hm2_7i92\.0\.write\b.*\n', "", hal_text)
+    if n != 1:
+        problems.append("REB.hal: expected one 'addf hm2_7i92.0.write' line, found %d" % n)
     if not expansion_box:
         return hal_text
     line = re.search(r'(?m)^addf hm2_7i92\.0\.read\b.*$', hal_text)
@@ -1153,16 +1159,12 @@ def _card_setup_hal(hal_text, expansion_box, problems):
         # the reply, one card after the other, and the two waits took the
         # servo thread to 859 of its 1000 us (16 October 2026,
         # "Unexpected realtime delay"). Order from Peter Wallace at Mesa
-        # for two cards: read-requests, reads, everything else, writes -
-        # the writes go last in generate_local_hal_files (_card_write_hal).
+        # for two cards: read-requests, reads, everything else, writes.
         requests = "\n".join(line.group(0).replace(".read" + " " * 9, ".read-request ", 1).replace(
             "hm2_7i92.0.", card) for card in ("hm2_7i92.0.", "hm2_7i92.1."))
         extra = line.group(0).replace("hm2_7i92.0.", "hm2_7i92.1.")
         hal_text = (hal_text[:line.start()] + requests + "\n" + line.group(0) + "\n" + extra
                     + hal_text[line.end():])
-    hal_text, n = re.subn(r'(?m)^addf hm2_7i92\.0\.write\b.*\n', "", hal_text)
-    if n != 1:
-        problems.append("REB.hal: expected one 'addf hm2_7i92.0.write' line, found %d" % n)
     setps = list(re.finditer(r'(?m)^setp hm2_7i92\.0\.(dpll|stepgen\.timer-number|watchdog)\b.*$', hal_text))
     if len(setps) != 3:
         problems.append("REB.hal: expected 3 card setp lines (dpll, stepgen timer, watchdog), found %d" % len(setps))
@@ -1175,18 +1177,18 @@ def _card_setup_hal(hal_text, expansion_box, problems):
 
 def _card_write_hal(expansion_box):
     '''
-    With the expansion box, both cards' write functions, added after
-    everything else in REB.local.hal (_card_setup_hal took the base
-    card's out of REB.hal's read/write pair) so each cycle sends what
-    motion and the PIDs just worked out. REB_PostGUI_v1.local.hal's
-    ENA-button logic is added later still, after the GUI loads; its
-    enables reach the cards one cycle later, as before. One card:
-    REB.hal's own order, unchanged.
+    The card write(s), added after everything else in REB.local.hal
+    (_card_setup_hal took REB.hal's own line out) - Mesa's order, read,
+    everything else, write, so each cycle sends what motion and the PIDs
+    just worked out. With the expansion box, hm2_7i92.1.write follows
+    the base card's. REB_PostGUI_v1.local.hal's ENA-button logic is
+    added later still, after the GUI loads; its enables reach the cards
+    one cycle later, as before.
     '''
-    if not expansion_box:
-        return ""
-    return ("\n# Both cards' writes last (Peter Wallace at Mesa, for two cards).\n"
-            + "".join("addf %-38s servo-thread\n" % ("hm2_7i92.%d.write" % n) for n in (0, 1)))
+    cards = (0, 1) if expansion_box else (0,)
+    return ("\n# Card write%s last (Mesa's order: read, everything else, write).\n"
+            % ("s" if expansion_box else "")
+            + "".join("addf %-38s servo-thread\n" % ("hm2_7i92.%d.write" % n) for n in cards))
 
 
 def _retarget_axis_block(block_text, letter, channel_id, joint_num, problems):
