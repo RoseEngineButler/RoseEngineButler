@@ -248,10 +248,14 @@ Progress on the `two-box` branch:
   generator now adds both cards' `read-request`s before the reads
   (5c19d2e on `two-box`): worst 533 us while jogging on both cards. A
   busy web browser was also using about two of the Pi's four cores the
-  first time - keep it closed while running. If the message comes back,
-  next steps: `isolcpus` for the realtime core, or moving each card's
-  `write` to the end of the thread (changes timing for every axis, so
-  retune check).
+  first time - keep it closed while running. Then, per Peter Wallace at
+  Mesa (order for two 7i92s: read-requests, reads, everything else,
+  writes), both cards' writes moved to the end of REB.local.hal (on
+  `two-box`, the commit after 5c19d2e), so each cycle sends fresh
+  commands: worst 556 us jogging, no following errors. One card keeps
+  REB.hal's read-then-write order - consider Peter's order there too.
+  Watch for following errors with the new order. If the realtime
+  message comes back: `isolcpus` for the realtime core.
 - **Channel numbers on the panel's Axis Assignments tiles, 14 October
   2026 (6465a4d on `two-box`, not yet seen in AXIS):** each tile has a
   "Channel NN" label like REB Settings. Makes the panel 34 px taller -
