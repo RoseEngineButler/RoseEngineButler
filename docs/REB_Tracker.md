@@ -34,12 +34,17 @@ Built and committed, but not yet seen working on real hardware.
 | REB.ini / REB.hal cleanup | 06 October 2026 | LinuxCNC starts with no HAL errors, an axis jogs and moves, and an Sp0 M19 index works. Probably already exercised by the 08 October spindle and speed-limit testing - tick it off if so. |
 | Index counters on the Indexing tab | 11 October 2026 | Each axis row and the spindle row show a count left of Distance: +1 per Fwd index, -1 per Rev (it can go negative). Resets to 0 at startup, on a distance or deg/div change, and on a double-click of the number. Check the count follows the on-screen Rev/Fwd columns, the spindle count works with Sp0, Sp1 and both, and the Distance column didn't get wider. Double-click reset verified by Rich, 11 October 2026 (after it was rebuilt on the button's "clicked" signal); still to check: the counting itself on real presses. |
 | Notes in REBset_v1.ini | 11 October 2026 | After an update (run twice on Chuck's and Roy's machines), `~/Documents/REBset_v1.ini` starts with the "Rose Engine Butler settings" notes and ends with the copyright, and the other settings/export files there have their notes too (not the `.bak-` backups); LinuxCNC and REB Settings still start, and Load Settings reads both a "Save All Settings As..." copy and a Save Subset export. |
+| Mesa's HAL order on a one-card machine | 16 October 2026 | (`two-box`, 10f3634.) With one card the servo thread is now read, everything else, write (Peter Wallace's order; the write used to follow the read straight away). Tested only with two cards. When Rich's single-card machine is rebuilt: LinuxCNC starts, axes jog and run a program with no following errors, and `halcmd show thread` stays well under 1000 us. |
 | File menu in REB Settings | 07 October 2026 | Ctrl+S / Shift+Ctrl+S / Ctrl+O / Ctrl+Q do the same as the buttons, including a half-typed value being saved. |
 
 ## Open items and follow-ups
 
 | Item | Since | Notes |
 |---|---|---|
+| Pi restarts when the 7i92 is switched on | 14 October 2026 | Every REB box (S/N 1, 2 and 3) powers the Pi and the 7i92 from one 24V -> 5V module; switching the card on while the Pi runs restarts the Pi without a shutdown (risk to the SD card). In normal use both come on together, so it only bites during the W5/W6 jumper change. Handled in the procedure, not the hardware (16 October 2026, 91ca961 on `two-box`): `REB_Change_Network.sh` now stores the card's address, moves the Pi, then offers to shut the Pi down - switch the machine off, move W5/W6, switch on, run `REB_Change_Network.sh check`. The installer does the same at its end (`--no-shutdown` in its Step 2). Dry-run only so far. Spare "Wired Ethernet" profiles: the other machine still has three - the script offers to delete them. |
+| Move S/N 1 and S/N 2 to 10.10.10.x | 16 October 2026 | Rich's decision: every machine and the shipping boxes on 10.10.10.x (base card .10, expansion .11, Pi .100), so a customer can just add an expansion box. Once `two-box` is on `main`, each owner: update, then `REB_Change_Network.sh base` (card already has REB firmware - answer no to writing it), shut down, move W5/W6, switch on, `check`. Order doesn't matter: the generator uses 192.168.1.121 while the Pi is still on 192.168.1.x (91ca961). Decide: by phone with the owners, or in person. Rehearse first on Rich's single-card machine (row below). |
+| Rich's single-card machine: back to as-built, then retest the move | 16 October 2026 | Its Mesa card was pulled; when it's rebuilt: card W5/W6 at the factory setting (192.168.1.121), Pi back with `REB_Change_Network.sh back` (192.168.1.120), check LinuxCNC starts as built (on `two-box`, this also tests the generator's 192.168.1.121 fallback and the one-card HAL order). Then run `REB_Change_Network.sh base` for real - the first full run of the script on hardware - including the shutdown step, and `check`. |
+| No sound from the speaker on Rich's Pi | 16 October 2026 | The Pi's audio output is "Dummy Output" (`wpctl status`), so the fault siren and done/pause beeps play into nothing - found when the lost-card siren pin fired but nothing was heard. The HDMI audio device exists but isn't selected: check the monitor has speakers / select HDMI (or a USB speaker) as the output, then retest the speaker sounds. |
 | Spindles on the second machine | 08 October 2026 | Sp0/Sp1 don't run there. They work on the prototype, so this is that machine's wiring - check its cables, plugs and drives first. |
 | Limit jack pin map | 28 September 2026 | `LIMIT_JACK_INPUT` (jacks 1/2/3 -> I/O 002/006/010) is a placeholder until the PCB wiring is final. Space is left on the Axis Selection page for a Limit Jack 4. |
 | Tell Roy about the C speed-up | 07 October 2026 | Close LinuxCNC, run the update **twice** in a row before starting LinuxCNC again, and check the output shows C's new limits. |
@@ -212,16 +217,83 @@ Progress on the `two-box` branch:
   Settings copied to `~/Documents/REBset_v1.ini.before-two-box`. To run
   `main`/`dev-rich` again: W5/W6 back to the factory setting,
   `REB_Change_Network.sh back`, copy that file back.
+- **Expansion card set up on Rich's Pi, 16 October 2026:** the new card
+  (a 7I92T - mesaflash only finds it with `--device 7i92t`, as the
+  scripts already use) arrived with Mesa's stock firmware (10 stepgens,
+  2 QCount). Claude ran `REB_Change_Network.sh expansion`'s commands by
+  hand (the script's questions can't be answered from Claude's shell):
+  a temporary 192.168.1.120 on eth0 to reach the factory address,
+  `7i92t_REB.bin` written and verified (`--reload` then showed 8
+  stepgens, InM, OutM), `--set ip=10.10.10.11`, then Rich moved W5/W6
+  to EEPROM and powered it on. Both cards now answer on the switch -
+  base 10.10.10.10 (MAC 00:60:1b:12:81:33), expansion 10.10.10.11
+  (00:60:1b:12:81:97) - with REB firmware, also after Rich connected
+  P1/P2 and mounted the board. The Pi's uptime was 6 minutes when the
+  card came back, so the power-on restart (Open items) may have
+  happened again; it came back on 10.10.10.100 on its own. The script
+  itself still hasn't run on hardware.
+- **Both cards run under LinuxCNC, 16 October 2026:** on `two-box` with
+  Expansion Box Connected ticked, one `hm2_eth` line loaded both cards
+  and channels 06-09 (W V A B on Rich's box) all move. A and B (08/09)
+  didn't move at first although the card sent their steps (stepgen
+  counts matched the commanded moves): the two new DM542T drives still
+  had their side switch at the factory 24V - it must be at **5V** for
+  the 7i92's signals. Ruled out on the way: firmware (`mesaflash
+  --readhmid` gives the same pin map on both cards, matching the
+  support page), HAL, motors. Jacks 4/5 (set to X/Z): tested - see below.
+- **Servo thread time with two cards, 16 October 2026:** LinuxCNC showed
+  "Unexpected realtime delay on task 0" (the 1 ms servo thread). The
+  latency test was fine (worst 26.6 us, no isolcpus), but the thread's
+  worst case was 859 us: each card's `read` sent a request and waited
+  for the reply, one card after the other (394 + 341 us worst). The
+  generator now adds both cards' `read-request`s before the reads
+  (5c19d2e on `two-box`): worst 533 us while jogging on both cards. A
+  busy web browser was also using about two of the Pi's four cores the
+  first time - keep it closed while running. Then, per Peter Wallace at
+  Mesa (order for two 7i92s: read-requests, reads, everything else,
+  writes), both cards' writes moved to the end of REB.local.hal (on
+  `two-box`, the commit after 5c19d2e), so each cycle sends fresh
+  commands: worst 556 us jogging, no following errors. One card keeps
+  REB.hal's read-then-write order - consider Peter's order there too.
+  Watch for following errors with the new order. If the realtime
+  message comes back: `isolcpus` for the realtime core.
 - **Channel numbers on the panel's Axis Assignments tiles, 14 October
   2026 (6465a4d on `two-box`, not yet seen in AXIS):** each tile has a
   "Channel NN" label like REB Settings. Makes the panel 34 px taller -
   check it still fits a 1080-line screen.
-- **Watchdog as E-stop - design needed:** a card's
-  `watchdog.has_bit` stays true after it fires until something clears
-  it, so wiring it straight into the E-stop chain could leave the
-  machine stuck in E-stop. Work out how a reset clears it first.
-- Next: testing on hardware once the new 7i92 arrives, then the
-  watchdog design.
+- **User Manual for two-box, 14 October 2026:** REB Settings' new "How
+  the Expansion Box Works" button (327b341 on `two-box`) opens
+  `Main.AxisSelection#ExpansionBox`. Draft page text with that section
+  was given to Rich (`~/Downloads/AxisSelection.pmwiki.txt`); publish it
+  when `two-box` reaches `main`, and retake the
+  `REBSettings-AxisSelection.png` and `SelectedAxes.png` screenshots then.
+  Rich took the new SelectedAxes screenshot 14 October 2026 using
+  `REB_SHOW_EXPANSION=1 ./REB_Launch.sh` (3037858 on `two-box`: the panel
+  shows the expansion box as connected, display only, settings untouched -
+  worked on the machine).
+- **Lost card = E-stop - built and tested, 16 October 2026** (5cfd3a0,
+  c44705b on `two-box`): pulling a card's cable while jogging, before
+  this, left the machine on and the other box's axes running - after 5
+  lost packets `hm2_eth` sets the card's `io_error` and stops talking to
+  it, and nothing brought it back. Now each card's
+  `packet-error-exceeded` and `watchdog.has_bit` (OR'd into net
+  `card-fault`) latch E-stop with the E-stop button, light the tower's
+  red and sound the siren; AXIS says "Expansion box (or Base box) lost
+  contact"; while in E-stop `REB_main.py` clears `io_error` (at most
+  every 5 s - each failed try prints "error finishing read") then
+  `has_bit`, so F1 resets once the cable is back. Tested on Rich's box:
+  expansion card - E-stop, red, buzzer, F1 refused while unplugged,
+  recovered, red off at F2, W jogged; base card - same, but the tower
+  stays dark (its outputs are on that card; very unlikely failure - Pi,
+  switch and base card share a box).
+- **Limit jacks 4, 5 and 6 on the expansion box tested, 16 October 2026:**
+  jack 4 set to X and jack 5 to Z (both ends, NC), on the expansion
+  card's I/O 002 and 006. Tripping each while jogging: the axis stopped,
+  "joint 0 (1) on limit switch error", machine off, red latched, 3 s
+  buzzer and panel siren; F2 brought the machine back and put red out.
+  Jack 6 (I/O 010), set to Z with jack 5 cleared: the same, twice.
+- Next: Rich's single-card machine rebuild and network rehearsal (Open items) before `two-box`
+  goes to `main`.
 
 Software work once the design is fixed (not started):
 
@@ -244,6 +316,7 @@ Most recent first.
 
 | Item | Settled | How |
 |---|---|---|
+| `7i92t_REB.pin` in the repo was incomplete | 16 October 2026 | It stopped after four P2 lines. Replaced with the full `mesaflash --device 7i92t --addr 10.10.10.10 --readhmid` output from Rich's Pi (the expansion card at .11 gives the same). |
 | Signal tower relay polarity setting | 11 October 2026 | Dropped: the relays are on Chuck's REB circuit board, and home-built systems must follow the same active-low standard. The "Relays switch on when low" checkbox is gone; `SIGNAL_TOWER_ACTIVE_LOW` is fixed. |
 | Startup splash drawing and fallback | 11 October 2026 | Verified by Rich: with X and Z assigned the preview shows "REB" over "ROSE ENGINE BUTLER", right way up, no error; X only, Z only, and neither all fall back to the empty splash; pressing Run with it loaded and the axes enabled moves nothing. |
 | Items from the Mac session's list | 11 October 2026 | Copied into this file. |
