@@ -42,6 +42,8 @@ Built and committed, but not yet seen working on real hardware.
 |---|---|---|
 | Pi reboots when the 7i92 is powered on | 14 October 2026 | During `REB_Change_Network.sh base` on Rich's Pi, powering the 7i92 back on (after moving W5/W6) restarted the Pi. They share one power supply, so the card's start-up likely pulls the supply down for a moment. Could happen on every power-up, and more so with two cards in the two-box design. Check the supply's rating and whether the Pi's 5V dips (`vcgencmd get_throttled` right after it happens); consider a bigger supply, or a separate one for the cards. |
 | `REB_Change_Network.sh base` can't recover from a Pi restart | 14 October 2026 | (`two-box` branch.) The script stores 10.10.10.10 in the card, asks for the power-cycle with W5/W6 on EEPROM, and only then moves the Pi to 10.10.10.100. When the Pi rebooted at the power-cycle (row above) it came back on 192.168.1.120, the card on 10.10.10.10, and LinuxCNC couldn't start; `./REB_Change_Network.sh pi` fixed it. Script fixed 14 October 2026 (9ec0f28 on `two-box`, dry-run only): it now moves the Pi as soon as the address is stored, before asking for the power-cycle, then checks the card at its new address; it also says to run `pi` if the Pi restarts. To test: set up the next card (e.g. the expansion card) with it. Spare "Wired Ethernet" profiles: the script now offers to delete them whenever it sets the Pi's address (two-box, 14 October 2026, dry-run only); the two on the shop Pi were deleted by hand that day - the other machine still has three. |
+| DM542T 5V switch in the build instructions | 16 October 2026 | New DM542T drives ship with their side voltage switch at 24V; with the 7i92's signals it must be at 5V, or the drive silently ignores step/dir (found on the expansion box's two new drives). Add it to the User Manual's build/assembly pages, and check drives on other machines. |
+| `7i92t_REB.pin` in the repo is incomplete | 16 October 2026 | `REB_Setup/MesaCard/7i92t_REB.pin` stops after four P2 lines. Replace it with the full `mesaflash --device 7i92t --addr 10.10.10.10 --readhmid` output (read from both cards on Rich's Pi, 16 October 2026 - identical). |
 | Spindles on the second machine | 08 October 2026 | Sp0/Sp1 don't run there. They work on the prototype, so this is that machine's wiring - check its cables, plugs and drives first. |
 | Limit jack pin map | 28 September 2026 | `LIMIT_JACK_INPUT` (jacks 1/2/3 -> I/O 002/006/010) is a placeholder until the PCB wiring is final. Space is left on the Axis Selection page for a Limit Jack 4. |
 | Tell Roy about the C speed-up | 07 October 2026 | Close LinuxCNC, run the update **twice** in a row before starting LinuxCNC again, and check the output shows C's new limits. |
@@ -228,9 +230,17 @@ Progress on the `two-box` branch:
   P1/P2 and mounted the board. The Pi's uptime was 6 minutes when the
   card came back, so the power-on restart (Open items) may have
   happened again; it came back on 10.10.10.100 on its own. The script
-  itself still hasn't run on hardware. Not yet checked: LinuxCNC on
-  `two-box` with Expansion Box Connected ticked, and the expansion
-  box's P1/P2 wiring.
+  itself still hasn't run on hardware.
+- **Both cards run under LinuxCNC, 16 October 2026:** on `two-box` with
+  Expansion Box Connected ticked, one `hm2_eth` line loaded both cards
+  and channels 06-09 (W V A B on Rich's box) all move. A and B (08/09)
+  didn't move at first although the card sent their steps (stepgen
+  counts matched the commanded moves): the two new DM542T drives still
+  had their side switch at the factory 24V - it must be at **5V** for
+  the 7i92's signals. Ruled out on the way: firmware (`mesaflash
+  --readhmid` gives the same pin map on both cards, matching the
+  support page), HAL, motors. Jacks 4/5 (set to X/Z) read "not
+  tripped" with NC switches fitted; tripping them not yet tried.
 - **Channel numbers on the panel's Axis Assignments tiles, 14 October
   2026 (6465a4d on `two-box`, not yet seen in AXIS):** each tile has a
   "Channel NN" label like REB Settings. Makes the panel 34 px taller -
@@ -249,9 +259,8 @@ Progress on the `two-box` branch:
   `watchdog.has_bit` stays true after it fires until something clears
   it, so wiring it straight into the E-stop chain could leave the
   machine stuck in E-stop. Work out how a reset clears it first.
-- Next: run LinuxCNC on `two-box` with both cards (Expansion Box
-  Connected ticked) and test channels 06-09 and jacks 4-6, then the
-  watchdog design.
+- Next: trip limit jacks 4-6 on the expansion box, then the watchdog
+  design.
 
 Software work once the design is fixed (not started):
 
