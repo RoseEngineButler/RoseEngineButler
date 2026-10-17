@@ -240,6 +240,18 @@ Progress on the `two-box` branch:
   --readhmid` gives the same pin map on both cards, matching the
   support page), HAL, motors. Jacks 4/5 (set to X/Z) read "not
   tripped" with NC switches fitted; tripping them not yet tried.
+- **Servo thread time with two cards, 16 October 2026:** LinuxCNC showed
+  "Unexpected realtime delay on task 0" (the 1 ms servo thread). The
+  latency test was fine (worst 26.6 us, no isolcpus), but the thread's
+  worst case was 859 us: each card's `read` sent a request and waited
+  for the reply, one card after the other (394 + 341 us worst). The
+  generator now adds both cards' `read-request`s before the reads
+  (5c19d2e on `two-box`): worst 533 us while jogging on both cards. A
+  busy web browser was also using about two of the Pi's four cores the
+  first time - keep it closed while running. If the message comes back,
+  next steps: `isolcpus` for the realtime core, or moving each card's
+  `write` to the end of the thread (changes timing for every axis, so
+  retune check).
 - **Channel numbers on the panel's Axis Assignments tiles, 14 October
   2026 (6465a4d on `two-box`, not yet seen in AXIS):** each tile has a
   "Channel NN" label like REB Settings. Makes the panel 34 px taller -
