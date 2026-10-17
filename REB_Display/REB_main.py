@@ -3156,7 +3156,7 @@ class HandlerClass:
                     self._card_retry_at[n] = now + CARD_RECONNECT_SECONDS
                     self._halcmd("setp", card + ".io_error", "FALSE")
             elif bitten:
-                # has_bit is netted (to estop-fault-or), so its signal is set.
+                # has_bit is netted (to card-fault-or), so its signal is set.
                 self._halcmd("sets", "card-%d-watchdog" % n, "FALSE")
         return True
 

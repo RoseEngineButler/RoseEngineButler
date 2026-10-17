@@ -417,7 +417,8 @@ def _signal_tower_hal(signal_tower, limit_nets, role_layout, fault_sound="both")
         Sp0+Sp1 path through Sp<n>-idx-active). OR'd by tower-green-or;
         the NOTs are logic NANDs with both inputs on the same signal,
         since not/and2 are already loaded elsewhere under fixed names.
-      - red: on after any active joint exceeds its following error, until
+      - red: on after any active joint exceeds its following error or a
+        card loses contact (net card-fault, from _estop_fault_hal), until
         the machine is turned back on (F2), and while any in-use limit
         jack is tripped (limit_nets, from _limit_jack_hal). LinuxCNC does
         NOT hold joint.N.f-errored - it clears as the machine turns off,
@@ -430,7 +431,9 @@ def _signal_tower_hal(signal_tower, limit_nets, role_layout, fault_sound="both")
         tower-on-edge's short pulse when machine-is-on rises (F2 - both
         faults turn the machine off). tower-red-or then ORs the latch
         with the live limit nets, so a switch still open after F2 keeps
-        red lit until the axis is moved off it.
+        red lit until the axis is moved off it. The tower's outputs are
+        on the base card, so a lost base card can't light it - the
+        speaker siren still sounds.
       - buzzer: a SIGNAL_TOWER_BUZZER_SECONDS pulse from a oneshot each
         time red rises (net tower-siren), when fault_sound includes the
         tower. _fault_siren_postgui_hal nets the same pulse to the
@@ -455,7 +458,8 @@ def _signal_tower_hal(signal_tower, limit_nets, role_layout, fault_sound="both")
 
     joints = sorted(role_layout.joint_number.values())
     red_inputs = ["tower-red-held"] + sorted(limit_nets)
-    logic = [("tower-fault-or", "0x2%02x" % (len(joints) + len(limit_nets)))]
+    # + 1: card-fault. At most 8 joints + 6 jacks + 1 = 15 (logic takes 16).
+    logic = [("tower-fault-or", "0x2%02x" % (len(joints) + len(limit_nets) + 1))]
     if len(red_inputs) > 1:
         logic.append(("tower-red-or", "0x2%02x" % len(red_inputs)))
 
@@ -506,6 +510,7 @@ def _signal_tower_hal(signal_tower, limit_nets, role_layout, fault_sound="both")
         lines.append(net.ljust(41) + "=> tower-fault-or.in-%02d" % i)
     for i, net in enumerate(sorted(limit_nets), start=len(joints)):
         lines.append(("net " + net).ljust(41) + "=> tower-fault-or.in-%02d" % i)
+    lines.append("net card-fault".ljust(41) + "=> tower-fault-or.in-%02d" % (len(joints) + len(limit_nets)))
     lines += [
         "net tower-fault".ljust(40) + "<=  tower-fault-or.or",
         "net tower-fault".ljust(41) + "=> tower-red-hold.in",
@@ -655,7 +660,7 @@ def _limit_jack_hal(limit_jacks, role_layout, switch_type="NC"):
 def _estop_fault_hal(estop_button, expansion_box):
     '''
     Returns HAL text OR-ing every E-stop fault into REB.hal's
-    estop-latch.0 fault-in through estop-fault-or (a lut5 - logic, or2
+    estop-latch.0 fault-in through estop-fault-or (lut5s - logic, or2
     and not are already loaded elsewhere under fixed names, and a
     realtime module loads only once):
       - the optional E-stop button's 7i92 input, when estop_button is
@@ -672,6 +677,9 @@ def _estop_fault_hal(estop_button, expansion_box):
         even after the cable went back in. REB_main.py clears io_error
         and has_bit while the machine is in E-stop (_poll_card_contact)
         - the watchdog nets are named so it can "halcmd sets" them.
+        The cards' signals are OR'd first, by card-fault-or, into net
+        card-fault, which _signal_tower_hal also counts as a fault (red
+        light and siren, Rich's request 16 October 2026).
     Any of these latches E-stop until it clears and the operator
     resets E-stop (F1).
     '''
@@ -682,9 +690,11 @@ def _estop_fault_hal(estop_button, expansion_box):
         "# button (REBset_v1.ini's estop_button, REB Settings) and each card",
         "# losing contact, OR'd into estop-latch.0.fault-in.",
         "# ********************************************************************",
-        "loadrt lut5 names=estop-fault-or",
+        "loadrt lut5 names=card-fault-or,estop-fault-or",
+        "addf card-fault-or".ljust(44) + "servo-thread",
         "addf estop-fault-or".ljust(44) + "servo-thread",
-        "# 5-input OR (lut5's documented value).",
+        "# 5-input ORs (lut5's documented value; unused inputs stay FALSE).",
+        "setp card-fault-or.function".ljust(44) + "0xfffffffe",
         "setp estop-fault-or.function".ljust(44) + "0xfffffffe",
     ]
     if estop_button:
@@ -697,10 +707,12 @@ def _estop_fault_hal(estop_button, expansion_box):
         watchdog = "net card-%d-watchdog" % card
         lines += [
             lost.ljust(40) + "<=  hm2_7i92.%d.packet-error-exceeded" % card,
-            lost.ljust(41) + "=> estop-fault-or.in-%d" % (1 + 2 * card),
+            lost.ljust(41) + "=> card-fault-or.in-%d" % (2 * card),
             watchdog.ljust(39) + "<=>  hm2_7i92.%d.watchdog.has_bit" % card,
-            watchdog.ljust(41) + "=> estop-fault-or.in-%d" % (2 + 2 * card),
+            watchdog.ljust(41) + "=> card-fault-or.in-%d" % (1 + 2 * card),
         ]
+    lines.append("net card-fault".ljust(40) + "<=  card-fault-or.out")
+    lines.append("net card-fault".ljust(41) + "=> estop-fault-or.in-1")
     lines.append("net estop-fault".ljust(40) + "<=  estop-fault-or.out")
     lines.append("net estop-fault".ljust(41) + "=> estop-latch.0.fault-in")
     return "\n".join(lines) + "\n"
