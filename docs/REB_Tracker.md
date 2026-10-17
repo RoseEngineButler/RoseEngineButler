@@ -240,8 +240,7 @@ Progress on the `two-box` branch:
   had their side switch at the factory 24V - it must be at **5V** for
   the 7i92's signals. Ruled out on the way: firmware (`mesaflash
   --readhmid` gives the same pin map on both cards, matching the
-  support page), HAL, motors. Jacks 4/5 (set to X/Z) read "not
-  tripped" with NC switches fitted; tripping them not yet tried.
+  support page), HAL, motors. Jacks 4/5 (set to X/Z): tested - see below.
 - **Servo thread time with two cards, 16 October 2026:** LinuxCNC showed
   "Unexpected realtime delay on task 0" (the 1 ms servo thread). The
   latency test was fine (worst 26.6 us, no isolcpus), but the thread's
@@ -287,7 +286,15 @@ Progress on the `two-box` branch:
   recovered, red off at F2, W jogged; base card - same, but the tower
   stays dark (its outputs are on that card; very unlikely failure - Pi,
   switch and base card share a box).
-- Next: trip limit jacks 4-6 on the expansion box.
+- **Limit jacks 4 and 5 on the expansion box tested, 16 October 2026:**
+  jack 4 set to X and jack 5 to Z (both ends, NC), on the expansion
+  card's I/O 002 and 006. Tripping each while jogging: the axis stopped,
+  "joint 0 (1) on limit switch error", machine off, red latched, 3 s
+  buzzer and panel siren; F2 brought the machine back and put red out.
+  Jack 6 (I/O 010) not yet tested - its plug isn't connected yet.
+- Next: jack 6 once its plug is connected; then Rich's single-card
+  machine rebuild and network rehearsal (Open items) before `two-box`
+  goes to `main`.
 
 Software work once the design is fixed (not started):
 
