@@ -286,14 +286,13 @@ Progress on the `two-box` branch:
   recovered, red off at F2, W jogged; base card - same, but the tower
   stays dark (its outputs are on that card; very unlikely failure - Pi,
   switch and base card share a box).
-- **Limit jacks 4 and 5 on the expansion box tested, 16 October 2026:**
+- **Limit jacks 4, 5 and 6 on the expansion box tested, 16 October 2026:**
   jack 4 set to X and jack 5 to Z (both ends, NC), on the expansion
   card's I/O 002 and 006. Tripping each while jogging: the axis stopped,
   "joint 0 (1) on limit switch error", machine off, red latched, 3 s
   buzzer and panel siren; F2 brought the machine back and put red out.
-  Jack 6 (I/O 010) not yet tested - its plug isn't connected yet.
-- Next: jack 6 once its plug is connected; then Rich's single-card
-  machine rebuild and network rehearsal (Open items) before `two-box`
+  Jack 6 (I/O 010), set to Z with jack 5 cleared: the same, twice.
+- Next: Rich's single-card machine rebuild and network rehearsal (Open items) before `two-box`
   goes to `main`.
 
 Software work once the design is fixed (not started):
