@@ -932,6 +932,9 @@ sets spindle.1-at-speed                     true
 # pull-up take the input high, which latches a fault and drops LinuxCNC
 # into E-stop until the button is released AND the operator turns
 # E-stop off in AXIS (F1), which pulses user-request-enable into reset.
+# Since 16 October 2026 the generator always feeds fault-in through an
+# OR (estop-fault-or) of the button and each card losing contact
+# (packet-error-exceeded, watchdog.has_bit) - see _estop_fault_hal.
 addf estop-latch.0                          servo-thread
 
 net estop-out                           <=  iocontrol.0.user-enable-out

@@ -367,6 +367,14 @@ SOUND_PLAYERS = (["paplay"], ["pw-play"], ["aplay", "-q"])
 # How often a running program is checked for finishing or pausing.
 PROGRAM_POLL_MS = 250
 
+# Card contact (see _poll_card_contact). The cards' names on screen.
+CARD_NAMES = {0: "Base box", 1: "Expansion box"}
+CARD_CONTACT_POLL_MS = 500
+# While in E-stop, a card hm2_eth has given up on is reconnected at
+# most this often: each try on a card that's still unplugged fails
+# again and prints "error finishing read" again.
+CARD_RECONNECT_SECONDS = 5
+
 # A Return to Start move smaller than this (machine units) on every
 # axis counts as "already there".
 SYNC_POSITION_TOLERANCE = 0.0001
@@ -3088,6 +3096,79 @@ class HandlerClass:
 
 
 #######################################################################
+# Card contact
+# Purpose:              A Mesa card that loses contact with the Pi -
+#                       network cable, switch or the box's power - stops
+#                       its axes but, on its own, leaves the machine on
+#                       and the other box's axes running, and stays cut
+#                       off even once the cable is back (found 16 October
+#                       2026). REB_Generate_Local_Ini.py's _estop_fault_hal
+#                       latches E-stop on the card's packet-error-exceeded
+#                       or watchdog.has_bit; this says which box it was
+#                       and, while the machine is in E-stop, brings the
+#                       card back: clears its io_error (hm2_eth then
+#                       talks to it again and reads has_bit, TRUE if the
+#                       card's watchdog bit), then has_bit (its outputs
+#                       come back). Both are done only in E-stop, so
+#                       nothing can move as the card returns. A card
+#                       still unplugged fails again at once, keeping the
+#                       latch set, so F1 can't reset until it's fixed.
+#                       Main panel only.
+# Updated:              ver 1.0, 16 October 2026
+#######################################################################
+    def _load_card_contact(self):
+        if self.builder.get_object("Sync_Run") is None:
+            return
+        # The cards this session loaded (not the expansion_box setting,
+        # which REB_SHOW_EXPANSION can override for screenshots).
+        self._cards = []
+        for n in CARD_NAMES:
+            try:
+                hal.get_value("hm2_7i92.%d.io_error" % n)
+            except RuntimeError:
+                continue
+            self._cards.append(n)
+        self._card_lost = {n: False for n in self._cards}
+        self._card_retry_at = {n: 0.0 for n in self._cards}
+        GLib.timeout_add(CARD_CONTACT_POLL_MS, self._poll_card_contact)
+
+    def _poll_card_contact(self):
+        s.poll()
+        in_estop = s.task_state == linuxcnc.STATE_ESTOP
+        now = time.monotonic()
+        for n in self._cards:
+            card = "hm2_7i92.%d" % n
+            io_error = bool(hal.get_value(card + ".io_error"))
+            bitten = bool(hal.get_value(card + ".watchdog.has_bit"))
+            lost = io_error or bitten or bool(hal.get_value(card + ".packet-error-exceeded"))
+            if lost and not self._card_lost[n]:
+                message = (CARD_NAMES[n] + " lost contact - E-stop. Check its network cable, "
+                           "the switch and its power, then press F1.")
+                print(message)
+                c.error_msg(message)
+            elif self._card_lost[n] and not lost:
+                print(CARD_NAMES[n] + " back in contact.")
+            self._card_lost[n] = lost
+            if not (lost and in_estop):
+                continue
+            if io_error:
+                if now >= self._card_retry_at[n]:
+                    self._card_retry_at[n] = now + CARD_RECONNECT_SECONDS
+                    self._halcmd("setp", card + ".io_error", "FALSE")
+            elif bitten:
+                # has_bit is netted (to estop-fault-or), so its signal is set.
+                self._halcmd("sets", "card-%d-watchdog" % n, "FALSE")
+        return True
+
+    @staticmethod
+    def _halcmd(*args):
+        try:
+            subprocess.run(["halcmd"] + list(args), check=True, capture_output=True, text=True)
+        except (OSError, subprocess.CalledProcessError) as e:
+            print("halcmd " + " ".join(args) + " failed: " + str(e))
+
+
+#######################################################################
 # __init__
 # Purpose:              This is used to initialize everything.
 # Updated:              ver 1.0, 21 July 2026
@@ -3236,6 +3317,10 @@ class HandlerClass:
 
         # Program-done / pause beeps (main panel only) - see _load_sounds.
         self._load_sounds()
+
+        # E-stop on a card losing contact, and bringing it back (main
+        # panel only) - see _load_card_contact.
+        self._load_card_contact()
 
 
 
