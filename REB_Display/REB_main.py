@@ -376,9 +376,6 @@ PROGRAM_POLL_MS = 250
 # run in the background when a program is loaded.
 PROGRAM_ESTIMATE_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                        "REB_Program_Estimate.py")
-# The time left is worked out from the program's real progress, so it
-# isn't shown until the program has run this long (not counting pauses).
-PROGRESS_SETTLE_SECONDS = 60
 # A run whose first move isn't among the program's first this many
 # moves was started part way (Run From Line) - no progress shown.
 PROGRESS_START_MOVES = 500
@@ -3126,7 +3123,7 @@ class HandlerClass:
 #######################################################################
 # Program progress
 # Purpose:              A bar left of Sync Move showing how far a G-code
-#                       program has got and about how long it has left.
+#                       program has got, as a percentage.
 #                       Line numbers can't say how far a program is -
 #                       o-word loops run the same lines over and over -
 #                       so when a program is loaded REB_Program_Estimate.py
@@ -3138,14 +3135,14 @@ class HandlerClass:
 #                       run started finds the place in the move list,
 #                       and the estimated time up to there over the
 #                       total is the percentage (time-weighted, so a long
-#                       slow cut counts for more than a quick rapid). The
-#                       estimate leaves out acceleration, so the time
-#                       left comes from the real rate instead, once the
-#                       program has run PROGRESS_SETTLE_SECONDS. Pauses
-#                       don't count. Driven by _poll_program. The bar
-#                       always keeps its space (set_child_visible) so the
-#                       panel doesn't change size when it appears - the
-#                       Sync Move row is otherwise empty on the other
+#                       slow cut counts for more than a quick rapid). No
+#                       time left: it was shown at first (worked out from
+#                       the real rate) but kept changing as the program
+#                       went - Rich's call, 20 October 2026, the
+#                       percentage is enough. Driven by _poll_program.
+#                       The bar always keeps its space (set_child_visible)
+#                       so the panel doesn't change size when it appears -
+#                       the Sync Move row is otherwise empty on the other
 #                       tabs. Main panel only.
 # Updated:              ver 1.0, 20 October 2026
 #######################################################################
@@ -3263,11 +3260,6 @@ class HandlerClass:
         run["fraction"] = fraction
         self._progress_bar.set_fraction(fraction)
         text = "Program %d%%" % int(fraction * 100)
-        if run["elapsed"] >= PROGRESS_SETTLE_SECONDS and done > 0:
-            left = (total - done) * run["elapsed"] / done
-            text += " - about %s left" % self._progress_duration(left)
-        else:
-            text += " - working out the time left"
         if paused:
             text += " (paused)"
         self._progress_bar.set_text(text)
