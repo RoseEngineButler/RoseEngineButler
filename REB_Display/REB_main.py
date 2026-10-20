@@ -299,6 +299,13 @@ MODE_HEADER_WIDGETS = ("Mode_Hdr_Rev", "Mode_Hdr_Fwd", "Title_Minus_Sign1", "Tit
 # disabled while any one of them is running (see _start_polled_mdi).
 MOTION_BUTTONS = ("Sync_Run", "Sync_Return", "Thread_Run", "Thread_Return")
 
+# The startup splash ("REB" / "ROSE ENGINE BUTLER", written each launch
+# by REB_Generate_Local_Ini.py) and the empty file swapped in for it
+# before a Sync Move or Cut Thread, whose tool path AXIS would otherwise
+# draw over the lettering - see _clear_splash.
+SPLASH_FILE_NAME = "REB_Splash.local.ngc"
+EMPTY_PREVIEW_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "REB_Splash.ngc")
+
 # Axis letters the Threading tab drives: X feeds the cutter in, Z moves
 # along the thread, C turns the work.
 THREAD_AXES = ("X", "Z", "C")
@@ -2387,6 +2394,7 @@ class HandlerClass:
         _mdi_progress_start.
         '''
         self._mdi_progress = progress
+        self._clear_splash()
         modal = set(s.gcodes)
         restore = []
         restore.append("G21" if 210 in modal else "G20")
@@ -2410,6 +2418,25 @@ class HandlerClass:
         # own Stop/ESC) stays responsive for however long the move takes.
         self._sync_poll_id = GLib.timeout_add(
             100, self._sync_poll_move, widget, " ".join(restore), time.time(), on_done)
+
+    @staticmethod
+    def _clear_splash():
+        '''
+        If AXIS still shows the startup splash, has it open the empty
+        REB_Splash.ngc instead (axis-remote - AXIS is a separate process),
+        so a Sync Move's or Cut Thread's tool path isn't drawn over the
+        lettering (Rich, 20 October 2026). A G-code program needs nothing:
+        opening it replaces the splash. Done before switching to MDI,
+        since AXIS refuses remote commands while anything runs.
+        '''
+        if os.path.basename(s.file or "") != SPLASH_FILE_NAME:
+            return
+        try:
+            subprocess.run(["axis-remote", EMPTY_PREVIEW_FILE], timeout=5,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except (OSError, subprocess.SubprocessError) as e:
+            print("Could not clear the splash: " + str(e))
+        s.poll()
 
     def _sync_poll_move(self, widget, restore_gcode, started, on_done=None):
         s.poll()
