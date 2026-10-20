@@ -350,8 +350,9 @@ THREAD_RESULT_SECONDS = 20
 # BEEP_SECONDS off - deliberately unlike the tower's steady 3 s fault
 # siren. On the speaker, REB_Display/Sounds/REB_Done.wav is a "ta-da"
 # (two organ-like chords, Rich's choice 20 October 2026) and
-# REB_Pause.wav the 2-beep pattern, each after 0.5 s of silence: an HDMI TV cuts off the start of a sound
-# while it locks on (Rich's lost the first beep, 20 October 2026).
+# REB_Pause.wav the 2-beep pattern, each after 0.5 s of silence: an
+# HDMI TV cuts off the start of a sound while it locks on (Rich's lost
+# the first beep, 20 October 2026).
 # The fault siren has its own setting, "fault_sound" (same choices):
 # the tower sounds it straight from HAL, and REB_Generate_Local_Ini.py
 # nets the same 3 s pulse to the fault-siren pin for the speaker, which
