@@ -348,8 +348,9 @@ THREAD_RESULT_SECONDS = 20
 # one is connected), "speaker" (the Pi's own audio - HDMI or USB) or
 # "both". Each pattern is that many short beeps, BEEP_SECONDS on then
 # BEEP_SECONDS off - deliberately unlike the tower's steady 3 s fault
-# siren. The .wav files in REB_Display/Sounds hold the same patterns,
-# each after 0.5 s of silence: an HDMI TV cuts off the start of a sound
+# siren. On the speaker, REB_Display/Sounds/REB_Done.wav is a "ta-da"
+# (two organ-like chords, Rich's choice 20 October 2026) and
+# REB_Pause.wav the 2-beep pattern, each after 0.5 s of silence: an HDMI TV cuts off the start of a sound
 # while it locks on (Rich's lost the first beep, 20 October 2026).
 # The fault siren has its own setting, "fault_sound" (same choices):
 # the tower sounds it straight from HAL, and REB_Generate_Local_Ini.py
