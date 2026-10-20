@@ -541,6 +541,19 @@ def _show_settings_error(widget, message):
     dialog.run()
     dialog.destroy()
 
+def _planner_length(deltas):
+    '''
+    The length LinuxCNC's motion planner counts for a move of deltas
+    ({letter: distance}): its X/Y/Z length, else U/V/W, else A/B/C -
+    what motion.current-vel (and so REB.hal's program-path) measures.
+    '''
+    for group in ("XYZ", "UVW", "ABC"):
+        length = math.sqrt(sum(d * d for axis, d in deltas.items() if axis in group))
+        if length > 0:
+            return length
+    return 0.0
+
+
 def _show_restart_required_popup(widget, detail=None):
     dialog = Gtk.MessageDialog(
         transient_for=widget.get_toplevel(),
@@ -2334,7 +2347,7 @@ class HandlerClass:
             return False
         return True
 
-    def _sync_start_move(self, widget, deltas, feeds, on_done=None):
+    def _sync_start_move(self, widget, deltas, feeds, on_done=None, progress=None):
         '''
         Sends deltas ({letter: signed incremental distance, in machine
         units}) as a single G1. Each letter's own time is
@@ -2351,9 +2364,9 @@ class HandlerClass:
         # Where each axis should end up - see _sync_run_finished.
         self._sync_target = {axis: s.position[STAT_POSITION_INDEX[axis]] + d
                              for axis, d in deltas.items()}
-        self._start_polled_mdi(widget, gcode, on_done)
+        self._start_polled_mdi(widget, gcode, on_done, progress)
 
-    def _start_polled_mdi(self, widget, gcode, on_done=None):
+    def _start_polled_mdi(self, widget, gcode, on_done=None, progress=None):
         '''
         Sends one MDI command (a single move, or a whole subroutine
         call) and polls until it finishes, with every MOTION_BUTTONS
@@ -2361,7 +2374,10 @@ class HandlerClass:
         units, distance mode, feed mode, lathe radius/diameter mode and
         modal F - whichever of those the command changed - and calls
         on_done(), if given. Shared by the Sync Move and Threading tabs.
+        progress, if given, puts the command on the progress bar - see
+        _mdi_progress_start.
         '''
+        self._mdi_progress = progress
         modal = set(s.gcodes)
         restore = []
         restore.append("G21" if 210 in modal else "G20")
@@ -2391,6 +2407,7 @@ class HandlerClass:
         # interp_state can still read idle for a moment right after
         # c.mdi() - don't mistake that for "already finished".
         if s.interp_state != linuxcnc.INTERP_IDLE or time.time() - started < 0.5:
+            self._mdi_progress_update()
             return True
         # Finished, or aborted from AXIS - either way, put the
         # operator's own modal state back.
@@ -2444,7 +2461,8 @@ class HandlerClass:
 
         self._sync_start = tuple(s.position)
         self._sync_feeds = feeds
-        self._sync_start_move(widget, deltas, feeds, self._sync_run_finished)
+        self._sync_start_move(widget, deltas, feeds, self._sync_run_finished,
+                              self._mdi_progress_start("Sync Move", length=_planner_length(deltas)))
 
     def _sync_run_finished(self):
         '''
@@ -2453,13 +2471,12 @@ class HandlerClass:
         (or by E-stop) stays silent.
         '''
         s.poll()
-        if s.task_state != linuxcnc.STATE_ON:
-            return
-        target = self._sync_target
-        for axis, end in target.items():
-            if abs(s.position[STAT_POSITION_INDEX[axis]] - end) >= SYNC_POSITION_TOLERANCE:
-                return
-        self._play_sound(DONE_BEEPS)
+        finished = (s.task_state == linuxcnc.STATE_ON
+                    and all(abs(s.position[STAT_POSITION_INDEX[axis]] - end) < SYNC_POSITION_TOLERANCE
+                            for axis, end in self._sync_target.items()))
+        self._mdi_progress_end(finished)
+        if finished:
+            self._play_sound(DONE_BEEPS)
 
     def Sync_Return(self, widget):
         '''
@@ -2828,7 +2845,9 @@ class HandlerClass:
         self._thread_running = True
         self._thread_last_code = 0
         self._thread_show_status("Starting...")
-        self._start_polled_mdi(widget, gcode, self._thread_finished)
+        self._start_polled_mdi(widget, gcode, self._thread_finished,
+                               self._mdi_progress_start("Threading", passes=passes,
+                                                        starts=starts, spring=spring))
 
     @staticmethod
     def _thread_ordinal(n):
@@ -2903,7 +2922,9 @@ class HandlerClass:
         self._thread_show_status(text)
         self._thread_result_id = GLib.timeout_add_seconds(
             THREAD_RESULT_SECONDS, self._thread_restore_instructions)
-        if (int(round(self._thread_last_code)) % 10000) // 1000 == THREAD_KIND_DONE:
+        finished = (int(round(self._thread_last_code)) % 10000) // 1000 == THREAD_KIND_DONE
+        self._mdi_progress_end(finished)
+        if finished:
             self._play_sound(DONE_BEEPS)
 
     def Thread_Return(self, widget):
@@ -3123,7 +3144,13 @@ class HandlerClass:
 #######################################################################
 # Program progress
 # Purpose:              A bar left of Sync Move showing how far a G-code
-#                       program has got, as a percentage.
+#                       program, a Sync Move or a Cut Thread has got, as
+#                       a percentage (not Run Operation, indexing or the
+#                       Return moves - Rich's choice, 20 October 2026). A
+#                       Sync Move is one move of known length, measured
+#                       with program-path below; a Cut Thread counts
+#                       passes finished from reb_thread.ngc's progress
+#                       codes (_mdi_progress_*). For a program:
 #                       Line numbers can't say how far a program is -
 #                       o-word loops run the same lines over and over -
 #                       so as a program starts REB_Program_Estimate.py
@@ -3160,6 +3187,7 @@ class HandlerClass:
         self._progress_proc = None          # the helper while it runs
         self._progress_output = "/tmp/REB_progress_%d.json" % os.getpid()
         self._progress_run = None           # the run being shown
+        self._mdi_progress = None           # a Sync Move or Cut Thread being shown
 
     def _progress_collect(self):
         '''Picks up the estimate helper's result once it has finished.'''
@@ -3282,6 +3310,76 @@ class HandlerClass:
               % (self._progress_duration(run["elapsed"]),
                  self._progress_duration(self._progress_estimate["time"][-1])
                  if self._progress_estimate else "none"), flush=True)
+
+    def _mdi_progress_start(self, name, length=None, passes=None, starts=None, spring=None):
+        '''
+        Puts a Sync Move (length = its planner length, measured with
+        program-path like a program) or a Cut Thread (counted in passes,
+        from reb_thread.ngc's progress codes) on the bar. Returns the
+        description for _start_polled_mdi, or None. Run Operation,
+        indexing and the Return moves aren't shown.
+        '''
+        if self._progress_bar is None:
+            return None
+        progress = {"name": name, "fraction": 0.0}
+        if length is not None:
+            start = self._progress_path()
+            if start is None or length <= 0:
+                return None
+            progress.update(start=start, length=length)
+        else:
+            progress.update(passes=passes, starts=starts, spring=spring)
+        self._progress_run = None
+        self._progress_bar.set_fraction(0.0)
+        self._progress_bar.set_text(name + " 0%")
+        self._progress_bar.set_child_visible(True)
+        return progress
+
+    def _mdi_progress_update(self):
+        progress = self._mdi_progress
+        if self._progress_bar is None or progress is None:
+            return
+        if "length" in progress:
+            path = self._progress_path()
+            if path is None:
+                return
+            fraction = (path - progress["start"]) / progress["length"]
+        else:
+            # Passes finished so far: reb_thread.ngc reports each pass as
+            # it starts (start x 10000 + kind x 1000 + pass number).
+            start, rest = divmod(int(round(self._thread_last_code)), 10000)
+            kind, number = divmod(rest, 1000)
+            passes = progress["passes"]
+            if start < 1:
+                done = 0
+            elif kind == THREAD_KIND_SPRING:
+                done = (start - 1) * passes + passes - progress["spring"] + number - 1
+            elif kind in (THREAD_KIND_PASS, THREAD_KIND_FINAL):
+                done = (start - 1) * passes + number - 1
+            elif kind == THREAD_KIND_DONE:
+                done = progress["starts"] * passes
+            else:                               # indexing to the next start
+                done = (start - 1) * passes
+            fraction = done / float(progress["starts"] * passes)
+        fraction = max(0.0, min(fraction, 0.999))
+        progress["fraction"] = fraction
+        self._progress_bar.set_fraction(fraction)
+        text = "%s %d%%" % (progress["name"], int(fraction * 100))
+        if s.interp_state == linuxcnc.INTERP_PAUSED:
+            text += " (paused)"
+        self._progress_bar.set_text(text)
+
+    def _mdi_progress_end(self, finished):
+        progress = self._mdi_progress
+        self._mdi_progress = None
+        if self._progress_bar is None or progress is None:
+            return
+        if finished:
+            self._progress_bar.set_fraction(1.0)
+            self._progress_bar.set_text(progress["name"] + " done")
+        else:
+            self._progress_bar.set_text("%s stopped at %d%%" % (progress["name"],
+                                                               int(progress["fraction"] * 100)))
 
     @staticmethod
     def _progress_duration(seconds):
