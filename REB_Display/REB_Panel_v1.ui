@@ -34,6 +34,7 @@
 #   1.3 - 14 October 2026 - Channel number on each Axis Assignments   #
 #         tile                                                        #
 #   1.4 - 20 October 2026 - Settings note removed, library button up  #
+#   1.5 - 20 October 2026 - Program progress bar beside Sync Move     #
 #                                                                     #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.             #
 #                                                                     #
@@ -5681,6 +5682,23 @@ direction</property>
                 <property name="top-attach">7</property>
                 <property name="width">4</property>
                 <property name="height">2</property>
+              </packing>
+            </child>
+            <child>
+              <!-- Program progress - REB_main.py shows it while a program runs. -->
+              <object class="GtkProgressBar" id="Program_Progress">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="valign">center</property>
+                <property name="margin-start">10</property>
+                <property name="margin-end">10</property>
+                <property name="show-text">True</property>
+                <property name="ellipsize">end</property>
+              </object>
+              <packing>
+                <property name="left-attach">4</property>
+                <property name="top-attach">20</property>
+                <property name="width">6</property>
               </packing>
             </child>
             <child>

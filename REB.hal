@@ -29,6 +29,7 @@
 # Version                                                             #
 #   1.0 - 22 July 2026                                                #
 #   1.1 - 16 October 2026 - card write moved to the end of the thread #
+#   1.2 - 20 October 2026 - program-path for the progress bar         #
 #                                                                     #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.             #
 #                                                                     #
@@ -948,6 +949,23 @@ net estop-ok                            <=  estop-latch.0.ok-out
 net estop-ok                             => iocontrol.0.emc-enable-in
 
 net machine-is-on                           halui.machine.is-on
+
+# ********************************************************************
+#  Program progress
+#  Added 20 October 2026
+# ********************************************************************
+# program-path.out adds up how far the motion planner has moved along
+# the toolpath (motion.current-vel integrated: X/Y/Z length, else U/V/W,
+# else A/B/C - in machine units or degrees). It only ever grows, so the
+# main panel's progress bar (REB_main.py, "Program progress") reads it
+# at the start of a run and compares how far it has grown with the
+# program's total from REB_Display/REB_Program_Estimate.py - which loops
+# and repeated lines can't confuse, unlike line numbers.
+loadrt integ names=program-path
+addf program-path                           servo-thread
+
+net program-speed                       <=  motion.current-vel
+net program-speed                        => program-path.in
 
 # ********************************************************************
 #  Card write - last in the servo thread

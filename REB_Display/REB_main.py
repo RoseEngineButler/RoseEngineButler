@@ -73,6 +73,7 @@ import subprocess
 import shutil
 import re
 import json
+import bisect
 from gi.repository import Gdk
 from gi.repository import Gtk
 from gi.repository import GLib
@@ -370,6 +371,17 @@ SOUND_FILES = {
 SOUND_PLAYERS = (["paplay"], ["pw-play"], ["aplay", "-q"])
 # How often a running program is checked for finishing or pausing.
 PROGRAM_POLL_MS = 250
+
+# Program progress (see _load_program_progress). The estimate helper,
+# run in the background when a program is loaded.
+PROGRAM_ESTIMATE_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                       "REB_Program_Estimate.py")
+# The time left is worked out from the program's real progress, so it
+# isn't shown until the program has run this long (not counting pauses).
+PROGRESS_SETTLE_SECONDS = 60
+# A run whose first move isn't among the program's first this many
+# moves was started part way (Run From Line) - no progress shown.
+PROGRESS_START_MOVES = 500
 
 # Card contact (see _poll_card_contact). The cards' names on screen.
 CARD_NAMES = {0: "Base box", 1: "Expansion box"}
@@ -3082,6 +3094,7 @@ class HandlerClass:
         if running and not self._program_was_running:
             self._program_end_line = self._find_program_end_line(s.file)
             self._program_read_end = False
+            self._progress_start()
         # read_line drops to 0 once the run ends, so note it while running.
         if running and self._program_end_line is not None \
                 and s.read_line >= self._program_end_line:
@@ -3102,10 +3115,201 @@ class HandlerClass:
                      "finished" if finished else "stopped/aborted"), flush=True)
             if finished:
                 self._play_sound(DONE_BEEPS)
+            self._progress_end(finished)
 
+        self._progress_update(running, paused)
         self._program_was_running = running
         self._program_was_paused = paused
         return True
+
+
+#######################################################################
+# Program progress
+# Purpose:              A bar left of Sync Move showing how far a G-code
+#                       program has got and about how long it has left.
+#                       Line numbers can't say how far a program is -
+#                       o-word loops run the same lines over and over -
+#                       so when a program is loaded REB_Program_Estimate.py
+#                       works out every move it will make, in order, with
+#                       the path length the motion planner counts for
+#                       each (in the background, a few seconds). REB.hal's
+#                       program-path.out adds up that same length as the
+#                       machine moves, so how far it has grown since the
+#                       run started finds the place in the move list,
+#                       and the estimated time up to there over the
+#                       total is the percentage (time-weighted, so a long
+#                       slow cut counts for more than a quick rapid). The
+#                       estimate leaves out acceleration, so the time
+#                       left comes from the real rate instead, once the
+#                       program has run PROGRESS_SETTLE_SECONDS. Pauses
+#                       don't count. Driven by _poll_program. The bar
+#                       always keeps its space (set_child_visible) so the
+#                       panel doesn't change size when it appears - the
+#                       Sync Move row is otherwise empty on the other
+#                       tabs. Main panel only.
+# Updated:              ver 1.0, 20 October 2026
+#######################################################################
+    def _load_program_progress(self):
+        self._progress_bar = None
+        if self.builder.get_object("Sync_Run") is None:
+            return
+        self._progress_bar = self.builder.get_object("Program_Progress")
+        self._progress_bar.set_child_visible(False)
+        self._progress_estimate = None      # the loaded program's moves (dict)
+        self._progress_key = None           # (file, mtime) it was worked out for
+        self._progress_proc = None          # the helper while it runs
+        self._progress_output = "/tmp/REB_progress_%d.json" % os.getpid()
+        self._progress_run = None           # the run being shown
+
+    def _progress_check_program(self):
+        '''
+        Starts the estimate helper when a different program (or a newer
+        copy of it - AXIS's Reload) is loaded, and picks up its result.
+        '''
+        if self._progress_proc is not None and self._progress_proc.poll() is not None:
+            ok = self._progress_proc.returncode == 0
+            self._progress_proc = None
+            self._progress_estimate = None
+            try:
+                if ok:
+                    with open(self._progress_output) as f:
+                        data = json.load(f)
+                    if data.get("error"):
+                        print("Program progress: " + data["error"])
+                    if data["time"] and data["time"][-1] > 0:
+                        self._progress_estimate = data
+                        print("Program progress: %d moves, about %s without acceleration"
+                              % (len(data["time"]), self._progress_duration(data["time"][-1])))
+            except (OSError, ValueError, KeyError) as e:
+                print("Program progress: no estimate - " + str(e))
+            try:
+                os.remove(self._progress_output)
+            except OSError:
+                pass
+
+        path = s.file
+        if not path:
+            return
+        try:
+            key = (path, os.path.getmtime(path))
+        except OSError:
+            return
+        if key == self._progress_key:
+            return
+        if self._progress_proc is not None:
+            self._progress_proc.kill()
+            self._progress_proc.wait()
+        self._progress_key = key
+        self._progress_estimate = None
+        if self._progress_run is None or self._progress_run.get("ended"):
+            self._progress_bar.set_child_visible(False)
+        try:
+            self._progress_proc = subprocess.Popen(
+                ["nice", "-n", "10", "python3", PROGRAM_ESTIMATE_SCRIPT, path,
+                 self._progress_output], stdout=subprocess.DEVNULL)
+        except OSError as e:
+            print("Program progress: could not start the estimate - " + str(e))
+
+    def _progress_path(self):
+        try:
+            return hal.get_value("program-path.out")
+        except Exception:
+            return None
+
+    def _progress_start(self):
+        if self._progress_bar is None:
+            return
+        self._progress_check_program()
+        start = self._progress_path()
+        if start is None:
+            self._progress_run = None
+            return
+        self._progress_run = {"start": start, "elapsed": 0.0, "last": time.monotonic(),
+                              "checked": False, "part_way": False, "fraction": 0.0}
+        self._progress_bar.set_fraction(0.0)
+        self._progress_bar.set_text("Program 0%")
+        self._progress_bar.set_child_visible(True)
+
+    def _progress_update(self, running, paused):
+        if self._progress_bar is None:
+            return
+        if not running:
+            self._progress_check_program()
+            return
+        run = self._progress_run
+        if run is None or run.get("ended"):
+            return
+        now = time.monotonic()
+        if not paused:
+            run["elapsed"] += now - run["last"]
+        run["last"] = now
+        data = self._progress_estimate
+        if data is None:
+            self._progress_check_program()      # estimate may finish mid-run
+            self._progress_bar.set_text("Program running - working out its length")
+            return
+        if not run["checked"] and s.motion_line > 0:
+            run["checked"] = True
+            run["part_way"] = s.motion_line not in data["line"][:PROGRESS_START_MOVES]
+        if run["part_way"]:
+            self._progress_bar.set_text("Started part way - no progress shown")
+            return
+        path = self._progress_path()
+        if path is None:
+            return
+        done = self._progress_time_at(data, path - run["start"])
+        total = data["time"][-1]
+        fraction = min(done / total, 0.999)
+        run["fraction"] = fraction
+        self._progress_bar.set_fraction(fraction)
+        text = "Program %d%%" % int(fraction * 100)
+        if run["elapsed"] >= PROGRESS_SETTLE_SECONDS and done > 0:
+            left = (total - done) * run["elapsed"] / done
+            text += " - about %s left" % self._progress_duration(left)
+        else:
+            text += " - working out the time left"
+        if paused:
+            text += " (paused)"
+        self._progress_bar.set_text(text)
+
+    @staticmethod
+    def _progress_time_at(data, distance):
+        '''Estimated time to the point `distance` along the move list.'''
+        lengths, times = data["length"], data["time"]
+        i = bisect.bisect_left(lengths, distance)
+        if i >= len(lengths):
+            return times[-1]
+        before_len = lengths[i - 1] if i > 0 else 0.0
+        before_time = times[i - 1] if i > 0 else 0.0
+        span = lengths[i] - before_len
+        part = (distance - before_len) / span if span > 0 else 1.0
+        return before_time + part * (times[i] - before_time)
+
+    def _progress_end(self, finished):
+        run = self._progress_run
+        if self._progress_bar is None or run is None:
+            return
+        run["ended"] = True
+        if run["part_way"] or self._progress_estimate is None:
+            self._progress_bar.set_child_visible(False)
+        elif finished:
+            self._progress_bar.set_fraction(1.0)
+            self._progress_bar.set_text("Program done in " + self._progress_duration(run["elapsed"]))
+        else:
+            self._progress_bar.set_text("Program stopped at %d%%" % int(run["fraction"] * 100))
+        print("Program progress: run took %s (not counting pauses), estimate %s"
+              % (self._progress_duration(run["elapsed"]),
+                 self._progress_duration(self._progress_estimate["time"][-1])
+                 if self._progress_estimate else "none"), flush=True)
+
+    @staticmethod
+    def _progress_duration(seconds):
+        minutes = int(round(seconds / 60.0))
+        if minutes < 1:
+            return "under a minute"
+        if minutes < 60:
+            return "%d min" % minutes
+        return "%d h %02d min" % (minutes // 60, minutes % 60)
 
 
 #######################################################################
@@ -3327,6 +3531,11 @@ class HandlerClass:
 
         # Threading tab setup (if owned by this component).
         self._load_threading_tab()
+
+        # Program progress bar (main panel only) - see
+        # _load_program_progress. Before _load_sounds, whose program poll
+        # drives it.
+        self._load_program_progress()
 
         # Program-done / pause beeps (main panel only) - see _load_sounds.
         self._load_sounds()
