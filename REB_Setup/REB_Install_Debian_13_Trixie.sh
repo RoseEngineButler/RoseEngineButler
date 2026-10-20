@@ -34,6 +34,12 @@
 #   1.3 - 12 August 2026 - Added creation of gcode folder.
 #   1.4 - 22 August 2026 - Moved more install steps to use
 #         this program.
+#   1.5 - 14 October 2026 - Two-box network: no gateway/DNS on the
+#         wired connection; REB_Change_Network.sh flashes the card,
+#         sets it to 10.10.10.10 and moves the Pi to 10.10.10.100.
+#   1.6 - 16 October 2026 - The card's W5/W6 jumper change moves to
+#         the end, after a shutdown (the Pi and card share one 5V
+#         supply).
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #
@@ -97,7 +103,18 @@ echo -e "${TITLE}card)                                                          
 # Add the wired Ethernet network connectin
 echo -e "${CMNTTEXT}Add the wired Ethernet network connectin${NOCOLOR}"
 
-nmcli con add type ethernet con-name "Wired Ethernet" ipv4.address 192.168.1.120/24 ipv4.method manual ipv4.gateway 192.168.1.1 ipv4.dns 192.168.1.1
+# 192.168.1.120 for now - a new Mesa card answers at its factory
+# address, 192.168.1.121. REB_Change_Network.sh (Step 2) moves this
+# connection to 10.10.10.100 once the card is set up. No gateway or DNS:
+# nothing but the Pi and the Mesa cards is on this network, and a
+# gateway here would clash with a home network that also uses
+# 192.168.1.x - the Pi's internet is on Wi-Fi.
+# Remove any left by an earlier run of this installer first - with
+# several of the same name, nmcli and REB_Change_Network.sh change only one.
+for uuid in $(nmcli -t -f UUID,NAME con show | awk -F: '$2 == "Wired Ethernet" {print $1}'); do
+    nmcli con delete "$uuid"
+done
+nmcli con add type ethernet con-name "Wired Ethernet" ipv4.address 192.168.1.120/24 ipv4.method manual
 if [ $? != 0 ]; then
     echo -e "${KEYNOTE}ERROR: nmcli failed.                                             ${NOCOLOR}"
     echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                   ${NOCOLOR}"
@@ -121,13 +138,19 @@ sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/MesaCard/7i92t_
 sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/MesaCard/7i92t_REB.pin .
 sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/MesaCard/PIN_REB_34.vhd .
 
-# Flash the Mesa card
-echo -e "${CMNTTEXT}Flash the Mesa Card Configuration${NOCOLOR}"
-mesaflash --device 7i92t --addr 192.168.1.121 --write 7i92t_REB.bin --reload
+# Flash the Mesa card and give it its address. REB_Change_Network.sh
+# writes the firmware, stores 10.10.10.10 on the card (the base box's
+# card - the expansion box's is set up the same way, as 10.10.10.11,
+# with "REB_Change_Network.sh expansion") and moves this Pi's wired
+# connection to 10.10.10.100. --no-shutdown: the card's W5/W6 jumpers
+# are moved at the end of this installer, after a shutdown, so the
+# steps below still run.
+echo -e "${CMNTTEXT}Flash the Mesa Card Configuration and set its address${NOCOLOR}"
+/home/reuben/linuxcnc/configs/RoseEngineButler/REB_Change_Network.sh base --no-shutdown
 if [ $? != 0 ]; then
-    echo -e "${KEYNOTE}ERROR: mesaflash failed.                                             ${NOCOLOR}"
+    echo -e "${KEYNOTE}ERROR: setting up the Mesa card failed.                              ${NOCOLOR}"
     echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-    exit $?
+    exit 1
 fi
 
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
@@ -278,6 +301,23 @@ fi
 # Success
 echo -e "${TITLE}System successfully installed.                                         ${NOCOLOR}"
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
+
+# The Mesa card's new address (Step 2) takes effect once its W5/W6
+# jumpers are moved, and they're only read when it's switched on. The
+# Pi and the card share one 5V supply - switching the card on while the
+# Pi runs restarts the Pi without a shutdown - so the whole machine is
+# switched off for it.
+echo -e "${CMNTTEXT}Last step - the Mesa card's jumpers:${NOCOLOR}"
+echo -e "${CMNTTEXT}  1. Shut the Pi down (next question) and wait for the screen to go dark.${NOCOLOR}"
+echo -e "${CMNTTEXT}  2. Switch the machine off.${NOCOLOR}"
+echo -e "${CMNTTEXT}  3. Move the card's W5/W6 jumpers to the setting the 7i92 manual calls EEPROM.${NOCOLOR}"
+echo -e "${CMNTTEXT}  4. Switch the machine on. Once the Pi has started, run${NOCOLOR}"
+echo -e "${CMNTTEXT}     /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Change_Network.sh check${NOCOLOR}"
+echo -e "${CMNTTEXT}     - it should say the card at 10.10.10.10 answers.${NOCOLOR}"
+read -r -p "Shut the Pi down now? [y/N] " answer
+if [[ "$answer" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+    sudo poweroff
+fi
 #
 # ********************************************************************
 # Nothing follows

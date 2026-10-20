@@ -112,16 +112,32 @@ FORMAT_VERSION = 1
 # file's 6 keys overwrite 00-05, and 06/07 simply keep this dict's
 # Sp0/Sp1 default, exactly matching what those channels always were
 # before this change.
+#
+# Two-box hardware (since 14 October 2026, two-box branch): 10 channels
+# for the 10 roles - "00".."05" in the base box (the first 7i92,
+# hm2_7i92.0, stepgens 00-05) and "06".."09" in the optional expansion
+# box (the second 7i92, hm2_7i92.1, its stepgens 00-03; see
+# channel_hal). Every channel always holds one role, so all 10 roles are
+# always placed; a role on an expansion channel is simply inactive when
+# no expansion box is connected ("expansion_box" setting). Channel ids
+# keep their old meaning for 00-05; on a development box (one 8-channel
+# card) 06/07 were that card's own last two plugs and are now expansion
+# plugs instead. Base box defaults chosen by Rich, 14 October 2026.
 CHANNEL_DEFAULT_ROLE = {
-    "00": "W",
+    "00": "X",
     "01": "Z",
-    "02": "U",
-    "03": "V",
-    "04": "X",
-    "05": "B",
-    "06": "Sp0",
-    "07": "Sp1",
+    "02": "B",
+    "03": "W",
+    "04": "Sp0",
+    "05": "Sp1",
+    "06": "U",
+    "07": "V",
+    "08": "A",
+    "09": "C",
 }
+CHANNEL_IDS = tuple(sorted(CHANNEL_DEFAULT_ROLE))
+BASE_CHANNELS = CHANNEL_IDS[:6]
+EXPANSION_CHANNELS = CHANNEL_IDS[6:]
 
 # All ten <axis id="..."> rows the current schema has ever shipped -
 # the eight assignable axis letters and the two spindles. Every one of
@@ -137,6 +153,54 @@ AXIS_IDS = ("X", "Z", "B", "U", "V", "W", "A", "C") + SPINDLE_IDS
 # spindles. Mirrors AXIS_SELECTION_LETTERS + SPINDLE_IDS in
 # REB_main.py/REB_Settings.py.
 CHANNEL_ROLES = tuple(a for a in AXIS_IDS if a not in SPINDLE_IDS) + SPINDLE_IDS
+
+
+def complete_channel_assignments(saved):
+    '''
+    A full channel id -> role dict for all of CHANNEL_IDS, each role used
+    exactly once, built from a saved channel_assignments (which may be
+    an old 8-channel one, or missing). Saved channels are kept as long
+    as their role is valid and not already taken by an earlier channel;
+    every other channel gets its CHANNEL_DEFAULT_ROLE if that role is
+    still free, else the first free role. So an old file's 00-07 stay
+    exactly as they were and 08/09 get whatever roles are left (A and C
+    on a typical machine), instead of one clash throwing the whole
+    assignment away.
+    '''
+    saved = saved if isinstance(saved, dict) else {}
+    result, used = {}, set()
+    for channel_id in CHANNEL_IDS:
+        role = saved.get(channel_id)
+        if role in CHANNEL_ROLES and role not in used:
+            result[channel_id] = role
+            used.add(role)
+    for channel_id in CHANNEL_IDS:
+        if channel_id in result:
+            continue
+        role = CHANNEL_DEFAULT_ROLE[channel_id]
+        if role in used:
+            role = next(r for r in CHANNEL_ROLES if r not in used)
+        result[channel_id] = role
+        used.add(role)
+    return {channel_id: result[channel_id] for channel_id in CHANNEL_IDS}
+
+
+def active_channels(settings):
+    '''The channel ids in use: the base box's, plus the expansion box's when connected.'''
+    return BASE_CHANNELS + (EXPANSION_CHANNELS if settings.get("expansion_box") is True else ())
+
+
+def channel_hal(channel_id):
+    '''
+    (card, stepgen) for a channel id: "hm2_7i92.0" and the same number
+    for the base box's 00-05; "hm2_7i92.1" and 00-03 for the expansion
+    box's 06-09. Its stepgen is <card>.stepgen.<stepgen>, its enable
+    output <card>.outm.00.out-<stepgen>.
+    '''
+    number = int(channel_id)
+    if number < len(BASE_CHANNELS):
+        return "hm2_7i92.0", "%02d" % number
+    return "hm2_7i92.1", "%02d" % (number - len(BASE_CHANNELS))
 
 PID_PARAMS = ("P", "I", "D", "FF0", "FF1", "FF2")
 
@@ -364,6 +428,7 @@ def default_settings():
     settings = {
         "format_version": FORMAT_VERSION,
         "channel_assignments": channel_assignments,
+        "expansion_box": False,
         "device_names": [],
         "measurement_system": "Imperial",
         "max_jog_speed": 1.0,
@@ -396,8 +461,7 @@ def _merge_defaults(loaded):
     '''
     merged = default_settings()
 
-    if "channel_assignments" in loaded and isinstance(loaded["channel_assignments"], dict):
-        merged["channel_assignments"].update(loaded["channel_assignments"])
+    merged["channel_assignments"] = complete_channel_assignments(loaded.get("channel_assignments"))
 
     merged["axes"] = {
         axis_id: _default_axis_entry(axis_id)
@@ -551,15 +615,8 @@ def _parse_legacy_xml(xml_text):
         # single-letter, so this stays correct if it's ever fed a
         # channel_assignments block written by a newer version of this
         # same schema.
-        assignments = dict(CHANNEL_DEFAULT_ROLE)
-        for channel_id, role in re.findall(
-                r'<channel id="(\d\d)">(\w+)</channel>', assignments_block):
-            if channel_id in assignments and role in CHANNEL_ROLES:
-                assignments[channel_id] = role
-        if len(set(assignments.values())) == len(assignments):
-            settings["channel_assignments"] = assignments
-        else:
-            print("Duplicate letter(s) in legacy channel_assignments - using shipped defaults")
+        settings["channel_assignments"] = complete_channel_assignments(dict(
+            re.findall(r'<channel id="(\d\d)">(\w+)</channel>', assignments_block)))
 
     # Rebuild the axes[] skeleton (default max_vel/max_accel/PID, which
     # depend on TYPE - see _default_axis_entry) before the per-axis XML

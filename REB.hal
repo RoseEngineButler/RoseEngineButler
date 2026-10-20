@@ -28,6 +28,8 @@
 #                                                                     #
 # Version                                                             #
 #   1.0 - 22 July 2026                                                #
+#   1.1 - 16 October 2026 - card write moved to the end of the thread #
+#   1.2 - 20 October 2026 - program-path for the progress bar         #
 #                                                                     #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.             #
 #                                                                     #
@@ -117,7 +119,11 @@ loadrt hostmot2
 # its 8 pins (Input0-7) become plain GPIO - the limit jacks and E-stop
 # button read them as hm2_7i92.0.gpio.NNN.in, and a spare one can be an
 # output (the signal tower's buzzer). See REB_Generate_Local_Ini.py.
-loadrt hm2_eth board_ip="192.168.1.121" config="num_encoders=0 num_inms=0 num_pwmgens=0 num_stepgens=8"
+# Two-box hardware: REB_Generate_Local_Ini.py rewrites this line every
+# launch (_card_setup_hal) - the base box's card alone, or both cards
+# (10.10.10.10 and .11) on one line when an expansion box is connected,
+# which also gets its own read/write and timer/watchdog setp lines below.
+loadrt hm2_eth board_ip="10.10.10.10" config="num_encoders=0 num_inms=0 num_pwmgens=0 num_stepgens=6"
 loadrt orient count=2
 # mux2.0/mux2.1 select spindle velocity source; mux2.2/mux2.3 select the
 # Sp0/Sp1 orient target angle source (M19 vs the simultaneous-index path -
@@ -137,8 +143,9 @@ loadrt estop_latch
 # to them in that case - see the AXIS_A/AXIS_C blocks below).
 loadrt pid names=pid.x,pid.z,pid.b,pid.a,pid.c,pid.u,pid.v,pid.w,pid.p0,pid.p1
 
+# The card's write is added last, after motion, the PIDs and the E-stop
+# chain (see "Card write" near the end of this file).
 addf hm2_7i92.0.read                        servo-thread
-addf hm2_7i92.0.write                       servo-thread
 addf motion-command-handler                 servo-thread
 addf motion-controller                      servo-thread
 
@@ -926,6 +933,10 @@ sets spindle.1-at-speed                     true
 # pull-up take the input high, which latches a fault and drops LinuxCNC
 # into E-stop until the button is released AND the operator turns
 # E-stop off in AXIS (F1), which pulses user-request-enable into reset.
+# Since 16 October 2026 the generator always feeds fault-in through an
+# OR (estop-fault-or) of the button and card-fault (any card losing
+# contact: packet-error-exceeded, watchdog.has_bit) - see
+# _estop_fault_hal.
 addf estop-latch.0                          servo-thread
 
 net estop-out                           <=  iocontrol.0.user-enable-out
@@ -938,6 +949,36 @@ net estop-ok                            <=  estop-latch.0.ok-out
 net estop-ok                             => iocontrol.0.emc-enable-in
 
 net machine-is-on                           halui.machine.is-on
+
+# ********************************************************************
+#  Program progress
+#  Added 20 October 2026
+# ********************************************************************
+# program-path.out adds up how far the motion planner has moved along
+# the toolpath (motion.current-vel integrated: X/Y/Z length, else U/V/W,
+# else A/B/C - in machine units or degrees). It only ever grows, so the
+# main panel's progress bar (REB_main.py, "Program progress") reads it
+# at the start of a run and compares how far it has grown with the
+# program's total from REB_Display/REB_Program_Estimate.py - which loops
+# and repeated lines can't confuse, unlike line numbers.
+loadrt integ names=program-path
+addf program-path                           servo-thread
+
+net program-speed                       <=  motion.current-vel
+net program-speed                        => program-path.in
+
+# ********************************************************************
+#  Card write - last in the servo thread
+#  Added 16 October 2026
+# ********************************************************************
+# Mesa's order (Peter Wallace, 16 October 2026): read, everything else,
+# then write, so each cycle sends what motion and the PIDs have just
+# worked out rather than the previous cycle's. REB_Generate_Local_Ini.py
+# moves this line in REB.local.hal to after the HAL it adds (limit
+# jacks, E-stop button, signal tower), and with the expansion box adds
+# hm2_7i92.1.write after it. REB_PostGUI_v1.hal's ENA-button logic is
+# added after the GUI loads, so it still runs after this.
+addf hm2_7i92.0.write                       servo-thread
 
 # ********************************************************************
 #  Restore persisted axis scale/maxvel/maxaccel/PID/backlash values

@@ -58,16 +58,11 @@ CHANNEL_ROLES = AXIS_SELECTION_LETTERS + SPINDLE_IDS
 
 # Channel id ("00".."07") -> the role REB.ini/REB.hal ship with by
 # default. Mirrors reb_settings_io.py's own CHANNEL_DEFAULT_ROLE.
-CHANNEL_DEFAULT_ROLE = {
-    "00": "W",
-    "01": "Z",
-    "02": "U",
-    "03": "V",
-    "04": "X",
-    "05": "B",
-    "06": "Sp0",
-    "07": "Sp1",
-}
+# Two-box hardware (14 October 2026): the 10 channels, their defaults
+# and which card/stepgen each is on come from reb_settings_io, so this
+# program numbers roles and joints exactly as REB_Generate_Local_Ini.py
+# did for this session.
+CHANNEL_DEFAULT_ROLE = reb_settings_io.CHANNEL_DEFAULT_ROLE
 
 # Canonical joint-numbering order for active axis letters - mirrors
 # REB_Setup/REB_Generate_Local_Ini.py's JOINT_NUMBER_CANONICAL_ORDER
@@ -81,24 +76,18 @@ SETTINGS_PATH = reb_settings_io.SETTINGS_PATH
 
 def _read_channel_assignments():
     '''
-    Reads the persisted channel -> role map, falling back to
-    CHANNEL_DEFAULT_ROLE for anything missing, unrecognized, or -
-    defensively, since REBset_v1.ini's own header says it should not be
-    hand-edited - assigned to more than one channel. Mirrors
-    REB_Generate_Local_Ini.py's/REB_main.py's/REB_Settings.py's/
-    REB_Settings_Restore.py's own copies of this same function.
+    The persisted channel -> role map, completed to all 10 channels
+    (reb_settings_io.complete_channel_assignments) - the same map
+    REB_Generate_Local_Ini.py used for this session.
     '''
-    assignments = dict(CHANNEL_DEFAULT_ROLE)
-    stored = reb_settings_io.load_settings().get("channel_assignments", {})
-    for channel_id, role in stored.items():
-        if channel_id in assignments and role in CHANNEL_ROLES:
-            assignments[channel_id] = role
+    return reb_settings_io.complete_channel_assignments(
+        reb_settings_io.load_settings().get("channel_assignments"))
 
-    if len(set(assignments.values())) != len(assignments):
-        print("Duplicate role(s) in persisted channel_assignments - using shipped defaults")
-        return dict(CHANNEL_DEFAULT_ROLE)
 
-    return assignments
+def _stepgen_pin(channel_id, suffix):
+    '''A channel's stepgen HAL pin on whichever card it's on (reb_settings_io.channel_hal).'''
+    card, stepgen = reb_settings_io.channel_hal(channel_id)
+    return card + ".stepgen." + stepgen + suffix
 
 
 class RoleLayout(object):
@@ -109,9 +98,14 @@ class RoleLayout(object):
     letter's joint.N now is (see JOINT_NUMBER_CANONICAL_ORDER).
     '''
     def __init__(self, assignments):
+        # Only channels in use count - the expansion box's 06-09 only
+        # while it's connected - exactly as REB_Generate_Local_Ini.py's
+        # RoleLayout, so joint numbers match this session's HAL.
+        active = reb_settings_io.active_channels(reb_settings_io.load_settings())
         self.channel_of = {}
         for channel_id, role in assignments.items():
-            self.channel_of[role] = channel_id
+            if channel_id in active:
+                self.channel_of[role] = channel_id
 
         active_letters = [l for l in JOINT_NUMBER_CANONICAL_ORDER if l in self.channel_of]
         self.joint_number = {letter: i for i, letter in enumerate(active_letters)}
@@ -137,7 +131,7 @@ PID_PARAMS = ("P", "I", "D", "FF0", "FF1", "FF2")
 
 
 def get_scale(stepgen_ch):
-    hal_pin = "hm2_7i92.0.stepgen." + stepgen_ch + ".position-scale"
+    hal_pin = _stepgen_pin(stepgen_ch, ".position-scale")
     result = subprocess.run(
         ["halcmd", "getp", hal_pin],
         check=True,
@@ -149,7 +143,7 @@ def get_scale(stepgen_ch):
 
 def get_stepgen_max(stepgen_ch, param):
     hal_suffix = ".maxvel" if param == "max_vel" else ".maxaccel"
-    hal_pin = "hm2_7i92.0.stepgen." + stepgen_ch + hal_suffix
+    hal_pin = _stepgen_pin(stepgen_ch, hal_suffix)
     result = subprocess.run(
         ["halcmd", "getp", hal_pin],
         check=True,

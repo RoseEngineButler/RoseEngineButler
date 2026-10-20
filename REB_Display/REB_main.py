@@ -73,6 +73,7 @@ import subprocess
 import shutil
 import re
 import json
+import bisect
 from gi.repository import Gdk
 from gi.repository import Gtk
 from gi.repository import GLib
@@ -99,16 +100,10 @@ SETTINGS_PATH = "/home/reuben/Documents/REBset_v1.ini"
 # PANEL_INTERNAL_IDS/_load_panel_axis_controls below) - this dict is
 # now used only to seed/validate the persisted assignment, the same way
 # REB_Settings.py already uses its own copy.
-CHANNEL_DEFAULT_ROLE = {
-    "00": "W",
-    "01": "Z",
-    "02": "U",
-    "03": "V",
-    "04": "X",
-    "05": "B",
-    "06": "Sp0",
-    "07": "Sp1",
-}
+# Two-box hardware (14 October 2026): the 10 channels, their defaults
+# and the old-file completion come from reb_settings_io - shared, so the
+# panel greys exactly the roles REB_Generate_Local_Ini.py left out.
+CHANNEL_DEFAULT_ROLE = reb_settings_io.CHANNEL_DEFAULT_ROLE
 
 # The 8 letters selectable on the Axis Selection tab (Y removed - not
 # used on this machine) and the 2 spindles - the 10 possible roles a
@@ -172,28 +167,11 @@ TYPE_ADJUSTMENT_PROFILE = {
 
 def _read_persisted_channel_assignments():
     '''
-    Reads the persisted channel -> role map, falling back to
-    CHANNEL_DEFAULT_ROLE for any channel whose entry is missing or
-    unrecognized - same "absent -> shipped default" convention as
-    _load_measurement_system. Mirrors REB_Settings.py's own function of
-    the same name exactly (duplicated, not imported - see
-    CHANNEL_DEFAULT_ROLE's comment above).
+    The persisted channel -> role map, completed to all 10 channels
+    (reb_settings_io.complete_channel_assignments).
     '''
-    assignments = dict(CHANNEL_DEFAULT_ROLE)
-    stored = reb_settings_io.load_settings().get("channel_assignments", {})
-    for channel_id, role in stored.items():
-        if channel_id in assignments and role in CHANNEL_ROLES:
-            assignments[channel_id] = role
-
-    # Defensive against a hand-edited or corrupted file (REBset_v1.ini's
-    # own header says "should not be modified directly"): if the same
-    # role somehow ended up on two channels, ignore the persisted data
-    # entirely rather than displaying a duplicate role as active twice.
-    if len(set(assignments.values())) != len(assignments):
-        print("Duplicate role(s) in persisted channel_assignments - using shipped defaults")
-        return dict(CHANNEL_DEFAULT_ROLE)
-
-    return assignments
+    return reb_settings_io.complete_channel_assignments(
+        reb_settings_io.load_settings().get("channel_assignments"))
 
 # The 10 roles, in the order the operator sees them top-to-bottom on
 # REB_Panel_v1.ui (Sp0, Sp1, then the 8 axis letters) - since the 18
@@ -222,7 +200,26 @@ _CHANNEL_ASSIGNMENTS_AT_STARTUP = _read_persisted_channel_assignments()
 # below to grey out every widget belonging to a role that isn't active,
 # and by _clear_ena_override/_axis_idx_move to decide whether an ENA
 # press or jog move is meaningful at all.
-_ACTIVE_ROLES_AT_STARTUP = set(_CHANNEL_ASSIGNMENTS_AT_STARTUP.values())
+# For User Manual screenshots only (Rich, 14 October 2026): started as
+#     REB_SHOW_EXPANSION=1 ./REB_Launch.sh
+# the panel shows the expansion box as connected - its Axis Assignments
+# tiles and its axes' rows - without changing REBset_v1.ini or the HAL
+# files, so LinuxCNC still starts with only the base box's card. Those
+# rows aren't wired to anything; don't use them. A normal launch is back
+# to normal.
+SHOW_EXPANSION_FOR_SCREENSHOTS = os.environ.get("REB_SHOW_EXPANSION") == "1"
+
+def _panel_settings():
+    '''REBset_v1.ini's settings, with the expansion box marked connected
+    when SHOW_EXPANSION_FOR_SCREENSHOTS is set.'''
+    settings = reb_settings_io.load_settings()
+    if SHOW_EXPANSION_FOR_SCREENSHOTS:
+        settings["expansion_box"] = True
+    return settings
+
+_ACTIVE_ROLES_AT_STARTUP = {
+    role for channel_id, role in _CHANNEL_ASSIGNMENTS_AT_STARTUP.items()
+    if channel_id in reb_settings_io.active_channels(_panel_settings())}
 
 # <letter>_-prefixed widget-id suffixes every axis-letter row
 # (X/Z/U/V/W/A/B/C) has, since REB_Panel_v1.ui's 18 September 2026
@@ -302,6 +299,13 @@ MODE_HEADER_WIDGETS = ("Mode_Hdr_Rev", "Mode_Hdr_Fwd", "Title_Minus_Sign1", "Tit
 # disabled while any one of them is running (see _start_polled_mdi).
 MOTION_BUTTONS = ("Sync_Run", "Sync_Return", "Thread_Run", "Thread_Return")
 
+# The startup splash ("REB" / "ROSE ENGINE BUTLER", written each launch
+# by REB_Generate_Local_Ini.py) and the empty file swapped in for it
+# before a Sync Move or Cut Thread, whose tool path AXIS would otherwise
+# draw over the lettering - see _clear_splash.
+SPLASH_FILE_NAME = "REB_Splash.local.ngc"
+EMPTY_PREVIEW_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "REB_Splash.ngc")
+
 # Axis letters the Threading tab drives: X feeds the cutter in, Z moves
 # along the thread, C turns the work.
 THREAD_AXES = ("X", "Z", "C")
@@ -374,6 +378,22 @@ SOUND_FILES = {
 SOUND_PLAYERS = (["paplay"], ["pw-play"], ["aplay", "-q"])
 # How often a running program is checked for finishing or pausing.
 PROGRAM_POLL_MS = 250
+
+# Program progress (see _load_program_progress). The estimate helper,
+# run in the background as a program starts.
+PROGRAM_ESTIMATE_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                       "REB_Program_Estimate.py")
+# A run whose first move isn't among the program's first this many
+# moves was started part way (Run From Line) - no progress shown.
+PROGRESS_START_MOVES = 500
+
+# Card contact (see _poll_card_contact). The cards' names on screen.
+CARD_NAMES = {0: "Base box", 1: "Expansion box"}
+CARD_CONTACT_POLL_MS = 500
+# While in E-stop, a card hm2_eth has given up on is reconnected at
+# most this often: each try on a card that's still unplugged fails
+# again and prints "error finishing read" again.
+CARD_RECONNECT_SECONDS = 5
 
 # A Return to Start move smaller than this (machine units) on every
 # axis counts as "already there".
@@ -528,6 +548,19 @@ def _show_settings_error(widget, message):
     dialog.run()
     dialog.destroy()
 
+def _planner_length(deltas):
+    '''
+    The length LinuxCNC's motion planner counts for a move of deltas
+    ({letter: distance}): its X/Y/Z length, else U/V/W, else A/B/C -
+    what motion.current-vel (and so REB.hal's program-path) measures.
+    '''
+    for group in ("XYZ", "UVW", "ABC"):
+        length = math.sqrt(sum(d * d for axis, d in deltas.items() if axis in group))
+        if length > 0:
+            return length
+    return 0.0
+
+
 def _show_restart_required_popup(widget, detail=None):
     dialog = Gtk.MessageDialog(
         transient_for=widget.get_toplevel(),
@@ -635,14 +668,23 @@ def _set_busy_cursor(widget, busy):
 # _load_panel_axis_display's read-only summary table), a row's letter
 # label never needs recoloring at runtime any more - removed along with
 # AXIS_LETTER_COLOR_CLASS/_AXIS_LETTER_COLOR_CLASSES.
+# A button with a text label (Sync Move, Cut Thread) is also disabled
+# while its move runs (MOTION_BUTTONS), and the theme draws disabled text
+# grey - invisible on the darkened background (found 20 October 2026) -
+# so the label is drawn white whether the button is disabled or not.
 _DEPRESS_CSS = b"""
 button.reb-depressed,
 button.reb-depressed:hover,
 button.reb-depressed:focus,
-button.reb-depressed:active {
+button.reb-depressed:active,
+button.reb-depressed:disabled {
     background-color: shade(@theme_bg_color, 0.6);
     background-image: none;
     box-shadow: inset 2px 2px 4px rgba(0,0,0,0.6), inset -1px -1px 2px rgba(255,255,255,0.15);
+}
+button.reb-depressed label,
+button.reb-depressed:disabled label {
+    color: #ffffff;
 }
 """
 
@@ -938,7 +980,8 @@ class HandlerClass:
         '''
         Reads the persisted channel -> axis letter assignment and
         populates the main panel's own read-only "Axis Assignments"
-        display (Panel_Channel_0N_Axis/_Type - REB_Panel_v1.ui), if
+        display (Panel_Channel_0N_Axis/_Type - REB_Panel_v1.ui; each
+        tile's "Channel 0N" frame label, _Name, is fixed text), if
         this component owns those widgets. Unlike the Axis Selection
         tab's combos, these are plain labels with no signal handlers -
         purely informational; the Settings tab is the only place the
@@ -978,6 +1021,19 @@ class HandlerClass:
             type_label = self.builder.get_object("Panel_Channel_" + channel_id + "_Type")
             if type_label is not None:
                 type_label.set_text(types[channel_id].capitalize())
+
+        # Two-box hardware: the expansion box's four tiles (channels
+        # 06-09, to the right of the base box's 3 x 2) only show while
+        # it's connected (Rich's choice, 14 October 2026). no_show_all
+        # keeps a later show_all() from bringing them back.
+        expansion = _panel_settings().get("expansion_box") is True
+        for channel_id in reb_settings_io.EXPANSION_CHANNELS:
+            tile = self.builder.get_object("Panel_Channel_" + channel_id + "_Axis")
+            while tile is not None and not isinstance(tile, Gtk.Frame):
+                tile = tile.get_parent()
+            if tile is not None:
+                tile.set_no_show_all(not expansion)
+                tile.set_visible(expansion)
 
     def _load_panel_axis_controls(self):
         '''
@@ -2307,7 +2363,7 @@ class HandlerClass:
             return False
         return True
 
-    def _sync_start_move(self, widget, deltas, feeds, on_done=None):
+    def _sync_start_move(self, widget, deltas, feeds, on_done=None, progress=None):
         '''
         Sends deltas ({letter: signed incremental distance, in machine
         units}) as a single G1. Each letter's own time is
@@ -2324,9 +2380,9 @@ class HandlerClass:
         # Where each axis should end up - see _sync_run_finished.
         self._sync_target = {axis: s.position[STAT_POSITION_INDEX[axis]] + d
                              for axis, d in deltas.items()}
-        self._start_polled_mdi(widget, gcode, on_done)
+        self._start_polled_mdi(widget, gcode, on_done, progress)
 
-    def _start_polled_mdi(self, widget, gcode, on_done=None):
+    def _start_polled_mdi(self, widget, gcode, on_done=None, progress=None):
         '''
         Sends one MDI command (a single move, or a whole subroutine
         call) and polls until it finishes, with every MOTION_BUTTONS
@@ -2334,7 +2390,11 @@ class HandlerClass:
         units, distance mode, feed mode, lathe radius/diameter mode and
         modal F - whichever of those the command changed - and calls
         on_done(), if given. Shared by the Sync Move and Threading tabs.
+        progress, if given, puts the command on the progress bar - see
+        _mdi_progress_start.
         '''
+        self._mdi_progress = progress
+        self._clear_splash()
         modal = set(s.gcodes)
         restore = []
         restore.append("G21" if 210 in modal else "G20")
@@ -2359,11 +2419,31 @@ class HandlerClass:
         self._sync_poll_id = GLib.timeout_add(
             100, self._sync_poll_move, widget, " ".join(restore), time.time(), on_done)
 
+    @staticmethod
+    def _clear_splash():
+        '''
+        If AXIS still shows the startup splash, has it open the empty
+        REB_Splash.ngc instead (axis-remote - AXIS is a separate process),
+        so a Sync Move's or Cut Thread's tool path isn't drawn over the
+        lettering (Rich, 20 October 2026). A G-code program needs nothing:
+        opening it replaces the splash. Done before switching to MDI,
+        since AXIS refuses remote commands while anything runs.
+        '''
+        if os.path.basename(s.file or "") != SPLASH_FILE_NAME:
+            return
+        try:
+            subprocess.run(["axis-remote", EMPTY_PREVIEW_FILE], timeout=5,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except (OSError, subprocess.SubprocessError) as e:
+            print("Could not clear the splash: " + str(e))
+        s.poll()
+
     def _sync_poll_move(self, widget, restore_gcode, started, on_done=None):
         s.poll()
         # interp_state can still read idle for a moment right after
         # c.mdi() - don't mistake that for "already finished".
         if s.interp_state != linuxcnc.INTERP_IDLE or time.time() - started < 0.5:
+            self._mdi_progress_update()
             return True
         # Finished, or aborted from AXIS - either way, put the
         # operator's own modal state back.
@@ -2417,7 +2497,8 @@ class HandlerClass:
 
         self._sync_start = tuple(s.position)
         self._sync_feeds = feeds
-        self._sync_start_move(widget, deltas, feeds, self._sync_run_finished)
+        self._sync_start_move(widget, deltas, feeds, self._sync_run_finished,
+                              self._mdi_progress_start("Sync Move", length=_planner_length(deltas)))
 
     def _sync_run_finished(self):
         '''
@@ -2426,13 +2507,12 @@ class HandlerClass:
         (or by E-stop) stays silent.
         '''
         s.poll()
-        if s.task_state != linuxcnc.STATE_ON:
-            return
-        target = self._sync_target
-        for axis, end in target.items():
-            if abs(s.position[STAT_POSITION_INDEX[axis]] - end) >= SYNC_POSITION_TOLERANCE:
-                return
-        self._play_sound(DONE_BEEPS)
+        finished = (s.task_state == linuxcnc.STATE_ON
+                    and all(abs(s.position[STAT_POSITION_INDEX[axis]] - end) < SYNC_POSITION_TOLERANCE
+                            for axis, end in self._sync_target.items()))
+        self._mdi_progress_end(finished)
+        if finished:
+            self._play_sound(DONE_BEEPS)
 
     def Sync_Return(self, widget):
         '''
@@ -2801,7 +2881,9 @@ class HandlerClass:
         self._thread_running = True
         self._thread_last_code = 0
         self._thread_show_status("Starting...")
-        self._start_polled_mdi(widget, gcode, self._thread_finished)
+        self._start_polled_mdi(widget, gcode, self._thread_finished,
+                               self._mdi_progress_start("Threading", passes=passes,
+                                                        starts=starts, spring=spring))
 
     @staticmethod
     def _thread_ordinal(n):
@@ -2876,7 +2958,9 @@ class HandlerClass:
         self._thread_show_status(text)
         self._thread_result_id = GLib.timeout_add_seconds(
             THREAD_RESULT_SECONDS, self._thread_restore_instructions)
-        if (int(round(self._thread_last_code)) % 10000) // 1000 == THREAD_KIND_DONE:
+        finished = (int(round(self._thread_last_code)) % 10000) // 1000 == THREAD_KIND_DONE
+        self._mdi_progress_end(finished)
+        if finished:
             self._play_sound(DONE_BEEPS)
 
     def Thread_Return(self, widget):
@@ -3064,6 +3148,7 @@ class HandlerClass:
         if running and not self._program_was_running:
             self._program_end_line = self._find_program_end_line(s.file)
             self._program_read_end = False
+            self._progress_start()
         # read_line drops to 0 once the run ends, so note it while running.
         if running and self._program_end_line is not None \
                 and s.read_line >= self._program_end_line:
@@ -3084,10 +3169,335 @@ class HandlerClass:
                      "finished" if finished else "stopped/aborted"), flush=True)
             if finished:
                 self._play_sound(DONE_BEEPS)
+            self._progress_end(finished)
 
+        self._progress_update(running, paused)
         self._program_was_running = running
         self._program_was_paused = paused
         return True
+
+
+#######################################################################
+# Program progress
+# Purpose:              A bar left of Sync Move showing how far a G-code
+#                       program, a Sync Move or a Cut Thread has got, as
+#                       a percentage (not Run Operation, indexing or the
+#                       Return moves - Rich's choice, 20 October 2026). A
+#                       Sync Move is one move of known length, measured
+#                       with program-path below; a Cut Thread counts
+#                       passes finished from reb_thread.ngc's progress
+#                       codes (_mdi_progress_*). For a program:
+#                       Line numbers can't say how far a program is -
+#                       o-word loops run the same lines over and over -
+#                       so as a program starts REB_Program_Estimate.py
+#                       works out every move it will make from where the
+#                       machine is, in order, with the path length the
+#                       motion planner counts for each (in the background,
+#                       a few seconds - not at load, since a jog in
+#                       between would change the first move). REB.hal's
+#                       program-path.out adds up that same length as the
+#                       machine moves, so how far it has grown since the
+#                       run started finds the place in the move list,
+#                       and the estimated time up to there over the
+#                       total is the percentage (time-weighted, so a long
+#                       slow cut counts for more than a quick rapid; the
+#                       estimate includes acceleration, without which the
+#                       bar lagged up to 30% on Rich's first test). No
+#                       time left: it was shown at first (worked out from
+#                       the real rate) but kept changing as the program
+#                       went - Rich's call, 20 October 2026, the
+#                       percentage is enough. Driven by _poll_program.
+#                       The bar always keeps its space (set_child_visible)
+#                       so the panel doesn't change size when it appears -
+#                       the Sync Move row is otherwise empty on the other
+#                       tabs. Main panel only.
+# Updated:              ver 1.0, 20 October 2026
+#######################################################################
+    def _load_program_progress(self):
+        self._progress_bar = None
+        if self.builder.get_object("Sync_Run") is None:
+            return
+        self._progress_bar = self.builder.get_object("Program_Progress")
+        self._progress_bar.set_child_visible(False)
+        self._progress_estimate = None      # this run's moves (dict)
+        self._progress_proc = None          # the helper while it runs
+        self._progress_output = "/tmp/REB_progress_%d.json" % os.getpid()
+        self._progress_run = None           # the run being shown
+        self._mdi_progress = None           # a Sync Move or Cut Thread being shown
+
+    def _progress_collect(self):
+        '''Picks up the estimate helper's result once it has finished.'''
+        if self._progress_proc is None or self._progress_proc.poll() is None:
+            return
+        ok = self._progress_proc.returncode == 0
+        self._progress_proc = None
+        try:
+            if ok:
+                with open(self._progress_output) as f:
+                    data = json.load(f)
+                if data.get("error"):
+                    print("Program progress: " + data["error"])
+                if data["time"] and data["time"][-1] > 0:
+                    self._progress_estimate = data
+                    print("Program progress: %d moves, estimated %s"
+                          % (len(data["time"]), self._progress_duration(data["time"][-1])))
+        except (OSError, ValueError, KeyError) as e:
+            print("Program progress: no estimate - " + str(e))
+        try:
+            os.remove(self._progress_output)
+        except OSError:
+            pass
+
+    def _progress_path(self):
+        try:
+            return hal.get_value("program-path.out")
+        except Exception:
+            return None
+
+    def _progress_start(self):
+        '''
+        A program has started: works out its moves from where the
+        machine is now (a few seconds, in the background), and notes
+        program-path, which grows from here as it moves.
+        '''
+        if self._progress_bar is None:
+            return
+        if self._progress_proc is not None:
+            self._progress_proc.kill()
+            self._progress_proc.wait()
+            self._progress_proc = None
+        self._progress_estimate = None
+        start = self._progress_path()
+        if start is None or not s.file:
+            self._progress_run = None
+            self._progress_bar.set_child_visible(False)
+            return
+        try:
+            self._progress_proc = subprocess.Popen(
+                ["nice", "-n", "10", "python3", PROGRAM_ESTIMATE_SCRIPT, s.file,
+                 self._progress_output], stdout=subprocess.DEVNULL)
+        except OSError as e:
+            print("Program progress: could not start the estimate - " + str(e))
+        self._progress_run = {"start": start, "elapsed": 0.0, "last": time.monotonic(),
+                              "first_line": 0, "part_way": None, "fraction": 0.0}
+        self._progress_bar.set_fraction(0.0)
+        self._progress_bar.set_text("Program 0% - working it out")
+        self._progress_bar.set_child_visible(True)
+
+    def _progress_update(self, running, paused):
+        run = self._progress_run
+        if self._progress_bar is None or not running or run is None or run.get("ended"):
+            return
+        now = time.monotonic()
+        if not paused:
+            run["elapsed"] += now - run["last"]
+        run["last"] = now
+        if not run["first_line"]:
+            run["first_line"] = s.motion_line
+        self._progress_collect()
+        data = self._progress_estimate
+        if data is None:
+            return
+        if run["part_way"] is None and run["first_line"]:
+            run["part_way"] = run["first_line"] not in data["line"][:PROGRESS_START_MOVES]
+        if run["part_way"]:
+            self._progress_bar.set_text("Started part way - no progress shown")
+            return
+        path = self._progress_path()
+        if path is None:
+            return
+        done = self._progress_time_at(data, path - run["start"])
+        total = data["time"][-1]
+        fraction = min(done / total, 0.999)
+        run["fraction"] = fraction
+        self._progress_bar.set_fraction(fraction)
+        text = "Program %d%%" % int(fraction * 100)
+        if paused:
+            text += " (paused)"
+        self._progress_bar.set_text(text)
+
+    @staticmethod
+    def _progress_time_at(data, distance):
+        '''Estimated time to the point `distance` along the move list.'''
+        lengths, times = data["length"], data["time"]
+        i = bisect.bisect_left(lengths, distance)
+        if i >= len(lengths):
+            return times[-1]
+        before_len = lengths[i - 1] if i > 0 else 0.0
+        before_time = times[i - 1] if i > 0 else 0.0
+        span = lengths[i] - before_len
+        part = (distance - before_len) / span if span > 0 else 1.0
+        return before_time + part * (times[i] - before_time)
+
+    def _progress_end(self, finished):
+        run = self._progress_run
+        if self._progress_bar is None or run is None:
+            return
+        run["ended"] = True
+        self._progress_collect()
+        if run["part_way"] or self._progress_estimate is None:
+            self._progress_bar.set_child_visible(False)
+        elif finished:
+            self._progress_bar.set_fraction(1.0)
+            self._progress_bar.set_text("Program done in " + self._progress_duration(run["elapsed"]))
+        else:
+            self._progress_bar.set_text("Program stopped at %d%%" % int(run["fraction"] * 100))
+        print("Program progress: run took %s (not counting pauses), estimate %s"
+              % (self._progress_duration(run["elapsed"]),
+                 self._progress_duration(self._progress_estimate["time"][-1])
+                 if self._progress_estimate else "none"), flush=True)
+
+    def _mdi_progress_start(self, name, length=None, passes=None, starts=None, spring=None):
+        '''
+        Puts a Sync Move (length = its planner length, measured with
+        program-path like a program) or a Cut Thread (counted in passes,
+        from reb_thread.ngc's progress codes) on the bar. Returns the
+        description for _start_polled_mdi, or None. Run Operation,
+        indexing and the Return moves aren't shown.
+        '''
+        if self._progress_bar is None:
+            return None
+        progress = {"name": name, "fraction": 0.0}
+        if length is not None:
+            start = self._progress_path()
+            if start is None or length <= 0:
+                return None
+            progress.update(start=start, length=length)
+        else:
+            progress.update(passes=passes, starts=starts, spring=spring)
+        self._progress_run = None
+        self._progress_bar.set_fraction(0.0)
+        self._progress_bar.set_text(name + " 0%")
+        self._progress_bar.set_child_visible(True)
+        return progress
+
+    def _mdi_progress_update(self):
+        progress = self._mdi_progress
+        if self._progress_bar is None or progress is None:
+            return
+        if "length" in progress:
+            path = self._progress_path()
+            if path is None:
+                return
+            fraction = (path - progress["start"]) / progress["length"]
+        else:
+            # Passes finished so far: reb_thread.ngc reports each pass as
+            # it starts (start x 10000 + kind x 1000 + pass number).
+            start, rest = divmod(int(round(self._thread_last_code)), 10000)
+            kind, number = divmod(rest, 1000)
+            passes = progress["passes"]
+            if start < 1:
+                done = 0
+            elif kind == THREAD_KIND_SPRING:
+                done = (start - 1) * passes + passes - progress["spring"] + number - 1
+            elif kind in (THREAD_KIND_PASS, THREAD_KIND_FINAL):
+                done = (start - 1) * passes + number - 1
+            elif kind == THREAD_KIND_DONE:
+                done = progress["starts"] * passes
+            else:                               # indexing to the next start
+                done = (start - 1) * passes
+            fraction = done / float(progress["starts"] * passes)
+        fraction = max(0.0, min(fraction, 0.999))
+        progress["fraction"] = fraction
+        self._progress_bar.set_fraction(fraction)
+        text = "%s %d%%" % (progress["name"], int(fraction * 100))
+        if s.interp_state == linuxcnc.INTERP_PAUSED:
+            text += " (paused)"
+        self._progress_bar.set_text(text)
+
+    def _mdi_progress_end(self, finished):
+        progress = self._mdi_progress
+        self._mdi_progress = None
+        if self._progress_bar is None or progress is None:
+            return
+        if finished:
+            self._progress_bar.set_fraction(1.0)
+            self._progress_bar.set_text(progress["name"] + " done")
+        else:
+            self._progress_bar.set_text("%s stopped at %d%%" % (progress["name"],
+                                                               int(progress["fraction"] * 100)))
+
+    @staticmethod
+    def _progress_duration(seconds):
+        minutes = int(round(seconds / 60.0))
+        if minutes < 1:
+            return "under a minute"
+        if minutes < 60:
+            return "%d min" % minutes
+        return "%d h %02d min" % (minutes // 60, minutes % 60)
+
+
+#######################################################################
+# Card contact
+# Purpose:              A Mesa card that loses contact with the Pi -
+#                       network cable, switch or the box's power - stops
+#                       its axes but, on its own, leaves the machine on
+#                       and the other box's axes running, and stays cut
+#                       off even once the cable is back (found 16 October
+#                       2026). REB_Generate_Local_Ini.py's _estop_fault_hal
+#                       latches E-stop on the card's packet-error-exceeded
+#                       or watchdog.has_bit; this says which box it was
+#                       and, while the machine is in E-stop, brings the
+#                       card back: clears its io_error (hm2_eth then
+#                       talks to it again and reads has_bit, TRUE if the
+#                       card's watchdog bit), then has_bit (its outputs
+#                       come back). Both are done only in E-stop, so
+#                       nothing can move as the card returns. A card
+#                       still unplugged fails again at once, keeping the
+#                       latch set, so F1 can't reset until it's fixed.
+#                       Main panel only.
+# Updated:              ver 1.0, 16 October 2026
+#######################################################################
+    def _load_card_contact(self):
+        if self.builder.get_object("Sync_Run") is None:
+            return
+        # The cards this session loaded (not the expansion_box setting,
+        # which REB_SHOW_EXPANSION can override for screenshots).
+        self._cards = []
+        for n in CARD_NAMES:
+            try:
+                hal.get_value("hm2_7i92.%d.io_error" % n)
+            except RuntimeError:
+                continue
+            self._cards.append(n)
+        self._card_lost = {n: False for n in self._cards}
+        self._card_retry_at = {n: 0.0 for n in self._cards}
+        GLib.timeout_add(CARD_CONTACT_POLL_MS, self._poll_card_contact)
+
+    def _poll_card_contact(self):
+        s.poll()
+        in_estop = s.task_state == linuxcnc.STATE_ESTOP
+        now = time.monotonic()
+        for n in self._cards:
+            card = "hm2_7i92.%d" % n
+            io_error = bool(hal.get_value(card + ".io_error"))
+            bitten = bool(hal.get_value(card + ".watchdog.has_bit"))
+            lost = io_error or bitten or bool(hal.get_value(card + ".packet-error-exceeded"))
+            if lost and not self._card_lost[n]:
+                message = (CARD_NAMES[n] + " lost contact - E-stop. Check its network cable, "
+                           "the switch and its power, then press F1.")
+                print(message)
+                c.error_msg(message)
+            elif self._card_lost[n] and not lost:
+                print(CARD_NAMES[n] + " back in contact.")
+            self._card_lost[n] = lost
+            if not (lost and in_estop):
+                continue
+            if io_error:
+                if now >= self._card_retry_at[n]:
+                    self._card_retry_at[n] = now + CARD_RECONNECT_SECONDS
+                    self._halcmd("setp", card + ".io_error", "FALSE")
+            elif bitten:
+                # has_bit is netted (to card-fault-or), so its signal is set.
+                self._halcmd("sets", "card-%d-watchdog" % n, "FALSE")
+        return True
+
+    @staticmethod
+    def _halcmd(*args):
+        try:
+            subprocess.run(["halcmd"] + list(args), check=True, capture_output=True, text=True)
+        except (OSError, subprocess.CalledProcessError) as e:
+            print("halcmd " + " ".join(args) + " failed: " + str(e))
 
 
 #######################################################################
@@ -3237,8 +3647,17 @@ class HandlerClass:
         # Threading tab setup (if owned by this component).
         self._load_threading_tab()
 
+        # Program progress bar (main panel only) - see
+        # _load_program_progress. Before _load_sounds, whose program poll
+        # drives it.
+        self._load_program_progress()
+
         # Program-done / pause beeps (main panel only) - see _load_sounds.
         self._load_sounds()
+
+        # E-stop on a card losing contact, and bringing it back (main
+        # panel only) - see _load_card_contact.
+        self._load_card_contact()
 
 
 

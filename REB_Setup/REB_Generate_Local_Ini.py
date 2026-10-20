@@ -148,6 +148,7 @@
 
 import os
 import re
+import subprocess
 import sys
 
 REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -180,19 +181,29 @@ AXIS_SELECTION_LETTERS = ("X", "Z", "U", "V", "W", "A", "B", "C")
 SPINDLE_IDS = ("Sp0", "Sp1")
 CHANNEL_ROLES = AXIS_SELECTION_LETTERS + SPINDLE_IDS
 
-# Channel id ("00".."07", the hm2_7i92.0.stepgen.NN suffix) -> the role
-# REB.ini/REB.hal ship with by default. Mirrors reb_settings_io.py's own
-# CHANNEL_DEFAULT_ROLE.
-CHANNEL_DEFAULT_ROLE = {
-    "00": "W",
-    "01": "Z",
-    "02": "U",
-    "03": "V",
-    "04": "X",
-    "05": "B",
-    "06": "Sp0",
-    "07": "Sp1",
-}
+# Channels, their default roles and which card/stepgen each one is on
+# live in reb_settings_io (CHANNEL_DEFAULT_ROLE, CHANNEL_IDS,
+# BASE_CHANNELS, EXPANSION_CHANNELS, channel_hal) - shared rather than
+# duplicated since the two-box hardware (14 October 2026), because the
+# old-file completion logic must match everywhere.
+
+# The two Mesa 7i92 cards' fixed addresses on the machine's private
+# wired network (the tracker's network plan, 12 October 2026) and the
+# hm2_eth config each is loaded with: the base box drives 6 stepgens,
+# the expansion box 4. Both cards run the same firmware (8 stepgens);
+# asking for fewer just leaves the rest as plain GPIO.
+BASE_CARD_IP = "10.10.10.10"
+EXPANSION_CARD_IP = "10.10.10.11"
+
+# A machine built before the two-box network (Pi wired 192.168.1.120,
+# card at its factory 192.168.1.121) keeps working until it's moved with
+# REB_Change_Network.sh: _base_card_ip picks the card address from the
+# Pi's own wired address, so an update can arrive before or after the
+# move (16 October 2026). Only eth0 is looked at - a home Wi-Fi is often
+# on 192.168.1.x too.
+FACTORY_CARD_IP = "192.168.1.121"
+WIRED_DEVICE = "eth0"
+CARD_CONFIG = "num_encoders=0 num_inms=0 num_pwmgens=0 num_stepgens=%d"
 
 # Each axis letter's OWN, PERMANENT [AXIS_<letter>]/[JOINT_n] joint
 # number in the tracked REB.ini template - i.e. which [JOINT_n] section
@@ -232,11 +243,18 @@ SPINDLE_NUMBER_CANONICAL_ORDER = ("Sp0", "Sp1")
 # that axis, switches in series), "<letter> min" (negative end only),
 # "<letter> max" (positive end only), or "" (not used).
 # Duplicated in REB_Display/REB_Settings.py's LIMIT_JACKS.
+#
+# Jacks 4-6 (two-box hardware, 14 October 2026) are the same three
+# inputs on the expansion box's card, used only when it's connected.
 LIMIT_JACK_INPUT = {
-    "1": "002",
-    "2": "006",
-    "3": "010",
+    "1": ("hm2_7i92.0", "002"),
+    "2": ("hm2_7i92.0", "006"),
+    "3": ("hm2_7i92.0", "010"),
+    "4": ("hm2_7i92.1", "002"),
+    "5": ("hm2_7i92.1", "006"),
+    "6": ("hm2_7i92.1", "010"),
 }
+EXPANSION_LIMIT_JACKS = ("4", "5", "6")
 
 # The optional E-stop button's GX-16/2 plug (normally-closed, P1 pin 21)
 # -> its 7i92 I/O pin (GPIO, as above). Wired into REB.hal's estop-latch.0 only when
@@ -282,24 +300,16 @@ SIGNAL_TOWER_LATCH_SECONDS = 1e9
 
 def _read_channel_assignments(settings):
     '''
-    Reads REBset_v1.ini's channel_assignments dict (written by the Axis
-    Selection tab - REB_Display/REB_Settings.py's _save_channel_assignments),
-    falling back to CHANNEL_DEFAULT_ROLE for any channel that's missing,
-    unrecognized, or - defensively, since REBset_v1.ini's own header
-    says it should not be hand-edited - assigned to more than one
-    channel.
+    REBset_v1.ini's channel_assignments (written by the Axis Selection
+    page) completed to all 10 channels - see
+    reb_settings_io.complete_channel_assignments.
     '''
-    assignments = dict(CHANNEL_DEFAULT_ROLE)
+    return reb_settings_io.complete_channel_assignments(settings.get("channel_assignments"))
 
-    for channel_id, role in settings.get("channel_assignments", {}).items():
-        if channel_id in assignments and role in CHANNEL_ROLES:
-            assignments[channel_id] = role
 
-    if len(set(assignments.values())) != len(assignments):
-        print("Duplicate role(s) in persisted channel_assignments - using shipped defaults")
-        return dict(CHANNEL_DEFAULT_ROLE)
-
-    return assignments
+def _read_expansion_box(settings):
+    '''Whether REBset_v1.ini says an expansion box is connected (absent = no).'''
+    return settings.get("expansion_box") is True
 
 
 def _parse_limit_value(value):
@@ -336,6 +346,8 @@ def _read_limit_jacks(settings):
     jacks = {}
     stored = settings.get("limit_switches", {})
     for jack in sorted(LIMIT_JACK_INPUT):
+        if jack in EXPANSION_LIMIT_JACKS and not _read_expansion_box(settings):
+            continue
         parsed = _parse_limit_value(stored.get(jack, ""))
         if parsed is None:
             continue
@@ -405,7 +417,8 @@ def _signal_tower_hal(signal_tower, limit_nets, role_layout, fault_sound="both")
         Sp0+Sp1 path through Sp<n>-idx-active). OR'd by tower-green-or;
         the NOTs are logic NANDs with both inputs on the same signal,
         since not/and2 are already loaded elsewhere under fixed names.
-      - red: on after any active joint exceeds its following error, until
+      - red: on after any active joint exceeds its following error or a
+        card loses contact (net card-fault, from _estop_fault_hal), until
         the machine is turned back on (F2), and while any in-use limit
         jack is tripped (limit_nets, from _limit_jack_hal). LinuxCNC does
         NOT hold joint.N.f-errored - it clears as the machine turns off,
@@ -418,7 +431,9 @@ def _signal_tower_hal(signal_tower, limit_nets, role_layout, fault_sound="both")
         tower-on-edge's short pulse when machine-is-on rises (F2 - both
         faults turn the machine off). tower-red-or then ORs the latch
         with the live limit nets, so a switch still open after F2 keeps
-        red lit until the axis is moved off it.
+        red lit until the axis is moved off it. The tower's outputs are
+        on the base card, so a lost base card can't light it - the
+        speaker siren still sounds.
       - buzzer: a SIGNAL_TOWER_BUZZER_SECONDS pulse from a oneshot each
         time red rises (net tower-siren), when fault_sound includes the
         tower. _fault_siren_postgui_hal nets the same pulse to the
@@ -443,7 +458,8 @@ def _signal_tower_hal(signal_tower, limit_nets, role_layout, fault_sound="both")
 
     joints = sorted(role_layout.joint_number.values())
     red_inputs = ["tower-red-held"] + sorted(limit_nets)
-    logic = [("tower-fault-or", "0x2%02x" % (len(joints) + len(limit_nets)))]
+    # + 1: card-fault. At most 8 joints + 6 jacks + 1 = 15 (logic takes 16).
+    logic = [("tower-fault-or", "0x2%02x" % (len(joints) + len(limit_nets) + 1))]
     if len(red_inputs) > 1:
         logic.append(("tower-red-or", "0x2%02x" % len(red_inputs)))
 
@@ -494,6 +510,7 @@ def _signal_tower_hal(signal_tower, limit_nets, role_layout, fault_sound="both")
         lines.append(net.ljust(41) + "=> tower-fault-or.in-%02d" % i)
     for i, net in enumerate(sorted(limit_nets), start=len(joints)):
         lines.append(("net " + net).ljust(41) + "=> tower-fault-or.in-%02d" % i)
+    lines.append("net card-fault".ljust(41) + "=> tower-fault-or.in-%02d" % (len(joints) + len(limit_nets)))
     lines += [
         "net tower-fault".ljust(40) + "<=  tower-fault-or.or",
         "net tower-fault".ljust(41) + "=> tower-red-hold.in",
@@ -628,7 +645,8 @@ def _limit_jack_hal(limit_jacks, role_layout, switch_type="NC"):
         net = letter.lower() + ("-limit-sw" if end == "both" else "-limit-" + end)
         pins = {"min": ["neg-lim-sw-in"], "max": ["pos-lim-sw-in"],
                 "both": ["neg-lim-sw-in", "pos-lim-sw-in"]}[end]
-        lines.append(("net " + net).ljust(40) + "<=  hm2_7i92.0.gpio." + LIMIT_JACK_INPUT[jack] + pin_side)
+        card, io_pin = LIMIT_JACK_INPUT[jack]
+        lines.append(("net " + net).ljust(40) + "<=  " + card + ".gpio." + io_pin + pin_side)
         for pin in pins:
             lines.append(("net " + net).ljust(41) + "=> " + joint + "." + pin)
         summary.append("jack " + jack + " -> " + letter + ("" if end == "both" else " " + end)
@@ -639,26 +657,64 @@ def _limit_jack_hal(limit_jacks, role_layout, switch_type="NC"):
     return "\n".join(lines) + "\n", summary, nets
 
 
-def _estop_button_hal(estop_button):
+def _estop_fault_hal(estop_button, expansion_box):
     '''
-    Returns HAL text wiring the optional E-stop button's 7i92 input into
-    REB.hal's estop-latch.0 fault-in when estop_button is True. GPIO
-    .in, same reasoning as _limit_jack_hal: a normally-closed button
-    to ground holds it low; pressed, broken, or unplugged reads high,
-    which latches E-stop.
+    Returns HAL text OR-ing every E-stop fault into REB.hal's
+    estop-latch.0 fault-in through estop-fault-or (lut5s - logic, or2
+    and not are already loaded elsewhere under fixed names, and a
+    realtime module loads only once):
+      - the optional E-stop button's 7i92 input, when estop_button is
+        True. GPIO .in, same reasoning as _limit_jack_hal: a
+        normally-closed button to ground holds it low; pressed, broken,
+        or unplugged reads high.
+      - each card in use losing contact: its packet-error-exceeded (the
+        Pi lost too many packets - hm2_eth then sets the card's
+        io_error and stops talking to it) and its watchdog.has_bit (the
+        card heard nothing for watchdog.timeout_ns and switched its
+        outputs off). Found 16 October 2026 by pulling the expansion
+        card's cable while jogging: without this the machine stayed on,
+        the base box's axes kept moving, and the card stayed cut off
+        even after the cable went back in. REB_main.py clears io_error
+        and has_bit while the machine is in E-stop (_poll_card_contact)
+        - the watchdog nets are named so it can "halcmd sets" them.
+        The cards' signals are OR'd first, by card-fault-or, into net
+        card-fault, which _signal_tower_hal also counts as a fault (red
+        light and siren, Rich's request 16 October 2026).
+    Any of these latches E-stop until it clears and the operator
+    resets E-stop (F1).
     '''
     lines = [
         "",
         "# ********************************************************************",
-        "# E-stop button - generated by REB_Generate_Local_Ini.py from",
-        "# REBset_v1.ini's estop_button (REB Settings, Axis Selection page).",
+        "# E-stop faults - generated by REB_Generate_Local_Ini.py: the E-stop",
+        "# button (REBset_v1.ini's estop_button, REB Settings) and each card",
+        "# losing contact, OR'd into estop-latch.0.fault-in.",
         "# ********************************************************************",
+        "loadrt lut5 names=card-fault-or,estop-fault-or",
+        "addf card-fault-or".ljust(44) + "servo-thread",
+        "addf estop-fault-or".ljust(44) + "servo-thread",
+        "# 5-input ORs (lut5's documented value; unused inputs stay FALSE).",
+        "setp card-fault-or.function".ljust(44) + "0xfffffffe",
+        "setp estop-fault-or.function".ljust(44) + "0xfffffffe",
     ]
     if estop_button:
         lines.append("net estop-button".ljust(40) + "<=  hm2_7i92.0.gpio." + ESTOP_BUTTON_INPUT + ".in")
-        lines.append("net estop-button".ljust(41) + "=> estop-latch.0.fault-in")
+        lines.append("net estop-button".ljust(41) + "=> estop-fault-or.in-0")
     else:
         lines.append("# (E-stop button not connected - software E-stop only)")
+    for card in ((0, 1) if expansion_box else (0,)):
+        lost = "net card-%d-lost" % card
+        watchdog = "net card-%d-watchdog" % card
+        lines += [
+            lost.ljust(40) + "<=  hm2_7i92.%d.packet-error-exceeded" % card,
+            lost.ljust(41) + "=> card-fault-or.in-%d" % (2 * card),
+            watchdog.ljust(39) + "<=>  hm2_7i92.%d.watchdog.has_bit" % card,
+            watchdog.ljust(41) + "=> card-fault-or.in-%d" % (1 + 2 * card),
+        ]
+    lines.append("net card-fault".ljust(40) + "<=  card-fault-or.out")
+    lines.append("net card-fault".ljust(41) + "=> estop-fault-or.in-1")
+    lines.append("net estop-fault".ljust(40) + "<=  estop-fault-or.out")
+    lines.append("net estop-fault".ljust(41) + "=> estop-latch.0.fault-in")
     return "\n".join(lines) + "\n"
 
 
@@ -670,10 +726,16 @@ class RoleLayout(object):
     which joint number (axis letters) or spindle index (spindles) that
     role's HAL block should be renumbered to.
     '''
-    def __init__(self, assignments):
+    def __init__(self, assignments, expansion_box=False):
+        # Roles on the expansion box's channels count only when it's
+        # connected; otherwise they're inactive like an unassigned role.
+        self.expansion_box = expansion_box
+        active = reb_settings_io.BASE_CHANNELS + (
+            reb_settings_io.EXPANSION_CHANNELS if expansion_box else ())
         self.channel_of = {}
         for channel_id, role in assignments.items():
-            self.channel_of[role] = channel_id
+            if channel_id in active:
+                self.channel_of[role] = channel_id
 
         active_letters = [l for l in JOINT_NUMBER_CANONICAL_ORDER if l in self.channel_of]
         active_spindles = [s for s in SPINDLE_NUMBER_CANONICAL_ORDER if s in self.channel_of]
@@ -1096,20 +1158,112 @@ def _extract_role_blocks(hal_text):
 def _retarget_channel(block_text, role, channel_id, problems):
     '''
     Common to every role (axis letter or spindle): repoints its
-    hm2_7i92.0.stepgen.NN.*/outm.00.out-NN references at channel_id.
-    Every role's block has exactly one distinct old channel number
-    embedded this way (verified below) - safe to blanket-replace within
-    this isolated block text.
+    hm2_7i92.0.stepgen.NN.* / hm2_7i92.0.outm.00.out-NN references at
+    channel_id's card and stepgen (reb_settings_io.channel_hal - the
+    expansion box's channels are on hm2_7i92.1). Every role's block in
+    the REB.hal template has exactly one channel number embedded this
+    way, always on hm2_7i92.0 - safe to blanket-replace within this
+    isolated block text.
     '''
     match = re.search(r'hm2_7i92\.0\.stepgen\.(\d\d)\.', block_text)
     if not match:
         problems.append(role + "'s block has no hm2_7i92.0.stepgen.NN. reference to retarget")
         return block_text
-    old_channel = match.group(1)
-    if old_channel != channel_id:
-        block_text = block_text.replace("stepgen." + old_channel + ".", "stepgen." + channel_id + ".")
-        block_text = re.sub(r'out-' + old_channel + r'(?![\w-])', "out-" + channel_id, block_text)
+    old = match.group(1)
+    card, stepgen = reb_settings_io.channel_hal(channel_id)
+    block_text = block_text.replace("hm2_7i92.0.stepgen." + old + ".", card + ".stepgen." + stepgen + ".")
+    block_text = re.sub(r'hm2_7i92\.0\.outm\.00\.out-' + old + r'(?![\w-])',
+                        card + ".outm.00.out-" + stepgen, block_text)
     return block_text
+
+
+def _base_card_ip():
+    '''
+    The base card's address for this launch: FACTORY_CARD_IP while the
+    Pi's wired connection is still on 192.168.1.x (a machine not yet
+    moved to the two-box network), else BASE_CARD_IP - also when eth0
+    has no address at all (cable unplugged or link down), since
+    10.10.10.x is the standard and LinuxCNC can't reach a card then
+    anyway.
+    '''
+    try:
+        out = subprocess.run(["ip", "-4", "-o", "addr", "show", "dev", WIRED_DEVICE],
+                             capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        out = ""
+    if " inet 192.168.1." in out:
+        return FACTORY_CARD_IP
+    if " inet 10.10.10." not in out:
+        print("Note: " + WIRED_DEVICE + " has no 10.10.10.x or 192.168.1.x address"
+              " (cable unplugged?) - using " + BASE_CARD_IP + ".")
+    return BASE_CARD_IP
+
+
+def _card_setup_hal(hal_text, expansion_box, problems, base_card_ip=BASE_CARD_IP):
+    '''
+    Rewrites REB.hal's card setup for this launch: one hm2_eth load for
+    the base card (base_card_ip, 6 stepgens) or both cards (plus
+    EXPANSION_CARD_IP, 4 stepgens) - a realtime module can only be loaded
+    once, so both cards go on one line as comma-separated lists, giving
+    hm2_7i92.0 and hm2_7i92.1 in that order. REB.hal's write line is
+    taken out (_card_write_hal adds it back last). With the expansion
+    box, both cards get read-requests before the reads, its card gets its
+    own read next to the base card's, and its own copy of the base card's
+    timer and watchdog setp lines.
+    '''
+    ips = [base_card_ip] + ([EXPANSION_CARD_IP] if expansion_box else [])
+    configs = [CARD_CONFIG % len(reb_settings_io.BASE_CHANNELS)] + (
+        [CARD_CONFIG % len(reb_settings_io.EXPANSION_CHANNELS)] if expansion_box else [])
+    load = 'loadrt hm2_eth board_ip="%s" config=%s' % (
+        ",".join(ips), ",".join('"%s"' % c for c in configs))
+    hal_text, n = re.subn(r'(?m)^loadrt hm2_eth .*$', lambda m: load, hal_text)
+    if n != 1:
+        problems.append("REB.hal: expected one 'loadrt hm2_eth' line, found %d" % n)
+    # The write goes last, after the HAL this script adds (_card_write_hal).
+    hal_text, n = re.subn(r'(?m)^addf hm2_7i92\.0\.write\b.*\n', "", hal_text)
+    if n != 1:
+        problems.append("REB.hal: expected one 'addf hm2_7i92.0.write' line, found %d" % n)
+    if not expansion_box:
+        return hal_text
+    line = re.search(r'(?m)^addf hm2_7i92\.0\.read\b.*$', hal_text)
+    if not line:
+        problems.append("REB.hal: no 'addf hm2_7i92.0.read' line")
+    else:
+        # Both cards' read-requests first, so they answer at the same
+        # time - each read otherwise sends its own request and waits for
+        # the reply, one card after the other, and the two waits took the
+        # servo thread to 859 of its 1000 us (16 October 2026,
+        # "Unexpected realtime delay"). Order from Peter Wallace at Mesa
+        # for two cards: read-requests, reads, everything else, writes.
+        requests = "\n".join(line.group(0).replace(".read" + " " * 9, ".read-request ", 1).replace(
+            "hm2_7i92.0.", card) for card in ("hm2_7i92.0.", "hm2_7i92.1."))
+        extra = line.group(0).replace("hm2_7i92.0.", "hm2_7i92.1.")
+        hal_text = (hal_text[:line.start()] + requests + "\n" + line.group(0) + "\n" + extra
+                    + hal_text[line.end():])
+    setps = list(re.finditer(r'(?m)^setp hm2_7i92\.0\.(dpll|stepgen\.timer-number|watchdog)\b.*$', hal_text))
+    if len(setps) != 3:
+        problems.append("REB.hal: expected 3 card setp lines (dpll, stepgen timer, watchdog), found %d" % len(setps))
+    else:
+        extra = "\n".join(m.group(0).replace("hm2_7i92.0.", "hm2_7i92.1.") for m in setps)
+        end = setps[-1].end()
+        hal_text = hal_text[:end] + "\n" + extra + hal_text[end:]
+    return hal_text
+
+
+def _card_write_hal(expansion_box):
+    '''
+    The card write(s), added after everything else in REB.local.hal
+    (_card_setup_hal took REB.hal's own line out) - Mesa's order, read,
+    everything else, write, so each cycle sends what motion and the PIDs
+    just worked out. With the expansion box, hm2_7i92.1.write follows
+    the base card's. REB_PostGUI_v1.local.hal's ENA-button logic is
+    added later still, after the GUI loads; its enables reach the cards
+    one cycle later, as before.
+    '''
+    cards = (0, 1) if expansion_box else (0,)
+    return ("\n# Card write%s last (Mesa's order: read, everything else, write).\n"
+            % ("s" if expansion_box else "")
+            + "".join("addf %-38s servo-thread\n" % ("hm2_7i92.%d.write" % n) for n in cards))
 
 
 def _retarget_axis_block(block_text, letter, channel_id, joint_num, problems):
@@ -1147,7 +1301,7 @@ def _retarget_spindle_block(block_text, spindle_id, channel_id, spindle_num, pro
 
 def generate_local_hal_files(role_layout, limit_jacks=None, estop_button=False,
                              signal_tower=False, fault_sound="both",
-                             limit_switch_type="NC"):
+                             limit_switch_type="NC", base_card_ip=BASE_CARD_IP):
     '''
     Regenerates REB.local.hal from the tracked REB.hal: for each of the
     8 currently-active roles, retargets its own isolated
@@ -1155,7 +1309,7 @@ def generate_local_hal_files(role_layout, limit_jacks=None, estop_button=False,
     an axis letter, or spindle index for a spindle) and keeps it; the 2
     currently-inactive roles' entire block is omitted. Then appends the
     in-use limit jacks', E-stop button's and signal tower's wiring
-    (_limit_jack_hal/_estop_button_hal/_signal_tower_hal). Copies
+    (_limit_jack_hal/_estop_fault_hal/_signal_tower_hal). Copies
     REB_PostGUI_v1.hal to REB_PostGUI_v1.local.hal unchanged (see this
     file's own header for why no substitution is needed there).
 
@@ -1216,12 +1370,14 @@ def generate_local_hal_files(role_layout, limit_jacks=None, estop_button=False,
         cursor = end
     pieces.append(hal_text[cursor:])
     hal_text = "".join(pieces)
+    hal_text = _card_setup_hal(hal_text, role_layout.expansion_box, problems, base_card_ip)
 
     # Goes just before REB.hal's closing "NOTHING FOLLOWS" banner, if
     # present, so that banner still ends the file.
     limit_text, limit_summary, limit_nets = _limit_jack_hal(limit_jacks or {}, role_layout, limit_switch_type)
-    limit_text += _estop_button_hal(estop_button)
+    limit_text += _estop_fault_hal(estop_button, role_layout.expansion_box)
     limit_text += _signal_tower_hal(signal_tower, limit_nets, role_layout, fault_sound)
+    limit_text += _card_write_hal(role_layout.expansion_box)
     end_banner = hal_text.rfind("\n# *********************** NOTHING FOLLOWS")
     if end_banner == -1:
         hal_text += limit_text
@@ -1244,6 +1400,8 @@ def generate_local_hal_files(role_layout, limit_jacks=None, estop_button=False,
         print("Could not write generated .local.hal file: " + str(e))
         return False
 
+    print("Expansion box: " + ("connected (cards %s and %s)" % (base_card_ip, EXPANSION_CARD_IP)
+                                 if role_layout.expansion_box else "not connected (card %s)" % base_card_ip))
     print("Regenerated REB.local.hal: " + ", ".join(retargeted))
     print("Limit jacks: " + (", ".join(limit_summary) or "none in use"))
     print("E-stop button: " + ("connected" if estop_button else "not connected"))
@@ -1423,7 +1581,17 @@ def main():
 
     settings = reb_settings_io.load_settings()
     assignments = _read_channel_assignments(settings)
-    role_layout = RoleLayout(assignments)
+    role_layout = RoleLayout(assignments, _read_expansion_box(settings))
+    base_card_ip = _base_card_ip()
+    if base_card_ip == FACTORY_CARD_IP and role_layout.expansion_box:
+        # Both cards would need 192.168.1.121. Refuse rather than quietly
+        # dropping the expansion box: REB_main.py and the other programs
+        # count its channels from the same setting, so joint numbers
+        # would no longer match this HAL.
+        print("Expansion Box is ticked in REB Settings, but the Pi's wired connection")
+        print("is still on 192.168.1.x. Run REB_Change_Network.sh to move it to the")
+        print("10.10.10.x network, or untick Expansion Box in REB Settings.")
+        sys.exit(1)
 
     # Regenerate REB.local.hal/REB_PostGUI_v1.local.hal FIRST and abort
     # immediately if it fails (see generate_local_hal_files) - if the
@@ -1434,7 +1602,7 @@ def main():
                                     _read_estop_button(settings),
                                     _read_signal_tower(settings),
                                     _read_fault_sound(settings),
-                                    _read_limit_switch_type(settings)):
+                                    _read_limit_switch_type(settings), base_card_ip):
         sys.exit(1)
 
     if generate_splash(role_layout):
