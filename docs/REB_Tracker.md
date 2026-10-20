@@ -42,7 +42,7 @@ Built and committed, but not yet seen working on real hardware.
 | Item | Since | Notes |
 |---|---|---|
 | Pi restarts when the 7i92 is switched on | 14 October 2026 | Every REB box (S/N 1, 2 and 3) powers the Pi and the 7i92 from one 24V -> 5V module; switching the card on while the Pi runs restarts the Pi without a shutdown (risk to the SD card). In normal use both come on together, so it only bites during the W5/W6 jumper change. Handled in the procedure, not the hardware (16 October 2026, 91ca961 on `two-box`): `REB_Change_Network.sh` now stores the card's address, moves the Pi, then offers to shut the Pi down - switch the machine off, move W5/W6, switch on, run `REB_Change_Network.sh check`. The installer does the same at its end (`--no-shutdown` in its Step 2). Dry-run only so far. Spare "Wired Ethernet" profiles: the other machine still has three - the script offers to delete them. |
-| Move S/N 1 and S/N 2 to 10.10.10.x | 16 October 2026 | Rich's decision: every machine and the shipping boxes on 10.10.10.x (base card .10, expansion .11, Pi .100), so a customer can just add an expansion box. Once `two-box` is on `main`, each owner: update, then `REB_Change_Network.sh base` (card already has REB firmware - answer no to writing it), shut down, move W5/W6, switch on, `check`. Order doesn't matter: the generator uses 192.168.1.121 while the Pi is still on 192.168.1.x (91ca961). Decide: by phone with the owners, or in person. Rehearse first on Rich's single-card machine (row below). |
+| Move S/N 1 and S/N 2 to 10.10.10.x | 16 October 2026 | Rich's decision: every machine and the shipping boxes on 10.10.10.x (base card .10, expansion .11, Pi .100), so a customer can just add an expansion box. Once the two-box work is on `main` (it's on `dev-rich` since 20 October 2026), each owner: update, then `REB_Change_Network.sh base` (card already has REB firmware - answer no to writing it), shut down, move W5/W6, switch on, `check`. Order doesn't matter: the generator uses 192.168.1.121 while the Pi is still on 192.168.1.x (91ca961). Decide: by phone with the owners, or in person. Rehearse first on Rich's single-card machine (row below). |
 | Rich's single-card machine: back to as-built, then retest the move | 16 October 2026 | Its Mesa card was pulled; when it's rebuilt: card W5/W6 at the factory setting (192.168.1.121), Pi back with `REB_Change_Network.sh back` (192.168.1.120), check LinuxCNC starts as built (on `two-box`, this also tests the generator's 192.168.1.121 fallback and the one-card HAL order). Then run `REB_Change_Network.sh base` for real - the first full run of the script on hardware - including the shutdown step, and `check`. |
 | No sound from the speaker on Rich's Pi | 16 October 2026 | The Pi's audio output was "Dummy Output" (`wpctl status`), so the fault siren and done/pause beeps played into nothing. 20 October 2026: the TV (Philips 40PFL6533 on HDMI 0) does take HDMI audio - `aplay` straight to `hdmi:CARD=vc4hdmi0` was heard - but PipeWire had offered no HDMI output since the 16 October boot (probably the TV not ready at boot). `systemctl --user restart wireplumber` brought "Built-in Audio Digital Stereo (HDMI)" back as the default, and `pw-play` (the panel's player here) was then heard. The TV also cut off the first beep, so each `.wav` now starts with 0.5 s of silence (`two-box`, a9e1604). Watch whether it comes back as Dummy Output after a reboot - if so, the fix is in the boot order (TV on first) or a WirePlumber setting, not the panel. Then retest the fault siren on the speaker. |
 | Spindles on the second machine | 08 October 2026 | Sp0/Sp1 don't run there. They work on the prototype, so this is that machine's wiring - check its cables, plugs and drives first. |
@@ -169,7 +169,7 @@ connected. Pictures: `docs/mockups/two_box_axis_selection.png` and
 on the `two-box-mockup` branch (display only - channels 08/09 and jacks
 4-6 do nothing; don't merge it): start the real screens from it.
 
-Progress on the `two-box` branch:
+Progress (built on the `two-box` branch, merged into `dev-rich` 20 October 2026):
 
 - **Step 1 - HAL side, done 14 October 2026 (8cfd0b7, not run on
   hardware):** ten channels in the shared settings module, the
@@ -292,10 +292,15 @@ Progress on the `two-box` branch:
   "joint 0 (1) on limit switch error", machine off, red latched, 3 s
   buzzer and panel siren; F2 brought the machine back and put red out.
   Jack 6 (I/O 010), set to Z with jack 5 cleared: the same, twice.
-- **Hold (Rich, 16 October 2026): don't merge `two-box` into `dev-rich`
-  or `main` until the S/N 1 and S/N 2 address changes are resolved**
-  (Open items: "Move S/N 1 and S/N 2 to 10.10.10.x"). Merging `dev-rich`
-  into `two-box` is fine.
+- **`two-box` merged into `dev-rich` and deleted, 20 October 2026**
+  (Rich's call - one development branch instead of two). Commit ids
+  above and below are still in `dev-rich`'s history. Rich's Pi runs
+  `dev-rich`.
+- **Hold (Rich, 16 October 2026, carried over 20 October): don't
+  fast-forward `main` to `dev-rich` until Rich has finished the S/N 3
+  hardware testing and re-tested the IP address change** - S/N 1 and
+  S/N 2 pull `main` (Open items: "Move S/N 1 and S/N 2 to 10.10.10.x").
+  An urgent fix for them meanwhile goes on a short branch from `main`.
 - Next: Rich's single-card machine rebuild and network rehearsal (Open
   items), then S/N 1 and S/N 2.
 
