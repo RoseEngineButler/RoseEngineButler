@@ -2936,7 +2936,8 @@ class HandlerClass:
 #                       "fault_sound" (the tower's own siren is all HAL).
 #                       Only the main panel component plays them; every
 #                       other component no-ops.
-# Updated:              ver 1.0, 07 October 2026
+# Updated:              ver 1.1, 20 October 2026 - program finish
+#                       detection (_poll_program)
 #######################################################################
     def _load_sounds(self):
         if self.builder.get_object("Sync_Run") is None:
@@ -2977,6 +2978,7 @@ class HandlerClass:
         self._program_was_running = False
         self._program_was_paused = False
         self._program_end_line = None
+        self._program_read_end = False
         GLib.timeout_add(PROGRAM_POLL_MS, self._poll_program)
 
     def _play_sound(self, beeps):
@@ -3023,19 +3025,19 @@ class HandlerClass:
 
     def _find_program_end_line(self, path):
         '''
-        Line number (1-based) of the loaded program's last line that
-        moves an axis. A program counts as finished once motion has got
-        at least that far - see _poll_program. None if the file can't
-        be read.
+        Line number (1-based) of the loaded program's last M2/M30, or
+        its last line if it has neither. A run counts as finished only
+        if the interpreter read that far - see _poll_program. None if
+        the file can't be read.
         '''
         try:
             with open(path, "r", errors="replace") as f:
                 lines = f.readlines()
         except OSError:
             return None
-        last = 0
+        last = len(lines)
         for number, line in enumerate(lines, 1):
-            if re.search(r"(?<![A-Z])[XYZABCUVW]\s*[-+.\d\[#]", self._gcode_words(line)):
+            if re.search(r"\bM0*(2|30)\b", self._gcode_words(line)):
                 last = number
         return last
 
@@ -3055,16 +3057,18 @@ class HandlerClass:
         Watches a program run from a file (AUTO mode). LinuxCNC has no
         "finished normally" flag - pressing Stop, E-stop, turning the
         machine off and an error all end a run the same way as M2/M30 -
-        so a run counts as finished only if the machine is still on and
-        motion got at least as far as the program's last move
-        (_find_program_end_line). An abort part way leaves motion_line
-        short of that, so it stays silent. MDI commands (Sync Move,
-        Threading, indexing) are left to their own handlers.
-
-        Unverified on the machine as of 06 October 2026: what
-        motion_line reads right after a normal finish and right after
-        an abort - every run's end is printed below so that can be
-        checked from the console.
+        so a run counts as finished only if the machine is still on,
+        the interpreter read as far as the program's M2/M30
+        (_find_program_end_line) and LinuxCNC already reports the run
+        done (RCS_DONE) as it goes idle. Checked on the machine 20
+        October 2026: at M30 read_line was past the M30 and the state
+        was DONE at once; after Stop read_line was part way and the
+        state stayed EXEC for a moment as the motion queue emptied.
+        The first version compared motion_line with the file's last
+        axis move, which a program whose last move is in an o-word If
+        it skipped (or that ends in loops) never reaches - no beeps.
+        MDI commands (Sync Move, Threading, indexing) are left to their
+        own handlers.
         '''
         s.poll()
         auto = s.task_mode == linuxcnc.MODE_AUTO
@@ -3073,6 +3077,11 @@ class HandlerClass:
 
         if running and not self._program_was_running:
             self._program_end_line = self._find_program_end_line(s.file)
+            self._program_read_end = False
+        # read_line drops to 0 once the run ends, so note it while running.
+        if running and self._program_end_line is not None \
+                and s.read_line >= self._program_end_line:
+            self._program_read_end = True
 
         if paused and not self._program_was_paused:
             if self._line_is_operator_stop(s.file, s.current_line) or \
@@ -3081,12 +3090,12 @@ class HandlerClass:
 
         if self._program_was_running and not running:
             finished = (s.task_state == linuxcnc.STATE_ON
-                        and self._program_end_line is not None
-                        and s.motion_line >= self._program_end_line)
-            print("Program run ended: motion_line=%d current_line=%d last move line=%s "
-                  "machine %s -> %s" % (s.motion_line, s.current_line, self._program_end_line,
-                                        "on" if s.task_state == linuxcnc.STATE_ON else "off",
-                                        "finished" if finished else "stopped/aborted"))
+                        and self._program_read_end
+                        and s.state == linuxcnc.RCS_DONE)
+            print("Program run ended: M2/M30 line=%s read=%s state=%d machine %s -> %s"
+                  % (self._program_end_line, self._program_read_end, s.state,
+                     "on" if s.task_state == linuxcnc.STATE_ON else "off",
+                     "finished" if finished else "stopped/aborted"), flush=True)
             if finished:
                 self._play_sound(DONE_BEEPS)
 
