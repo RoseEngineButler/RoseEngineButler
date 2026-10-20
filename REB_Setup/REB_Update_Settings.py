@@ -34,11 +34,19 @@
 #   Accel only if it's now too low, the one case where an existing    #
 #   value is changed.                                                 #
 #                                                                     #
+#   Then runs the one-time machine steps in ONE_TIME_STEPS (see       #
+#   run_one_time_steps). They're here, not in REB_Update.sh, because  #
+#   this program is started fresh after the pull, while the copy of   #
+#   REB_Update.sh already running keeps its old steps until the next  #
+#   update.                                                           #
+#                                                                     #
 # Version                                                             #
 #   1.0 - 03 October 2026                                             #
 #   1.1 - 07 October 2026 - raise too-low stepgen Max Accel           #
 #   1.2 - 08 October 2026 - fill in each axis's speed limits, which   #
 #         moved from REB.ini to REB Settings (replaces 1.1's rule)    #
+#   1.3 - 20 October 2026 - runs one-time machine steps (folder       #
+#         shortcuts)                                                  #
 #                                                                     #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.             #
 #                                                                     #
@@ -48,6 +56,7 @@
 import json
 import os
 import shutil
+import subprocess
 import sys
 import time
 
@@ -57,6 +66,11 @@ sys.path.insert(0, os.path.join(REPO_DIR, "REB_Display"))
 import reb_settings_io
 
 SEED_PATH = os.path.join(REPO_DIR, "REB_Setup", "REBset_v1.ini")
+# One-time steps for machines built before a feature the installer now
+# sets up. Each script decides for itself whether it has already run.
+ONE_TIME_STEPS = (
+    os.path.join(REPO_DIR, "REB_Setup", "REB_Add_Shortcuts.sh"),   # 20 October 2026
+)
 SETTINGS_PATH = reb_settings_io.SETTINGS_PATH
 
 # Settings whose value is one whole choice, not a set of independent
@@ -199,7 +213,27 @@ def add_notes_to_other_files(main_path):
                 pass
 
 
+def run_one_time_steps():
+    '''
+    Runs each ONE_TIME_STEPS script. A failure is reported but doesn't
+    stop the update.
+    '''
+    for script in ONE_TIME_STEPS:
+        sys.stdout.flush()      # keep this program's messages in order
+        try:
+            if subprocess.call([script]) != 0:
+                print("WARNING: " + os.path.basename(script) + " reported a problem - see above.")
+        except OSError as e:
+            print("WARNING: could not run " + os.path.basename(script) + ": " + str(e))
+
+
 def main():
+    result = update_settings()
+    run_one_time_steps()
+    return result
+
+
+def update_settings():
     print("Checking " + SETTINGS_PATH + " for new settings")
 
     try:

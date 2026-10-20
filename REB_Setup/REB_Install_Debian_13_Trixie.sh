@@ -40,6 +40,8 @@
 #   1.6 - 16 October 2026 - The card's W5/W6 jumper change moves to
 #         the end, after a shutdown (the Pi and card share one 5V
 #         supply).
+#   1.7 - 20 October 2026 - Adds the folder shortcuts
+#         (REB_Add_Shortcuts.sh).
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #
@@ -296,6 +298,14 @@ if [ $? != 0 ]; then
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
    exit $?
 fi
+
+echo -e "${TITLE}#######################################################################${NOCOLOR}"
+echo -e "${TITLE}Step 10 - Add folder shortcuts                                         ${NOCOLOR}"
+echo -e "${TITLE}                                                                       ${NOCOLOR}"
+# Thunar Places shortcuts and bottom-bar launchers (Reuben head icons)
+# for the RoseEngineButler and gcode folders. Machines installed before
+# this step get them from REB_Update_Settings.py on their next update.
+/home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/REB_Add_Shortcuts.sh
 
 # ********************************************************************
 # Success
