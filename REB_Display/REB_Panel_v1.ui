@@ -33,6 +33,7 @@
 #   1.2 - 24 September 2026 - Threading tab                           #
 #   1.3 - 14 October 2026 - Channel number on each Axis Assignments   #
 #         tile                                                        #
+#   1.4 - 20 October 2026 - Settings note removed, library button up  #
 #                                                                     #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.             #
 #                                                                     #
@@ -1865,8 +1866,8 @@ feed rate</property>
                 <property name="can-focus">True</property>
                 <property name="receives-default">True</property>
                 <property name="halign">start</property>
-                <property name="valign">end</property>
-                <property name="vexpand">True</property>
+                <property name="valign">start</property>
+                <property name="margin-top">10</property>
                 <property name="relief">half</property>
                 <property name="use-underline">True</property>
                 <property name="image-position">top</property>
@@ -1875,7 +1876,7 @@ feed rate</property>
               </object>
               <packing>
                 <property name="left-attach">0</property>
-                <property name="top-attach">24</property>
+                <property name="top-attach">23</property>
                 <property name="width">4</property>
               </packing>
             </child>
@@ -2606,53 +2607,6 @@ W is parallel to Z</property>
                     <property name="expand">False</property>
                     <property name="fill">True</property>
                     <property name="position">1</property>
-                  </packing>
-                </child>
-                <child>
-                  <object class="GtkBox" id="Settings_Note">
-                    <property name="visible">True</property>
-                    <property name="can-focus">False</property>
-                    <property name="halign">start</property>
-                    <property name="valign">start</property>
-                    <property name="margin-start">2</property>
-                    <property name="margin-top">15</property>
-                    <property name="spacing">8</property>
-                    <child>
-                      <object class="GtkImage">
-                        <property name="visible">True</property>
-                        <property name="can-focus">False</property>
-                        <property name="valign">start</property>
-                        <property name="pixbuf">Images/REB_SettingsGear-Sm.png</property>
-                      </object>
-                      <packing>
-                        <property name="expand">False</property>
-                        <property name="fill">True</property>
-                        <property name="position">0</property>
-                      </packing>
-                    </child>
-                    <child>
-                      <object class="GtkLabel" id="Settings_Note_Text">
-                        <property name="visible">True</property>
-                        <property name="can-focus">False</property>
-                        <property name="halign">start</property>
-                        <property name="valign">start</property>
-                        <property name="label" translatable="yes">SETTINGS
-To change how the system is set up - which axis uses each plug, scales, tuning, jog speeds, limit switches, E-stop button, or signal tower - exit Rose Engine Butler and use the Rose Engine Butler Settings program.</property>
-                        <property name="wrap">True</property>
-                      <property name="max-width-chars">54</property>
-                        <property name="xalign">0</property>
-                      </object>
-                      <packing>
-                        <property name="expand">False</property>
-                        <property name="fill">True</property>
-                        <property name="position">1</property>
-                      </packing>
-                    </child>
-                  </object>
-                  <packing>
-                    <property name="expand">False</property>
-                    <property name="fill">True</property>
-                    <property name="position">2</property>
                   </packing>
                 </child>
               </object>
