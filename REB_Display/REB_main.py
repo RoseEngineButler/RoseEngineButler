@@ -661,14 +661,23 @@ def _set_busy_cursor(widget, busy):
 # _load_panel_axis_display's read-only summary table), a row's letter
 # label never needs recoloring at runtime any more - removed along with
 # AXIS_LETTER_COLOR_CLASS/_AXIS_LETTER_COLOR_CLASSES.
+# A button with a text label (Sync Move, Cut Thread) is also disabled
+# while its move runs (MOTION_BUTTONS), and the theme draws disabled text
+# grey - invisible on the darkened background (found 20 October 2026) -
+# so the label is drawn white whether the button is disabled or not.
 _DEPRESS_CSS = b"""
 button.reb-depressed,
 button.reb-depressed:hover,
 button.reb-depressed:focus,
-button.reb-depressed:active {
+button.reb-depressed:active,
+button.reb-depressed:disabled {
     background-color: shade(@theme_bg_color, 0.6);
     background-image: none;
     box-shadow: inset 2px 2px 4px rgba(0,0,0,0.6), inset -1px -1px 2px rgba(255,255,255,0.15);
+}
+button.reb-depressed label,
+button.reb-depressed:disabled label {
+    color: #ffffff;
 }
 """
 
