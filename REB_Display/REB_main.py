@@ -373,7 +373,7 @@ SOUND_PLAYERS = (["paplay"], ["pw-play"], ["aplay", "-q"])
 PROGRAM_POLL_MS = 250
 
 # Program progress (see _load_program_progress). The estimate helper,
-# run in the background when a program is loaded.
+# run in the background as a program starts.
 PROGRAM_ESTIMATE_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                        "REB_Program_Estimate.py")
 # A run whose first move isn't among the program's first this many
@@ -3126,16 +3126,20 @@ class HandlerClass:
 #                       program has got, as a percentage.
 #                       Line numbers can't say how far a program is -
 #                       o-word loops run the same lines over and over -
-#                       so when a program is loaded REB_Program_Estimate.py
-#                       works out every move it will make, in order, with
-#                       the path length the motion planner counts for
-#                       each (in the background, a few seconds). REB.hal's
+#                       so as a program starts REB_Program_Estimate.py
+#                       works out every move it will make from where the
+#                       machine is, in order, with the path length the
+#                       motion planner counts for each (in the background,
+#                       a few seconds - not at load, since a jog in
+#                       between would change the first move). REB.hal's
 #                       program-path.out adds up that same length as the
 #                       machine moves, so how far it has grown since the
 #                       run started finds the place in the move list,
 #                       and the estimated time up to there over the
 #                       total is the percentage (time-weighted, so a long
-#                       slow cut counts for more than a quick rapid). No
+#                       slow cut counts for more than a quick rapid; the
+#                       estimate includes acceleration, without which the
+#                       bar lagged up to 30% on Rich's first test). No
 #                       time left: it was shown at first (worked out from
 #                       the real rate) but kept changing as the program
 #                       went - Rich's call, 20 October 2026, the
@@ -3152,60 +3156,33 @@ class HandlerClass:
             return
         self._progress_bar = self.builder.get_object("Program_Progress")
         self._progress_bar.set_child_visible(False)
-        self._progress_estimate = None      # the loaded program's moves (dict)
-        self._progress_key = None           # (file, mtime) it was worked out for
+        self._progress_estimate = None      # this run's moves (dict)
         self._progress_proc = None          # the helper while it runs
         self._progress_output = "/tmp/REB_progress_%d.json" % os.getpid()
         self._progress_run = None           # the run being shown
 
-    def _progress_check_program(self):
-        '''
-        Starts the estimate helper when a different program (or a newer
-        copy of it - AXIS's Reload) is loaded, and picks up its result.
-        '''
-        if self._progress_proc is not None and self._progress_proc.poll() is not None:
-            ok = self._progress_proc.returncode == 0
-            self._progress_proc = None
-            self._progress_estimate = None
-            try:
-                if ok:
-                    with open(self._progress_output) as f:
-                        data = json.load(f)
-                    if data.get("error"):
-                        print("Program progress: " + data["error"])
-                    if data["time"] and data["time"][-1] > 0:
-                        self._progress_estimate = data
-                        print("Program progress: %d moves, about %s without acceleration"
-                              % (len(data["time"]), self._progress_duration(data["time"][-1])))
-            except (OSError, ValueError, KeyError) as e:
-                print("Program progress: no estimate - " + str(e))
-            try:
-                os.remove(self._progress_output)
-            except OSError:
-                pass
-
-        path = s.file
-        if not path:
+    def _progress_collect(self):
+        '''Picks up the estimate helper's result once it has finished.'''
+        if self._progress_proc is None or self._progress_proc.poll() is None:
             return
+        ok = self._progress_proc.returncode == 0
+        self._progress_proc = None
         try:
-            key = (path, os.path.getmtime(path))
+            if ok:
+                with open(self._progress_output) as f:
+                    data = json.load(f)
+                if data.get("error"):
+                    print("Program progress: " + data["error"])
+                if data["time"] and data["time"][-1] > 0:
+                    self._progress_estimate = data
+                    print("Program progress: %d moves, estimated %s"
+                          % (len(data["time"]), self._progress_duration(data["time"][-1])))
+        except (OSError, ValueError, KeyError) as e:
+            print("Program progress: no estimate - " + str(e))
+        try:
+            os.remove(self._progress_output)
         except OSError:
-            return
-        if key == self._progress_key:
-            return
-        if self._progress_proc is not None:
-            self._progress_proc.kill()
-            self._progress_proc.wait()
-        self._progress_key = key
-        self._progress_estimate = None
-        if self._progress_run is None or self._progress_run.get("ended"):
-            self._progress_bar.set_child_visible(False)
-        try:
-            self._progress_proc = subprocess.Popen(
-                ["nice", "-n", "10", "python3", PROGRAM_ESTIMATE_SCRIPT, path,
-                 self._progress_output], stdout=subprocess.DEVNULL)
-        except OSError as e:
-            print("Program progress: could not start the estimate - " + str(e))
+            pass
 
     def _progress_path(self):
         try:
@@ -3214,40 +3191,51 @@ class HandlerClass:
             return None
 
     def _progress_start(self):
+        '''
+        A program has started: works out its moves from where the
+        machine is now (a few seconds, in the background), and notes
+        program-path, which grows from here as it moves.
+        '''
         if self._progress_bar is None:
             return
-        self._progress_check_program()
+        if self._progress_proc is not None:
+            self._progress_proc.kill()
+            self._progress_proc.wait()
+            self._progress_proc = None
+        self._progress_estimate = None
         start = self._progress_path()
-        if start is None:
+        if start is None or not s.file:
             self._progress_run = None
+            self._progress_bar.set_child_visible(False)
             return
+        try:
+            self._progress_proc = subprocess.Popen(
+                ["nice", "-n", "10", "python3", PROGRAM_ESTIMATE_SCRIPT, s.file,
+                 self._progress_output], stdout=subprocess.DEVNULL)
+        except OSError as e:
+            print("Program progress: could not start the estimate - " + str(e))
         self._progress_run = {"start": start, "elapsed": 0.0, "last": time.monotonic(),
-                              "checked": False, "part_way": False, "fraction": 0.0}
+                              "first_line": 0, "part_way": None, "fraction": 0.0}
         self._progress_bar.set_fraction(0.0)
-        self._progress_bar.set_text("Program 0%")
+        self._progress_bar.set_text("Program 0% - working it out")
         self._progress_bar.set_child_visible(True)
 
     def _progress_update(self, running, paused):
-        if self._progress_bar is None:
-            return
-        if not running:
-            self._progress_check_program()
-            return
         run = self._progress_run
-        if run is None or run.get("ended"):
+        if self._progress_bar is None or not running or run is None or run.get("ended"):
             return
         now = time.monotonic()
         if not paused:
             run["elapsed"] += now - run["last"]
         run["last"] = now
+        if not run["first_line"]:
+            run["first_line"] = s.motion_line
+        self._progress_collect()
         data = self._progress_estimate
         if data is None:
-            self._progress_check_program()      # estimate may finish mid-run
-            self._progress_bar.set_text("Program running - working out its length")
             return
-        if not run["checked"] and s.motion_line > 0:
-            run["checked"] = True
-            run["part_way"] = s.motion_line not in data["line"][:PROGRESS_START_MOVES]
+        if run["part_way"] is None and run["first_line"]:
+            run["part_way"] = run["first_line"] not in data["line"][:PROGRESS_START_MOVES]
         if run["part_way"]:
             self._progress_bar.set_text("Started part way - no progress shown")
             return
@@ -3282,6 +3270,7 @@ class HandlerClass:
         if self._progress_bar is None or run is None:
             return
         run["ended"] = True
+        self._progress_collect()
         if run["part_way"] or self._progress_estimate is None:
             self._progress_bar.set_child_visible(False)
         elif finished:

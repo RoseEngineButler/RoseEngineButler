@@ -31,9 +31,13 @@
 #   the path length LinuxCNC's motion planner will count for it - the
 #   X/Y/Z distance, or U/V/W if only those move, or A/B/C if only
 #   rotary axes move - in machine units, and a time estimate from the
-#   feed rate and each axis's MAX_VELOCITY (no acceleration, so it
-#   runs short on programs of many small moves; the panel corrects
-#   the time remaining from the real progress once running).
+#   feed rate and each axis's MAX_VELOCITY and MAX_ACCELERATION, each
+#   move treated as starting and ending at rest. That overestimates
+#   the total (LinuxCNC blends moves together - Rich's
+#   Geo1216Case12-10-13-26b.ngc: 13.5 min estimated, 10 min real) but
+#   keeps the proportions right, which is all the percentage needs:
+#   without acceleration the bar ran up to 30% behind on that
+#   program, with it within 6% (20 October 2026).
 #
 #   The output is JSON: "length" and "time" are running totals per
 #   move, "line" each move's program line. REB.hal integrates
@@ -43,6 +47,9 @@
 #
 #   Needs LinuxCNC running (INI_FILE_NAME in the environment, and its
 #   status for the tool table) - the panel's own environment has both.
+#   The first move is from where the machine is now, so the panel runs
+#   this as a program starts, not when it's loaded (a jog in between
+#   would change that move's length and shift every total after it).
 #
 # End User Customisation:
 #   THE END USER OF THE ROSE ENGINE BUTLER SYSTEM SHOULD NOT MODIFY
@@ -110,9 +117,10 @@ class EstimateCanon(Translated, ArcsToSegmentsMixin, StatMixin):
     units; `to_machine` converts linear distances for comparing with
     HAL (motion.current-vel is in machine units).
     '''
-    def __init__(self, stat, max_vel, to_machine):
+    def __init__(self, stat, max_vel, max_accel, to_machine):
         StatMixin.__init__(self, stat, 0)
         self.max_vel = max_vel          # 9 values, machine units/s (0 = unused)
+        self.max_accel = max_accel      # 9 values, machine units/s^2
         self.to_machine = to_machine
         self.pos = None
         self.feed = 1.0                 # inches (or degrees) per second
@@ -188,13 +196,21 @@ class EstimateCanon(Translated, ArcsToSegmentsMixin, StatMixin):
             length, scale = abc, 1.0
         else:
             return
-        # Slowest axis at its MAX_VELOCITY; a feed move also at its feed.
-        seconds = 0.0
+        # Cruising: slowest axis at its MAX_VELOCITY; a feed move also
+        # at its feed. Then each axis at the speed that gives, speeding
+        # up and slowing down at its MAX_ACCELERATION.
+        cruise = 0.0
         for i, d in enumerate(machine):
             if abs(d) > TINY and self.max_vel[i] > 0:
-                seconds = max(seconds, abs(d) / self.max_vel[i])
+                cruise = max(cruise, abs(d) / self.max_vel[i])
         if not rapid and self.feed > 0:
-            seconds = max(seconds, length / self.feed)
+            cruise = max(cruise, length / self.feed)
+        seconds = cruise
+        if cruise > 0:
+            for i, d in enumerate(machine):
+                if abs(d) > TINY:
+                    seconds = max(seconds, rest_to_rest(abs(d), abs(d) / cruise,
+                                                        self.max_accel[i]))
         self._record(length * scale, seconds)
 
     def _record(self, length, seconds):
@@ -203,6 +219,15 @@ class EstimateCanon(Translated, ArcsToSegmentsMixin, StatMixin):
         self.lines.append(self.lineno)
         self.lengths.append(round(self.total_length, 6))
         self.times.append(round(self.total_time, 4))
+
+
+def rest_to_rest(distance, speed, accel):
+    '''Seconds to move `distance` from rest to rest, at most `speed`.'''
+    if accel <= 0:
+        return distance / speed
+    if distance >= speed * speed / accel:
+        return distance / speed + speed / accel     # speeds up, cruises, slows
+    return 2 * math.sqrt(distance / accel)          # never reaches `speed`
 
 
 def main():
@@ -215,8 +240,9 @@ def main():
     inch = (ini.find("TRAJ", "LINEAR_UNITS") or "inch").strip().lower() in ("inch", "in", "imperial")
     to_machine = 1.0 if inch else 25.4
     max_vel = [float(ini.find("AXIS_" + a, "MAX_VELOCITY") or 0) for a in AXES]
+    max_accel = [float(ini.find("AXIS_" + a, "MAX_ACCELERATION") or 0) for a in AXES]
 
-    canon = EstimateCanon(stat, max_vel, to_machine)
+    canon = EstimateCanon(stat, max_vel, max_accel, to_machine)
     # The interpreter saves its parameters at the end, so give it a
     # copy - like AXIS's preview - never the machine's own file.
     parameter = os.path.join(os.path.dirname(ini_path),
