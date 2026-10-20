@@ -165,9 +165,10 @@ Box - Connected" checkbox, each box with its own Top / Bottom rows; the
 Inputs, Outputs and Sounds page shows Limit Jacks 1-3 under Base Box over
 Limit Jacks 4-6 under Expansion Box, the expansion side greyed out until
 connected. Pictures: `docs/mockups/two_box_axis_selection.png` and
-`docs/mockups/two_box_inputs_outputs_sounds.png`. The mock-up itself is
-on the `two-box-mockup` branch (display only - channels 08/09 and jacks
-4-6 do nothing; don't merge it): start the real screens from it.
+`docs/mockups/two_box_inputs_outputs_sounds.png`. The mock-up itself was
+the `two-box-mockup` branch (display only), which the real screens were
+built from; deleted 20 October 2026 at Rich's request (last commit
+7de560f).
 
 Progress (built on the `two-box` branch, merged into `dev-rich` 20 October 2026):
 
