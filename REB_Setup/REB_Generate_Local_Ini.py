@@ -148,8 +148,13 @@
 
 import os
 import re
+import shutil
 import subprocess
 import sys
+
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk
 
 REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REB_INI_PATH = os.path.join(REPO_DIR, "REB.ini")
@@ -168,6 +173,98 @@ SETTINGS_PATH = reb_settings_io.SETTINGS_PATH
 # inside the HAL files themselves) against the directory of whichever
 # ini file was actually launched.
 LOCAL_INI_PATH = os.path.join(REPO_DIR, "REB.local.ini")
+
+# gcode/ is REB.ini's [DISPLAY]PROGRAM_PREFIX - LinuxCNC searches it for
+# named subroutines (o<name> call) and user M-code files (M100-M199)
+# before REB's own [RS274NGC]SUBROUTINE_PATH, so a file there starting
+# with "reb"/"REB" (any case) or named M100-M199 could silently run
+# instead of a REB subroutine or a future REB M-code - see "Reserved
+# names" in CLAUDE.md. Checked once at every launch (added 23 October
+# 2026); REBset_v1.ini's "startup_file_check" ("abort", the default, or
+# "warn", set on REB Settings' Other tab) picks what happens if one is
+# found.
+GCODE_DIR = os.path.join(REPO_DIR, "gcode")
+RESERVED_M_CODE_PATTERN = re.compile(r"^m1\d\d$", re.IGNORECASE)
+
+# Played on the Pi's speaker when startup is refused (added 23 October
+# 2026) - not on the signal tower's buzzer, since LinuxCNC/HAL don't
+# exist yet at this point in the launch, so the tower (wired up later,
+# in generate_local_hal_files) can't be driven. Same player fallback
+# chain as REB_main.py's attention sounds (SOUND_PLAYERS/_play_on_speaker),
+# but its own short "uh oh" two-note sound (REB_Abort.wav) rather than
+# the 3 s fault siren - Rich found the siren too alarming for a startup
+# check that just needs a file renamed.
+SOUND_PLAYERS = (["paplay"], ["pw-play"], ["aplay", "-q"])
+ABORT_SOUND_PATH = os.path.join(REPO_DIR, "REB_Display", "Sounds", "REB_Abort.wav")
+
+
+def _play_abort_sound():
+    for player in SOUND_PLAYERS:
+        if shutil.which(player[0]):
+            try:
+                subprocess.Popen(player + [ABORT_SOUND_PATH],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except OSError as e:
+                print("Could not play " + ABORT_SOUND_PATH + ": " + str(e))
+            return
+    print("Startup abort sound: no audio player found (" +
+          ", ".join(p[0] for p in SOUND_PLAYERS) + ")")
+
+
+def _find_reserved_gcode_names():
+    '''
+    Lists every file directly in gcode_dir (not recursive) whose name is
+    reserved for Rose Engine Butler - see GCODE_DIR above.
+    '''
+    if not os.path.isdir(GCODE_DIR):
+        return []
+    found = []
+    for name in sorted(os.listdir(GCODE_DIR)):
+        if not os.path.isfile(os.path.join(GCODE_DIR, name)):
+            continue
+        stem = os.path.splitext(name)[0]
+        if name.lower().startswith("reb") or RESERVED_M_CODE_PATTERN.match(stem):
+            found.append(name)
+    return found
+
+
+def check_reserved_gcode_names(settings):
+    '''
+    Aborts (or, if REBset_v1.ini's "startup_file_check" is "warn", just
+    warns and returns) when gcode/ holds a reserved file name. Shows a
+    GTK dialog either way, since this runs from the desktop launcher
+    with no terminal visible.
+    '''
+    found = _find_reserved_gcode_names()
+    if not found:
+        return
+
+    file_list = "\n".join("  " + name for name in found)
+    detail = (
+        "The gcode directory must never hold a file starting with \"reb\"/"
+        "\"REB\" (any case) or named M100-M199 - LinuxCNC searches that folder before "
+        "Rose Engine Butler's own subroutines and M-codes, so a matching "
+        "file would quietly run instead of Rose Engine Butler's. Rename "
+        "the file (the Gcode icon on the panel opens that folder), then "
+        "try again.\n\nFile(s) found:\n" + file_list
+    )
+
+    abort = settings.get("startup_file_check", "abort") != "warn"
+    title = ("Reserved file name found - startup stopped" if abort
+             else "Reserved file name found")
+    print(("ABORTING: " if abort else "WARNING: ") + detail.replace("\n", " "))
+    if abort:
+        _play_abort_sound()
+
+    dialog = Gtk.MessageDialog(
+        message_type=Gtk.MessageType.ERROR if abort else Gtk.MessageType.WARNING,
+        buttons=Gtk.ButtonsType.OK, text=title)
+    dialog.format_secondary_text(detail)
+    dialog.run()
+    dialog.destroy()
+
+    if abort:
+        sys.exit(1)
 
 
 # The 8 axis letters (Y removed - not used on this machine, LATHE=1) and
@@ -1580,6 +1677,8 @@ def main():
         sys.exit(1)
 
     settings = reb_settings_io.load_settings()
+    check_reserved_gcode_names(settings)
+
     assignments = _read_channel_assignments(settings)
     role_layout = RoleLayout(assignments, _read_expansion_box(settings))
     base_card_ip = _base_card_ip()

@@ -396,6 +396,25 @@ MANUAL_LINKS = {
     "Spindle_Scale_Link":        MANUAL_URL + "ScaleSettingsForADevice",
 }
 
+# Whether a reserved-name file in gcode/ (one starting with "reb"/"REB",
+# any case, or named M100-M199) stops LinuxCNC from starting or only
+# warns - the Startup_Check_Abort / Startup_Check_Warn radios, persisted
+# as REBset_v1.ini's "startup_file_check" ("abort" or "warn"; absent =
+# "abort"). The scan itself runs in REB_Setup/REB_Generate_Local_Ini.py,
+# before LinuxCNC is launched - see "Reserved names" in CLAUDE.md for
+# why gcode/ can never hold such a file.
+STARTUP_FILE_CHECKS = ("abort", "warn")
+
+def _save_startup_file_check(choice):
+    settings = reb_settings_io.load_settings()
+    settings["startup_file_check"] = choice
+    reb_settings_io.save_settings(settings)
+    print("Saved startup file check: " + choice)
+
+def _read_persisted_startup_file_check():
+    choice = reb_settings_io.load_settings().get("startup_file_check", "abort")
+    return choice if choice in STARTUP_FILE_CHECKS else "abort"
+
 def _save_limit_switch_type(switch_type):
     settings = reb_settings_io.load_settings()
     settings["limit_switch_type"] = switch_type
@@ -1719,6 +1738,28 @@ class HandlerClass:
             return
         _save_signal_tower(widget.get_active())
 
+    def _load_startup_file_check(self):
+        '''
+        Reads the persisted startup file check choice (REBset_v1.ini's
+        "startup_file_check") into the Startup_Check_Abort / _Warn
+        radios.
+        '''
+        radio = self.builder.get_object("Startup_Check_" + _read_persisted_startup_file_check().capitalize())
+        if radio is None:
+            return
+        self._applying_startup_file_check = True
+        radio.set_active(True)
+        self._applying_startup_file_check = False
+
+    def Startup_Check_Toggled(self, widget):
+        '''
+        Persists the startup file check choice. Each click fires
+        "toggled" on both radios; only the one becoming active saves.
+        '''
+        if self._applying_startup_file_check or not widget.get_active():
+            return
+        _save_startup_file_check(Gtk.Buildable.get_name(widget).split("_")[-1].lower())
+
     def _load_limit_switch_type(self):
         '''
         Reads the persisted limit switch type (REBset_v1.ini's
@@ -2947,6 +2988,10 @@ class HandlerClass:
         # Signal_Tower_Connected checkbox.
         self._applying_signal_tower = False
 
+        # Same suppression as above, for _load_startup_file_check driving
+        # the Startup_Check_Abort / _Warn radios.
+        self._applying_startup_file_check = False
+
         # Same suppression as above, for _load_limit_switch_type driving
         # the Limit_Switch_NC / _NO radios.
         self._applying_limit_switch_type = False
@@ -3024,6 +3069,7 @@ class HandlerClass:
         # the Axis Selection tab's Signal Tower checkbox.
         self._load_signal_tower()
         self._load_limit_switch_type()
+        self._load_startup_file_check()
         self._load_done_sound()
         self._load_fault_sound()
 
