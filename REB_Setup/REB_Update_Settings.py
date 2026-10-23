@@ -40,6 +40,9 @@
 #   REB_Update.sh already running keeps its old steps until the next  #
 #   update.                                                           #
 #                                                                     #
+#   Finally calls REB_Report_Version.report_version() - unlike the    #
+#   one-time steps, this runs every update (see that file's header).  #
+#                                                                     #
 # Version                                                             #
 #   1.0 - 03 October 2026                                             #
 #   1.1 - 07 October 2026 - raise too-low stepgen Max Accel           #
@@ -47,6 +50,8 @@
 #         moved from REB.ini to REB Settings (replaces 1.1's rule)    #
 #   1.3 - 20 October 2026 - runs one-time machine steps (folder       #
 #         shortcuts)                                                  #
+#   1.4 - 23 October 2026 - runs the serial number one-time step, and #
+#         reports this machine's version every update                 #
 #                                                                     #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.             #
 #                                                                     #
@@ -64,12 +69,14 @@ REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REB_INI_PATH = os.path.join(REPO_DIR, "REB.ini")
 sys.path.insert(0, os.path.join(REPO_DIR, "REB_Display"))
 import reb_settings_io
+import REB_Report_Version
 
 SEED_PATH = os.path.join(REPO_DIR, "REB_Setup", "REBset_v1.ini")
 # One-time steps for machines built before a feature the installer now
 # sets up. Each script decides for itself whether it has already run.
 ONE_TIME_STEPS = (
-    os.path.join(REPO_DIR, "REB_Setup", "REB_Add_Shortcuts.sh"),   # 20 October 2026
+    os.path.join(REPO_DIR, "REB_Setup", "REB_Add_Shortcuts.sh"),       # 20 October 2026
+    os.path.join(REPO_DIR, "REB_Setup", "REB_Set_Serial_Number.sh"),   # 23 October 2026
 )
 SETTINGS_PATH = reb_settings_io.SETTINGS_PATH
 
@@ -230,6 +237,9 @@ def run_one_time_steps():
 def main():
     result = update_settings()
     run_one_time_steps()
+    # Runs every update (not a one-time step) - after the serial-number
+    # step above, so a number set just now is included in this report.
+    REB_Report_Version.report_version()
     return result
 
 

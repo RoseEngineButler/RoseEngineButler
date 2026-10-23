@@ -42,6 +42,8 @@
 #         supply).
 #   1.7 - 20 October 2026 - Adds the folder shortcuts
 #         (REB_Add_Shortcuts.sh).
+#   1.8 - 23 October 2026 - Step 11: records the machine's serial
+#         number (REB_Set_Serial_Number.sh).
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #
@@ -306,6 +308,16 @@ echo -e "${TITLE}                                                               
 # for the RoseEngineButler and gcode folders. Machines installed before
 # this step get them from REB_Update_Settings.py on their next update.
 /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/REB_Add_Shortcuts.sh
+
+echo -e "${TITLE}#######################################################################${NOCOLOR}"
+echo -e "${TITLE}Step 11 - Record this machine's serial number                         ${NOCOLOR}"
+echo -e "${TITLE}                                                                       ${NOCOLOR}"
+# Optional - leave it blank if there isn't one (e.g. a self-built
+# machine). The system reports its version every update, identified by
+# the Pi's own hardware serial either way; this friendly number is only
+# a label for talking to support. Machines installed before this step
+# get asked on their next update instead.
+/home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/REB_Set_Serial_Number.sh
 
 # ********************************************************************
 # Success
