@@ -1,4 +1,4 @@
-#! /home/reuben/Downloads
+#!/bin/bash
 #######################################################################
 #                    RRRRRR    EEEEEEEE  BBBBBBB                      #
 #                    RR   RR   EE        BB    BB                     #
@@ -14,7 +14,7 @@
 # LinuxCNC configuration for use with a Rose Engine
 #
 # File:
-#   Install.sh
+#   REB_Install_Debian_13_Trixie.sh
 #
 # Purpose:
 #   This is used to install the Rose Engine Butler application.
@@ -44,6 +44,10 @@
 #         (REB_Add_Shortcuts.sh).
 #   1.8 - 23 October 2026 - Step 11: records the machine's serial
 #         number (REB_Set_Serial_Number.sh).
+#   1.9 - 24 October 2026 - First line names bash; a failed step
+#         exits with an error code (exit $? after an echo was 0);
+#         REB_Update.sh and REBset_v1.ini copied without sudo, so
+#         they belong to reuben, not root.
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #
@@ -104,8 +108,8 @@ echo -e "${TITLE}###############################################################
 echo -e "${TITLE}Step 1 - Setup the wired Ethernet connection (to connect to the Mesa   ${NOCOLOR}"
 echo -e "${TITLE}card)                                                                  ${NOCOLOR}"
 
-# Add the wired Ethernet network connectin
-echo -e "${CMNTTEXT}Add the wired Ethernet network connectin${NOCOLOR}"
+# Add the wired Ethernet network connection
+echo -e "${CMNTTEXT}Add the wired Ethernet network connection${NOCOLOR}"
 
 # 192.168.1.120 for now - a new Mesa card answers at its factory
 # address, 192.168.1.121. REB_Change_Network.sh (Step 2) moves this
@@ -122,7 +126,7 @@ nmcli con add type ethernet con-name "Wired Ethernet" ipv4.address 192.168.1.120
 if [ $? != 0 ]; then
     echo -e "${KEYNOTE}ERROR: nmcli failed.                                             ${NOCOLOR}"
     echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                   ${NOCOLOR}"
-    exit $?
+    exit 1
 fi
 
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
@@ -169,7 +173,7 @@ if [ $? != 0 ]; then
    echo -e "${KEYNOTE}    to /home/reuben/                                                 ${NOCOLOR}"
    echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-   exit $?
+   exit 1
 fi
 
 mv axisrc .axisrc
@@ -178,18 +182,18 @@ if [ $? != 0 ]; then
    echo -e "${KEYNOTE}    to .axisrc                                                       ${NOCOLOR}"
    echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-   exit $?
+   exit 1
 fi
 
 echo -e "${CMNTTEXT}    REB_Update.sh                                                  ${NOCOLOR}"
-sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Update.sh .
+cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Update.sh .
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: copy of REB_Update.sh                                        ${NOCOLOR}"
    echo -e "${KEYNOTE}    from /home/reuben/linuxcnc/configs/RoseEngineButler           ${NOCOLOR}"
    echo -e "${KEYNOTE}    to /home/reuben/                                                 ${NOCOLOR}"
    echo -e "${KEYNOTE}failed.                                                              ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-   exit $?
+   exit 1
 fi
 
 echo -e "${CMNTTEXT}    Create the gcode library                                       ${NOCOLOR}"
@@ -198,7 +202,7 @@ mkdir gcode
 
 echo -e "${CMNTTEXT}    REBset_v1.ini                                                  ${NOCOLOR}"
 cd /home/reuben/Documents
-sudo cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/REBset_v1.ini .
+cp /home/reuben/linuxcnc/configs/RoseEngineButler/REB_Setup/REBset_v1.ini .
 
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
 echo -e "${TITLE}Step 4 - Install ClamAV                                                ${NOCOLOR}"
@@ -211,7 +215,7 @@ sudo apt install -y clamav
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: Could not install ClamAV                                      ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-   exit $?
+   exit 1
 fi
 
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
@@ -221,7 +225,7 @@ sudo apt install -y menulibre
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: Could not install MenuLibre                                   ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-   exit $?
+   exit 1
 fi
 
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
@@ -231,7 +235,7 @@ sudo apt install -y galculator
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: Could not install galculator                                  ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-   exit $?
+   exit 1
 fi
 
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
@@ -241,7 +245,7 @@ sudo apt install -y xfce4-screenshooter
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: Could not install xfce4-screenschooter                        ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-   exit $?
+   exit 1
 fi
 
 echo -e "${TITLE}#######################################################################${NOCOLOR}"
@@ -251,14 +255,14 @@ curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: Could not install Claude Code                                 ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-   exit $?
+   exit 1
 fi
 
 sudo apt install -y -y nodejs
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: Could not install Claude Code                                 ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-   exit $?
+   exit 1
 fi
 
 mkdir -p ~/.npm-global
@@ -266,7 +270,7 @@ npm config set prefix '~/.npm-global'
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: Could not install Claude Code                                 ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-   exit $?
+   exit 1
 fi
 
 echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
@@ -274,7 +278,7 @@ source ~/.bashrc
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: Could not install Claude Code                                 ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-   exit $?
+   exit 1
 fi
 
 echo Install Claude Code
@@ -282,7 +286,7 @@ npm install -g @anthropic-ai/claude-code
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: Could not install Claude Code                                 ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-   exit $?
+   exit 1
 fi
 
 claude --version
@@ -298,7 +302,7 @@ sudo apt install -y chromium
 if [ $? != 0 ]; then
    echo -e "${KEYNOTE}ERROR: Could not install Chromium                                    ${NOCOLOR}"
    echo -e "${KEYNOTE}PROGRAM TERMINATED PREMATURELY                                       ${NOCOLOR}"
-   exit $?
+   exit 1
 fi
 
 echo -e "${TITLE}#######################################################################${NOCOLOR}"

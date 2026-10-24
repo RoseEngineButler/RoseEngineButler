@@ -17,14 +17,21 @@
 #   REB_Launch.sh
 #
 # Purpose:
-#   Desktop-launcher entry point for a LinuxCNC session. Regenerates
-#   REB.local.ini (written next to REB.ini, in this repo's own
-#   directory - see REB_Generate_Local_Ini.py's header for why it can't
-#   live in RoseEngineButlerLocal instead) from the tracked REB.ini,
-#   overlaying this machine's persisted Max Jog Speed / Measurement
-#   System, and starts LinuxCNC against that generated file instead of
-#   the tracked REB.ini directly. This keeps REB.ini itself untouched so
-#   a `git pull` never clobbers a machine-local setting.
+#   Desktop-launcher entry point for a LinuxCNC session. Runs
+#   REB_Setup/REB_Generate_Local_Ini.py, which builds this machine's
+#   configuration from the tracked templates and
+#   /home/reuben/Documents/REBset_v1.ini:
+#     REB.local.ini (next to REB.ini - see REB_Generate_Local_Ini.py's
+#       header for why it must live there): axis/channel assignment,
+#       units, speed limits, jog speeds, backlash;
+#     REB.local.hal and REB_Display/REB_PostGUI_v1.local.hal: Mesa
+#       card(s), each role on its channel, limit jacks, E-stop button,
+#       signal tower, sounds;
+#     REB_Display/REB_Splash.local.ngc: the start-up preview drawing.
+#   Then starts LinuxCNC on REB.local.ini. If the generator reports a
+#   problem it exits non-zero and LinuxCNC isn't started (set -e). The
+#   tracked templates are never changed, so a `git pull` never clobbers
+#   a machine-local setting.
 #
 #   Point the desktop launcher's Exec= at this script instead of at
 #   `linuxcnc REB.ini` directly.
@@ -38,6 +45,7 @@
 #
 # Version
 #   1.0 - 01 August 2026
+#   1.1 - 18 October 2026 - Purpose brought up to date.
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #

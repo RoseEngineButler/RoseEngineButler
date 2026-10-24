@@ -19,10 +19,11 @@
 # Purpose:
 #   Desktop-launcher entry point for the standalone REB_Settings
 #   configurator (REB_Display/REB_Settings.py). Runs as an ordinary,
-#   independent program - not embedded inside LinuxCNC's AXIS GUI - and
-#   can be launched whether or not LinuxCNC happens to be running at
-#   the time (every live HAL read/write it makes degrades harmlessly
-#   via halcmd if LinuxCNC isn't up).
+#   independent program - not embedded inside LinuxCNC's AXIS GUI.
+#   LinuxCNC must be closed first: REB_Settings.py says so and exits
+#   if it finds LinuxCNC running. Everything it saves goes into
+#   /home/reuben/Documents/REBset_v1.ini and takes effect at the next
+#   launch (REB_Launch.sh).
 #
 #   Point a desktop launcher's Exec= at this script.
 #
@@ -35,6 +36,7 @@
 #
 # Version
 #   1.0 - 04 September 2026
+#   1.1 - 18 October 2026 - Purpose updated: LinuxCNC must be closed.
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #

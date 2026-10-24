@@ -43,6 +43,8 @@
 #   1.4 - 08 October 2026 - Refreshes the EtherLab package source's
 #             signing key before "apt update" (see below): its copy
 #             expired 20 September 2026, which made apt update warn.
+#   1.5 - 18 October 2026 - The "local changes" warning names the
+#             Support Manual page by its real title; marked runnable.
 #
 # Copyright (c) 2026 Colvin Tools and Brainwave Embedded.
 #
@@ -136,7 +138,7 @@ if [ "$stashed" = true ]; then
         git reset --hard -q HEAD
         echo -e "${KEYNOTE}WARNING: local changes could not be re-applied automatically.       ${NOCOLOR}"
         echo -e "${KEYNOTE}They are saved - see 'git stash list' (REB_Update ...) and the       ${NOCOLOR}"
-        echo -e "${KEYNOTE}Support Manual page 'Updates and Branches' to restore them.           ${NOCOLOR}"
+        echo -e "${KEYNOTE}Support Manual page 'Updating Rose Engine Butler' to restore them.   ${NOCOLOR}"
     fi
 fi
 echo -e "${TITLE}Latest files pulled from GitHub                                        ${NOCOLOR}"
