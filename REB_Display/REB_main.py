@@ -81,6 +81,14 @@ import reb_settings_io
 
 SETTINGS_PATH = "/home/reuben/Documents/REBset_v1.ini"
 
+# The friendly serial number an owner can set (REB_Set_Serial_Number.sh) -
+# same path as REB_Report_Version.py's own SERIAL_PATH (duplicated, not
+# imported - that script runs standalone from REB_Update_Settings.py).
+# Appended to the main panel's "REB O/S ..." label by _load_version_label
+# below; absent/empty means no S/N has been set yet, so nothing is
+# appended.
+SERIAL_PATH = os.path.expanduser("~/.config/REB/serial")
+
 # Channel id ("00".."07") -> the role (one of the 8 axis letters or 2
 # spindles) REB.ini/REB.hal ship with by default. Seed value for a
 # channel's <channel_assignments> entry in REBset_v1.ini when the
@@ -3428,6 +3436,34 @@ class HandlerClass:
 
 
 #######################################################################
+# Version label (machine S/N)
+# Purpose:              Appends ", Machine S/N <n>" to the main panel's
+#                       "REB O/S ..." label once an owner has set a
+#                       friendly serial number (REB_Set_Serial_Number.sh,
+#                       ~/.config/REB/serial - SERIAL_PATH above), so the
+#                       panel shows which machine this is at a glance
+#                       (Rich's idea). Left as shipped (no suffix) until
+#                       a serial has been set. Main panel only -
+#                       REB_Panel_v1.ui's own static text is untouched,
+#                       which is what REB_Report_Version.py reads by
+#                       regex.
+# Updated:              ver 1.0, 26 October 2026
+#######################################################################
+    def _load_version_label(self):
+        label = self.builder.get_object("OS_Version_Label")
+        if label is None:
+            return
+        try:
+            with open(SERIAL_PATH, "r") as f:
+                serial = f.read().strip()
+        except OSError:
+            serial = ""
+        if not serial:
+            return
+        label.set_text(label.get_text() + ", Machine S/N " + serial)
+
+
+#######################################################################
 # Card contact
 # Purpose:              A Mesa card that loses contact with the Pi -
 #                       network cable, switch or the box's power - stops
@@ -3640,6 +3676,11 @@ class HandlerClass:
         # match each channel's current type/letter (if owned by this
         # component).
         self._load_panel_axis_controls()
+
+        # Append ", Machine S/N <n>" to the "REB O/S ..." label if this
+        # owner has set a friendly serial number (if owned by this
+        # component) - see _load_version_label.
+        self._load_version_label()
 
         # Sync Move tab setup (if owned by this component).
         self._load_sync_move_tab()

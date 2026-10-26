@@ -136,6 +136,24 @@ UI_FILE = os.path.join(SCRIPT_DIR, "REB_Settings_v1.ui")
 
 SETTINGS_PATH = "/home/reuben/Documents/REBset_v1.ini"
 
+# The friendly serial number an owner can set (REB_Set_Serial_Number.sh) -
+# same path as REB_Report_Version.py's own SERIAL_PATH and REB_main.py's
+# copy (duplicated, not imported - each runs standalone). Appended to
+# each page's "REB O/S ..." label by _load_version_label below;
+# absent/empty means no S/N has been set yet, so nothing is appended.
+SERIAL_PATH = os.path.expanduser("~/.config/REB/serial")
+
+# The one "REB O/S ..." label's widget id on each of the 4 Settings
+# pages (Axis Selection, Inputs/Outputs/and Sounds, Axis and Stepper
+# Motor Tuning, Other) - REB_Settings_v1.ui repeats the same static
+# text on every page, each with its own widget id.
+OS_VERSION_LABEL_IDS = (
+    "OS_Version_Label_Axis_Selection",
+    "OS_Version_Label_IO",
+    "OS_Version_Label_Tuning",
+    "OS_Version_Label_Other",
+)
+
 # Channel id ("00".."07", matching the hm2_7i92.0.stepgen.NN suffix) ->
 # the role (one of the 8 axis letters or 2 spindles) REB.ini/REB.hal
 # ship with by default. This is the seed value for a channel's
@@ -1824,6 +1842,26 @@ class HandlerClass:
             return
         _save_fault_sound(widget.get_active_id())
 
+    def _load_version_label(self):
+        '''
+        Appends ", Machine S/N <n>" to each page's "REB O/S ..." label
+        once an owner has set a friendly serial number (SERIAL_PATH) -
+        same idea as REB_main.py's main-panel version label. Left as
+        shipped (no suffix) until a serial has been set.
+        '''
+        try:
+            with open(SERIAL_PATH, "r") as f:
+                serial = f.read().strip()
+        except OSError:
+            serial = ""
+        if not serial:
+            return
+        suffix = ", Machine S/N " + serial
+        for label_id in OS_VERSION_LABEL_IDS:
+            label = self.builder.get_object(label_id)
+            if label is not None:
+                label.set_text(label.get_text() + suffix)
+
     def _update_limit_jack_warnings(self):
         '''
         Recomputes every Limit_Jack_N_Warning label and returns whether
@@ -3072,6 +3110,10 @@ class HandlerClass:
         self._load_startup_file_check()
         self._load_done_sound()
         self._load_fault_sound()
+
+        # Append ", Machine S/N <n>" to each page's "REB O/S ..." label
+        # if this owner has set a friendly serial number.
+        self._load_version_label()
 
         # Restore the persisted Max Jog Speed (REBset_v1.ini) into the
         # Max Jog Speed spin button.
