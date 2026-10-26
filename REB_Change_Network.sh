@@ -35,7 +35,7 @@
 #   shut down for the jumper change. Every REB box powers the Pi and the
 #   card from one 24V -> 5V module, and switching the card on while the
 #   Pi runs restarts the Pi without a shutdown (found 14 October 2026 on
-#   S/N 3; S/N 1 and 2 are built the same way) - so the whole machine is
+#   S/N REB003; S/N 1 and 2 are built the same way) - so the whole machine is
 #   switched off, the jumpers moved, and switched on, and the Pi starts
 #   up already on 10.10.10.x. Afterwards 'check' shows which cards
 #   answer. If the Pi restarts at any point anyway, run this again with
